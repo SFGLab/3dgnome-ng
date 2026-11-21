@@ -1,4 +1,5 @@
-"""The genes of a cell type by name: the suggestions of the region field and the names of Ensembl ids."""
+"""The genes of a cell type by name. They give the suggestions of the region
+field and the names of Ensembl ids."""
 
 from __future__ import annotations
 
@@ -11,14 +12,14 @@ from .shapes import GeneHit
 
 @lru_cache(maxsize=None)
 def _by_name(table: Path) -> list[tuple[str, str, str, int]]:
-    """Each gene name of a gene table once: the name in capitals, the name, the chromosome and the TSS."""
+    """Returns each gene name of a gene table once, as the name in capitals, the name, the chromosome and the TSS."""
     genes = gene_table(table).drop_duplicates("name")
     return sorted((str(n).upper(), str(n), str(c), int(t)) for n, c, t in zip(genes["name"], genes["chrom"], genes["tss"], strict=True))
 
 
 def find(cell: CellType, text: str, limit: int) -> list[GeneHit]:
-    """Genes of a cell type whose name starts with the text, then those that hold it. Each has
-    its name, chromosome and TSS. A text under two letters finds none."""
+    """Finds the genes of a cell type whose name starts with the text, then those that hold it. Each
+    has its name, chromosome and TSS. A text under two letters finds none."""
     text = text.strip().upper()
     if len(text) < 2:
         return []
@@ -38,5 +39,5 @@ def _names(table: Path) -> dict[str, str]:
 
 
 def names_by_id(catalog: Catalog) -> dict[str, str]:
-    """The name of each gene by its Ensembl id without the version, from the gene table of the first cell type."""
+    """Returns the name of each gene by its Ensembl id without the version, from the gene table of the first cell type."""
     return _names(next(iter(catalog.cell_types.values())).path("genes"))

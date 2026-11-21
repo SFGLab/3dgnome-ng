@@ -4,7 +4,7 @@
  */
 :root {
   --bg: #FCFCFB;
-  /* A clickable element under the pointer: darker on a light page, lighter on a dark one. */
+  /* A clickable element under the pointer is darker on a light page and lighter on a dark one. */
   --hover: brightness(0.96);
   --surface: #FFFFFF;
   --panel: #F5F4F1;

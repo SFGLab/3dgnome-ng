@@ -10,8 +10,8 @@ from .shapes import Preview
 
 
 def around(cell: CellType, r: Region) -> Preview:
-    """The loops of each factor inside a region and its genes. A loop is the two anchor middles
-    and the count, then the outer edges, which decide whether a region holds the loop."""
+    """Returns the loops of each factor inside a region and its genes. A loop is the two anchor
+    middles and the count, then the outer edges, which decide whether a region holds the loop."""
     loops: dict[str, list[tuple[int, int, int, int, int]]] = {}
     for factor, name in cell.clusters.items():
         t = pd.read_csv(cell.root / name, sep=r"\s+", header=None, usecols=range(7), comment="#")

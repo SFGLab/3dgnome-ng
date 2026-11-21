@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
-/** A folder of src that must not import the folders named: the rule and its message. */
+/** Returns the rule and its message for a folder of src that must not import the given folders. */
 const apart = (folders, message) => ({
   'no-restricted-imports': ['error', { patterns: [{ group: folders.flatMap((f) => [`**/${f}`, `**/${f}/**`]), message }] }],
 })
@@ -31,8 +31,8 @@ export default tseslint.config(
       ],
     },
   },
-  // The folders of src import in one direction. A page puts the parts of the site together, and a
-  // part does not reach into another part or into a page.
+  // The folders of src import in one direction. A page puts the parts of the site together. A part
+  // does not import another part or a page.
   { files: ['src/job/**'], rules: apart(['model', 'pages'], `job/ does not import the form or a page. ${SHARED}`) },
   { files: ['src/model/**'], rules: apart(['job', 'pages'], `model/ does not import the job views or a page. ${SHARED}`) },
   { files: ['src/myjobs/**'], rules: apart(['job', 'model', 'pages'], `myjobs/ does not import the form, the job views or a page. ${SHARED}`) },

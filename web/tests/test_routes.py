@@ -1,9 +1,7 @@
-"""The addresses the site answers on.
+"""The addresses of the site.
 
-    pytest web/tests/test_routes.py
-
-The pages of the site, links in the wild and scripts call these addresses. A change of this list
-is a change of the site's interface and is made here on purpose.
+The pages of the site, links in the wild and scripts call these addresses. A change of this list is
+a change of the interface of the site and is made here on purpose.
 """
 
 from __future__ import annotations

@@ -33,7 +33,7 @@ const EXPRESSION: Group[] = [
   { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14), bar('ctcf', 0.23), bar('rnapii', 0.27)] },
 ]
 
-/** The runs of the three tools on one task, each as beads and seconds. A null time is a run that did not finish. */
+/** Returns the runs of the three tools on one task, each as beads and seconds. A null time is a run that did not finish. */
 const runs = (cudammc: [number, number], multimm: [number, number | null], ours: [number, number], note?: string): ToolRun[] => [
   { series: 'cudammc', name: 'cudaMMC', beads: cudammc[0], seconds: cudammc[1] },
   { series: 'multimm', name: 'MultiMM', beads: multimm[0], seconds: multimm[1], note },
@@ -78,7 +78,7 @@ const RUN_TIME: [string, string, 'seconds' | 'minutes', ToolRun[]][] = [
   ['One structure, whole genome', 'chr1 to chr22.', 'minutes', runs([458445, 1882.1], [1312597, null], [1312597, 2784.0], 'did not complete')],
 ]
 
-/** One structure of GM12878 chr1 from 10 Mb per tool: megabases, beads, seconds. The last is the whole chromosome. */
+/** One structure of GM12878 chr1 from 10 Mb per tool, as megabases, beads and seconds. The last is the whole chromosome. */
 const ONE_STRUCTURE: [Line['series'], string, [number, number, number][]][] = [
   ['cudammc', 'cudaMMC', [[1, 129, 6.5], [2, 448, 7.2], [5, 762, 8.9], [10, 2170, 13.7], [20, 7128, 25.5], [50, 14936, 53.3], [100, 20401, 79.4], [248, 50631, 194.8]]],
   ['multimm', 'MultiMM', [[1, 662, 7.3], [2, 1598, 8.2], [5, 2590, 8.5], [10, 6953, 15.8], [20, 15643, 33.9], [50, 36255, 97.6], [100, 56458, 189.7], [248, 124657, 853.1]]],

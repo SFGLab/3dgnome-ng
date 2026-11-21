@@ -9,7 +9,7 @@ import { ContactMapTab } from './ContactMapTab'
 
 const MAP = {
   bins: [11_500_000, 11_525_000, 11_550_000],
-  // Each map as the server sends it, each pair of bins once: row i from column i on.
+  // Each map as the server sends it, each pair of bins once, row i from column i on.
   upper: [[5, 2, 1], [6, 3], [7]],
   lower: [[9, 4, 1], [8, 2], [9]],
   upper_label: 'Hi-C of GM12878',
@@ -58,7 +58,7 @@ describe('ContactMapTab', () => {
       vi.unstubAllGlobals()
       return first.searchParams.get('res')
     }
-    // 20 Mb with the bases of its insertions, from a start off the grid: 801 bins at 25 kb.
+    // 20 Mb with the bases of its insertions, from a start off the grid, is 801 bins at 25 kb.
     expect(await asked('chr3:120184079-140189332')).toBe('25000')
     // 30 Mb is 1,200 bins at 25 kb and 600 at 50 kb.
     expect(await asked('chr3:120000000-150000000')).toBe('50000')

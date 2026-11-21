@@ -201,10 +201,10 @@ def _format(e: Editable, value: str) -> str:
 
 
 def validate_overrides(raw: dict[str, str]) -> dict[str, str]:
-    """Checks setting changes keyed section.key and returns them in the config's form.
+    """Checks setting changes keyed section.key and returns them in the form of the config.
 
     @param raw the changes from the form or an uploaded config
-    @return the changes, booleans written as yes or no
+    @return the changes, booleans as yes or no
     @raises OverrideError for a key off the list or a value outside its range
     """
     out = {}
@@ -254,8 +254,8 @@ def parse_ini(text: str) -> tuple[dict[str, str], list[str]]:
 
 
 def schema(cell_config: Path) -> list[SettingGroup]:
-    """The editable settings in groups, each with its type, default, the value of the cell
-    type's config, its range or choices and the text of `HELP`."""
+    """Returns the editable settings in groups, each with its type, default, the value of the config
+    of the cell type, its range or choices and the text of `HELP`."""
     rows = {(r.section, r.key): r for r in read_settings_md()}
     cp = configparser.ConfigParser(interpolation=None)
     cp.read(cell_config)

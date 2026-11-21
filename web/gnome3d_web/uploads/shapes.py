@@ -1,4 +1,4 @@
-"""The shapes of the record of an upload and of what the dialog is told about it."""
+"""The shapes of the record of an upload and of the answer the dialog gets about it."""
 
 from __future__ import annotations
 
@@ -44,5 +44,5 @@ class UploadResult(TypedDict):
     counts: bool
 
 
-# A loop of an upload inside a region: its two anchor middles and its count.
+# A loop of an upload inside a region, as its two anchor middles and its count.
 LoopDrawn = tuple[int, int, int]

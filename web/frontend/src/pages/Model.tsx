@@ -33,7 +33,7 @@ function goTo(url: string) {
   window.location.assign(served(url))
 }
 
-/** The form that starts a job: cell type and region, loops, variants, background and settings. */
+/** The form that starts a job, with cell type and region, loops, variants, background and settings. */
 export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => void }) {
   const [params] = useSearchParams()
   const catalog = useQuery(asked.catalog())
@@ -49,9 +49,9 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const cells = Object.keys(catalog.data?.cell_types ?? {})
   const lookup = ownCell ? form.own.loopsFrom || cells[0] || 'GM12878' : form.cell
   const region = useRegion(lookup, form.region)
-  // The loops stay drawn at the last region while new coordinates are read, so a drag of the
-  // region on them does not blank the picture. A region longer than the limit stays on them too,
-  // to be shortened there. Any other region the server refuses takes them away.
+  // The loops stay drawn at the last region while new coordinates are read. A drag of the region on
+  // them does not blank the picture. A region longer than the limit stays on them too, to be
+  // shortened there. Any other region the server refuses takes them away.
   const lastRegion = useRef<Region>()
   if (region.data) lastRegion.current = region.data
   const maxSpan = (catalog.data?.max_region_mb ?? 20) * 1e6
@@ -88,7 +88,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   }, [source, sourceJob.data, catalog.data, cellNames])
 
   // My jobs shows a job by its name, or by its cell type and region when it has none. Two jobs
-  // shown alike cannot be told apart there.
+  // shown alike cannot be distinguished there.
   const label = region.data ? `${form.cell} ${region.data.label.split(',')[0]}` : `${form.cell} ${form.region}`
   const shownAs = form.name.trim() || label
   const sameName = form.region.trim() !== '' && recentJobs().some((j) => (j.name || j.label) === shownAs)
@@ -110,7 +110,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     ) : null
 
   const cellType = catalog.data?.cell_types[form.cell]
-  // The hosted expression of the cell type, and of the sample of a hosted call set.
+  // The hosted expression of the cell type and of the sample of a hosted call set.
   const expressionOptions = useQuery({
     ...asked.expression(form.cell, form.svSet, form.sample),
     enabled: !ownCell && !!catalog.data?.cell_types[form.cell],

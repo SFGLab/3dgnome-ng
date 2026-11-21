@@ -1,11 +1,11 @@
 # The site and the engine in one container. Jobs run in the web process, WORKERS_PER_GPU at once on
-# each card of GPUS. Run from web/:
+# each card of GPUS. Run from web/.
 #   SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPUS=0,1 WORKERS_PER_GPU=2 \
 #     SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
-# SITE_ROOT holds data/, which the container reads, and results/, which it writes as SITE_USER. The
+# SITE_ROOT holds data/ for the container to read and results/ for it to write as SITE_USER. The
 # port is bound to the loopback of the host. A job that waits in the queue is lost when the
 # container stops. A path of the catalog must exist inside the container. A set kept elsewhere is
-# mounted below /data in an override file:
+# mounted below /data in an override file.
 #   services: { site: { volumes: ["/srv/tbooo/release:/data/svs/tbooo:ro"] } }
 name: gnome3d-site
 services:
@@ -22,7 +22,8 @@ services:
       WORKERS_PER_GPU: "${WORKERS_PER_GPU:-1}"
       WORKER_CORES: "${WORKER_CORES:-}"
       GPU_POOL_GIB: "${GPU_POOL_GIB:-}"
-      # The site does not start with this variable set and names GPUS and WORKERS_PER_GPU in its place.
+      # The site does not start with this variable set. Its message gives
+      # GPUS and WORKERS_PER_GPU in its place.
       GPU_SLOTS: "${GPU_SLOTS:-}"
       BASE_PATH: "${BASE_PATH:-}"
       RETENTION_DAYS: "${RETENTION_DAYS:-14}"

@@ -45,7 +45,7 @@ export function FileChip({ entry }: { entry: Entry }) {
   )
 }
 
-/** What a step takes: a sentence or two and the columns of the file on a line of their own. */
+/** The rule of a step, a sentence or two and the columns of the file on a line of their own. */
 export function Rule({ text, columns }: { text: string; columns?: string }) {
   return (
     <div className={cn('rule')}>
@@ -60,7 +60,7 @@ export function Rule({ text, columns }: { text: string; columns?: string }) {
   )
 }
 
-/** A step that takes one file: its rule, the file with its check, or a field to choose one, then what the step adds. */
+/** A step that takes one file. It has its rule, the file with its check or a field to choose one, then what the step adds. */
 export function OneFile({
   kind,
   rule,

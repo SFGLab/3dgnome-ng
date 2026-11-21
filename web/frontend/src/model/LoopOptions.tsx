@@ -11,8 +11,10 @@ const OPTIONS: [Factors | 'own', string, string][] = [
   ['own', 'Your own loops', 'Any loop set in BEDPE, for example ChIA-PET, HiChIP, Micro-C or Hi-C loop calls.'],
 ]
 
-/** Step 2, the loop set of the job. Own loops open the uploads. On your own cell type a listed
- * set comes from the cell type named under "Loops of". */
+/**
+ * Step 2, the loop set of the job. Own loops open the uploads. On your own cell type a listed set
+ * comes from the cell type chosen under "Loops of".
+ */
 export function LoopOptions({
   value,
   ownCell,

@@ -77,7 +77,7 @@
   font-size: 13px;
 }
 
-/* These pages have no side panel, so the reading column takes the left gutter itself. */
+/* These pages have no side panel and the reading column takes the left gutter itself. */
 :global(.doc-page).examples-page {
   padding-left: 48px;
 }

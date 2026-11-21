@@ -16,7 +16,7 @@ const WORDS: Record<string, string> = {
   done: 'Done',
 }
 
-/** The share of the bar each stage fills; modelling fills its share by structures written. */
+/** Returns the share of the bar each stage fills. Modelling fills its share by structures written. */
 function weights(hicdiffusion: boolean): [string, number][] {
   return hicdiffusion
     ? [
@@ -34,11 +34,11 @@ function weights(hicdiffusion: boolean): [string, number][] {
 
 
 /**
- * A queued or running job: the stage with its count, the bar and the stages, then the end of the
- * engine log, which follows its last line unless the reader has scrolled up. The stages are the
- * ones the job goes through, in order. A finished stage has a tick and the time it took, the
- * running one a spinner and its time so far, and a stage to come has neither. A waiting job has
- * no engine yet and no log.
+ * A queued or running job. It has the stage with its count, the bar and the stages, then the end of
+ * the engine log, which follows its last line unless the reader has scrolled up. The stages are the
+ * ones the job goes through, in order. A finished stage has a tick and the time it took and the
+ * running one a spinner and its time so far. A stage to come has neither. A waiting job has no
+ * engine yet and no log.
  */
 export function Progress({ summary }: { summary: Summary }) {
   const stage = summary.state === 'queued' ? 'queued' : (summary.stage ?? 'inputs')

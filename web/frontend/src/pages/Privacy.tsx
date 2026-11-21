@@ -20,7 +20,7 @@ const STORED: [string, string, string][] = [
   ['Server log', 'The IP address, the time and the address of each request, written by the web servers of the faculty for the operation and the security of the service.', 'set by the faculty'],
 ]
 
-/** The privacy notice: what the site stores, where, for how long and the rights under the GDPR. */
+/** The privacy notice, with the data the site stores, its place, its retention and the rights under the GDPR. */
 export function Privacy() {
   return (
     <DocPage title="Privacy" sections={SECTIONS} lead={<>This notice says what the site stores about you and your data, for how long and what your rights are under the General Data Protection Regulation of the EU, the GDPR.</>}>

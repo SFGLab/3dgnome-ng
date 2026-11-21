@@ -1,7 +1,7 @@
 """The HiCDiffusion step of a job, the contact map predicted from the haplotype's sequence.
 
 HiCDiffusion, Chiliński and Plewczynski 2024, runs in its own interpreter. Its package
-pins clash with the engine's. Four variables name its parts.
+pins clash with the engine's. Four variables give its parts.
 
 HICDIFFUSION_DIR     the checkout
 HICDIFFUSION_PYTHON  the command that starts its interpreter
@@ -36,10 +36,10 @@ MAP_FILE = "hicdiffusion.bedpe"
 
 
 def missing(env: Mapping[str, str] | None = None) -> list[str]:
-    """What the step lacks on this server, empty when it can run.
+    """Returns the parts the step lacks on this server, empty when it can run.
 
-    @param env the environment to read, the process's own by default
-    @return one phrase per variable that is not set or names a part that is not there
+    @param env the environment to read, the one of the process by default
+    @return one phrase per variable that is not set or whose part is not there
     """
     env = os.environ if env is None else env
     out = [f"{k} is not set" for k in VARIABLES if not env.get(k)]
@@ -59,13 +59,13 @@ def missing(env: Mapping[str, str] | None = None) -> list[str]:
 
 
 def predict(chrom: str, start: int, svs: list, log: Path, env_extra: Mapping[str, str] | None = None) -> np.ndarray:  # type: ignore[type-arg]
-    """The predicted map of the 2 Mb window from `start` on the haplotype.
+    """Predicts the map of the 2 Mb window from `start` on the haplotype.
 
     @param chrom the chromosome of the window
-    @param start the reference position the window begins at, 0 based
-    @param svs the haplotype's structural variants, applied to the reference sequence
-    @param log the file that receives the model's output
-    @param env_extra added to the model's environment, the GPU of a queue slot for example
+    @param start the reference position of the start of the window, 0 based
+    @param svs the structural variants of the haplotype, applied to the reference sequence
+    @param log the file that receives the output of the model
+    @param env_extra added to the environment of the model, the GPU of a queue slot for example
     @return 256 by 256 bins of 8,192 bp on the log of one plus the count
     """
     window = haplotype_window(Reference(Path(os.environ["REFERENCE_FASTA"])), chrom, start, svs)
@@ -84,12 +84,14 @@ def predict(chrom: str, start: int, svs: list, log: Path, env_extra: Mapping[str
 
 
 def write_map(path: Path, chrom: str, start: int, cond: np.ndarray) -> None:  # type: ignore[type-arg]
-    """Write the predicted map as bin pairs, one row per pair of the upper half and the diagonal.
+    """Writes the predicted map as bin pairs, one row per pair of the upper half and the diagonal.
 
     The columns are those of a contact BEDPE. The seventh is the predicted count, the mean of the
     two halves of the prediction.
 
-    @param start the position the window begins at, in the haplotype's coordinates
+    @param path the file to write
+    @param chrom the chromosome of the window
+    @param start the position of the start of the window, in the coordinates of the haplotype
     @param cond the prediction on the log of one plus the count
     """
     counts = np.expm1(np.clip(cond, 0, None))
@@ -100,7 +102,7 @@ def write_map(path: Path, chrom: str, start: int, cond: np.ndarray) -> None:  # 
 
 
 def read_map(path: Path) -> tuple[str, int, int, np.ndarray]:  # type: ignore[type-arg]
-    """The map `write_map` wrote.
+    """Reads a map of `write_map`.
 
     @return the chromosome, the start of the window, the bin and the symmetric counts
     """

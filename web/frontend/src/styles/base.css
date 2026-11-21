@@ -45,7 +45,8 @@ pre {
   cursor: pointer;
 }
 
-/* A link drawn with the buttons that read as links has their look: no line until the pointer is on it. */
+/* A link drawn with the buttons that read as links has their look, with no line
+   until the pointer is on it. */
 a.link-button {
   text-decoration: none;
 }
@@ -179,9 +180,10 @@ a:not(.button, .button-link, .cite-button, .chip-button, .action, .brand, .recen
   }
 }
 
-/* The raised NG of the site's name. Its capitals end level with the capitals of the name: it
-   stays on the name's baseline and is lifted by the height of the name's capitals less its own.
-   The capitals of Inter are 0.727 em tall, `--cap`. `--ng` is its size against the name's. */
+/* The raised NG of the site's name. Its capitals end level with the capitals
+   of the name. It stays on the baseline of the name and is lifted by the
+   height of the capitals of the name less its own. The capitals of Inter are
+   0.727 em tall, `--cap`. `--ng` is its size against the size of the name. */
 sup.ng {
   --ng: 0.42;
   --cap: 0.727;

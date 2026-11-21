@@ -1,9 +1,9 @@
 import type { Factors } from './form'
 
 /**
- * The examples: each a request that fills the form and the tab or second loop set its finished job
- * opens on. Each description is read from the hosted data and must be checked again when the data
- * changes.
+ * The examples. Each is a request that fills the form, with the tab or the
+ * second loop set of its finished job. Each description is read from the
+ * hosted data and must be checked again when the data changes.
  */
 export type Example = {
   id: string

@@ -132,8 +132,8 @@ describe('My jobs', () => {
     expect(dialog).toHaveTextContent('The jobs stay on this computer and the code keeps working on the others.')
     expect(checkCopy(container)).toEqual([])
     expect(checkCopy(dialog)).toEqual([])
-    // Stop syncing is the red button at the end, where a dialog has its action. Keep syncing is
-    // plain, at the place of Cancel, and has the focus. It closes the dialog and changes nothing.
+    // Stop syncing is the red button at the end, the place of the action of a dialog. Keep syncing
+    // is plain, at the place of Cancel. It has the focus, closes the dialog and changes nothing.
     const [keep, stop] = within(dialog).getAllByRole('button').slice(-2)
     expect(keep).toHaveTextContent('Keep syncing')
     expect(keep).toHaveClass('secondary')

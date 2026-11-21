@@ -1,7 +1,4 @@
-"""The app serves the frontend build for client routes and keeps its API and job routes.
-
-    pytest web/tests/test_frontend.py
-"""
+"""The app serves the frontend build for client routes and keeps its API and job routes."""
 
 from __future__ import annotations
 
@@ -97,7 +94,7 @@ def test_returns_the_app(site: SimpleNamespace) -> None:
     assert r.status_code == 503 and "The frontend is not built" in r.text, "without a build the app says so: " + str(r.status_code)
     assert bare.get("/api/catalog").status_code == 200, "without a build the API still answers"
 
-    # The site under a prefix: BASE_PATH on the server and a build made for the same path.
+    # The site under a prefix, with BASE_PATH on the server and a build made for the same path.
     (dist / "index.html").write_text('<html><body>FRONTEND-OK<script src="/new/assets/app.js"></script></body></html>')
     os.environ.update(FRONTEND_DIST=str(dist), BASE_PATH="/new/")
     under = TestClient(create_app())

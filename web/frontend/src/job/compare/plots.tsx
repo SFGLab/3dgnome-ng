@@ -6,7 +6,7 @@ const cn = scoped(sheet)
 
 const PLOT = { w: 340, h: 286, left: 48, right: 12, top: 12, bottom: 56 }
 
-/** The ticks of an axis from lo to hi at a round step, six at most. */
+/** Returns the ticks of an axis from lo to hi at a round step, six at most. */
 function ticks(lo: number, hi: number): number[] {
   const step = [0.5, 1, 2, 5, 10, 20, 50, 100].find((s) => (hi - lo) / s <= 5) ?? 100
   const out: number[] = []
@@ -18,7 +18,7 @@ type Scale = (v: number) => number
 
 export type Key = [className: string, text: string]
 
-/** The y axis of a plot with its ticks and its title, and the key of the marks below the plot. */
+/** The y axis of a plot with its ticks and its title and the key of the marks below the plot. */
 function Sides({ yr, yTitle, capped, fy, keys }: { yr: [number, number]; yTitle: string; capped?: boolean; fy: Scale; keys: Key[] }) {
   const { h, left, top, bottom } = PLOT
   const middle = (top + h - bottom) / 2
@@ -97,15 +97,17 @@ export function Frame({
   )
 }
 
-/** The value a share of the way through sorted values, between two of them where it falls there. */
+/** Returns the value a share of the way through sorted values, between two of them when it falls between. */
 function quantile(sorted: number[], share: number): number {
   const at = (sorted.length - 1) * share
   const low = Math.floor(at)
   return sorted[low] + (sorted[Math.min(low + 1, sorted.length - 1)] - sorted[low]) * (at - low)
 }
 
-/** The distance of one gene in the structures of two jobs: a box from the first to the third
- * quartile with the median, whiskers to the least and the greatest value and a point for each structure. */
+/**
+ * The distance of one gene in the structures of two jobs. It has a box from the first to the third quartile
+ * with the median, whiskers to the least and the greatest value and a point for each structure.
+ */
 export function BoxPlot({ gene, names, a, b }: { gene: string; names: [string, string]; a: number[]; b: number[] }) {
   const { w, h, left, right, top, bottom } = PLOT
   const hi = Math.max(1, Math.ceil(Math.max(...a, ...b) * 1.05))

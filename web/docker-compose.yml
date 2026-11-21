@@ -1,4 +1,4 @@
-# Web, one worker and Redis. Run from web/:
+# Web, one worker and Redis. Run from web/.
 #   DATA_DIR=/srv/gnome3d/data RESULTS_DIR=/srv/gnome3d/results docker compose up -d --build
 # The worker asks for one GPU. On a machine without one, drop the deploy block and set the configs
 # of the cell types to the serial executor, see design/website/deployment.md.

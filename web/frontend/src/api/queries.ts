@@ -1,6 +1,7 @@
 /**
- * One definition for each question the pages ask the server: its key in the cache and its call.
- * A page spreads a definition into useQuery and adds what is its own, such as when to ask again.
+ * One definition for each question the pages ask the server, with its key
+ * in the cache and its call. A page spreads a definition into useQuery and
+ * adds its own options, such as the time to ask again.
  */
 import { queryOptions } from '@tanstack/react-query'
 import type { ApiError } from './http'
@@ -26,7 +27,7 @@ export const asked = {
   compareExpression: (a: string, b: string, shared: boolean) => queryOptions({ queryKey: ['compare-expression', a, b, shared], queryFn: () => compareExpression(a, b, shared) }),
 }
 
-/** The questions about one job. */
+/** Returns the questions about one job. */
 export const askedOf = (job: JobApi) => ({
   summary: () => queryOptions({ queryKey: ['summary', job.base], queryFn: job.summary }),
   structure: (i: number) => queryOptions({ queryKey: ['structure', job.base, i], queryFn: () => job.structure(i) }),

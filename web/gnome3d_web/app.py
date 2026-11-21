@@ -1,4 +1,4 @@
-"""The web app: the routes of every part of the site and the built frontend."""
+"""The web app. It has the routes of every part of the site and the built frontend."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ from .variants import routes as variants
 
 
 def interface() -> FastAPI:
-    """The app with every route and no site behind it. It describes the interface of the site at
-    /openapi.json, and the types of the frontend are generated from that description."""
+    """Returns the app with every route and no site behind it. It describes the interface of the
+    site at /openapi.json. The types of the frontend are generated from that description."""
     app = FastAPI(title="3D-GNOME")
     handle_errors(app)
     for part in (jobs.router, uploads.router, variants.router, catalog.router, engine.router, results.job_routes("jobs"), results.job_routes("p"), results.router, lists.router):

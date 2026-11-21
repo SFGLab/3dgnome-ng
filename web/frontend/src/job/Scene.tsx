@@ -11,12 +11,14 @@ import sheet from './job.module.css'
 const cn = scoped(sheet)
 
 const BACKGROUND = '#FFFFFF'
-/** How solid the chain outside the part in focus is drawn. */
+/** The opacity of the chain outside the part in focus. */
 const GHOST = 0.2
-/** The hovered bead's colour, one no mark uses. */
+/** The colour of the hovered bead, one no mark uses. */
 const HOVER = '#2A78D6'
-/** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
- * of the bead under it and the hover would flicker between the two. */
+/**
+ * Takes a mark drawn over the chain out of the pointer events. The pointer would hit the mark
+ * instead of the bead under it and the hover would flicker between the two.
+ */
 const noRaycast = () => null
 /**
  * The labels over the canvas take no pointer events. drei's `Html` applies its `pointerEvents` prop
@@ -29,9 +31,9 @@ const MARK_STYLE = { pointerEvents: 'none' } as const
  */
 const MARK_LAYER: [number, number] = [1, 0]
 /**
- * Hover and pick by the screen: every bond is projected as the tube it is drawn as and the front
- * tube under the cursor gives the bead. No hover while a drag rotates the view. A click is a press
- * and release that hardly moved.
+ * Hover and pick by the screen. Every bond is projected as its drawn tube and the front tube under
+ * the cursor gives the bead. No hover while a drag rotates the view. A click is a press and release
+ * that hardly moved.
  */
 function Picker({
   points,
@@ -114,7 +116,7 @@ function Picker({
 
 export type Marker = { label: string; at: [number, number, number] }
 const NO_FOCUS: [number, number][] = []
-/** `png` gives the view as a picture with its marks drawn on it, and `caption` in its lower left corner. */
+/** `png` gives the view as a picture with its marks drawn on it and `caption` in its lower left corner. */
 export type SceneHandle = { reset: () => void; png: (caption?: string) => string | null }
 
 function CameraSync({ link, id }: { link: CameraLink; id: string }) {
@@ -148,7 +150,7 @@ function CameraLight() {
   return <directionalLight ref={light} intensity={1.6} />
 }
 
-/** Fog from the structure's middle to its far side, kept there as the camera zooms. */
+/** Fog from the middle of the structure to its far side, kept there as the camera zooms. */
 function DepthFog({ radius }: { radius: number }) {
   const { scene } = useThree()
   useEffect(() => {
@@ -171,7 +173,7 @@ type Matrices = { joints: THREE.Matrix4[]; tubes: THREE.Matrix4[] }
 /** An instance drawn at no size is not drawn. */
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0)
 
-/** The place of every bead's sphere and every bond's tube. */
+/** Returns the place of the sphere of every bead and of the tube of every bond. */
 function chainMatrices(points: [number, number, number][]): Matrices {
   const q = new THREE.Quaternion()
   const up = new THREE.Vector3(0, 1, 0)

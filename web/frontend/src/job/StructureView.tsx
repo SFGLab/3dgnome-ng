@@ -24,8 +24,10 @@ type Props = {
   mode: Mode
   onMode: (m: Mode) => void
   markers?: Marker[]
-  /** The beads of a selection, a gene's promoter and enhancer or a measured pair. A short
-   * stretch of the chain at each stays solid and the rest is drawn see through. */
+  /**
+   * The beads of a selection, the promoter and the enhancer of a gene or a measured pair. A short
+   * stretch of the chain at each stays solid and the rest is drawn see through.
+   */
   focusBeads?: number[]
   onPickBead?: (bead: number) => void
   /** The genomic position of the chain under the pointer, null when the pointer leaves it. */
@@ -45,21 +47,21 @@ const MODES: [Mode, string][] = [
 ]
 const NO_BEADS: number[] = []
 
-/** The Structure tab's 3D view: toolbar, coloured chain, hover box, legend and caption. */
+/** The 3D view of the Structure tab, with the toolbar, the coloured chain, the hover box, the legend and the caption. */
 export function StructureView({ structure, annotations, region, chrom = '', index, total, mode, onMode, markers, focusBeads = NO_BEADS, onPickBead, onHoverPosition, above, focusSpan = null, toolbarStart, toolbarEnd }: Props) {
   const scene = useRef<SceneHandle>(null)
   const box = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<HoverInfo | null>(null)
-  // The focus follows the pointer with a short delay and leaves with a longer one, so a pointer
-  // that crosses the model does not flash the whole chain.
+  // The focus follows the pointer with a short delay and leaves with a longer one. A pointer that
+  // crosses the model does not flash the whole chain.
   const [held, setHeld] = useState<number | null>(null)
   const over = hover?.index ?? null
   useEffect(() => {
     const t = setTimeout(() => setHeld(over), over === null ? 250 : 120)
     return () => clearTimeout(t)
   }, [over])
-  // Keyed on the beads' numbers: a parent passes a new array each render and a new focus would
-  // recolour the whole chain on every pointer move.
+  // Keyed on the numbers of the beads. A parent passes a new array each render and a new focus
+  // would recolour the whole chain on every pointer move.
   const beadsKey = focusBeads.join(',')
   const focus = useMemo(() => {
     const n = structure.chain.length
@@ -70,7 +72,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
   }, [structure, beadsKey, held, focusSpan?.[0], focusSpan?.[1]]) // eslint-disable-line react-hooks/exhaustive-deps
   const palette = useMemo(readPalette, [])
   const points = useMemo(() => structure.chain.map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure])
-  // Keyed on the region's numbers: a parent passes a new array each render and a new colour
+  // Keyed on the numbers of the region. A parent passes a new array each render and a new colour
   // array would rebuild every tube of the chain on every hover.
   const colors = useMemo(
     () => chainColors(structure, annotations, region, mode, palette),
@@ -121,7 +123,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           ))}
         </div>
         {toolbarEnd}
-        {/* One group, so the three wrap together and none is left alone on a row. */}
+        {/* One group. The three wrap together and none is left alone on a row. */}
         <div className={cn('tool-group')}>
         <button type="button" className={cn('icon-tool')} aria-label="Reset view" onClick={() => scene.current?.reset()}>
           <RotateCcw size={15} aria-hidden />

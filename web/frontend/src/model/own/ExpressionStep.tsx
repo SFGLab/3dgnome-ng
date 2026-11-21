@@ -6,7 +6,7 @@ import sheet from './owndata.module.css'
 
 const cn = scoped(sheet)
 
-/** The expression step: a table of genes by samples, the samples the job takes and what its values are. */
+/** The expression step, with a table of genes by samples, the samples the job takes and the kind of its values. */
 export function ExpressionStep({
   table,
   samples,

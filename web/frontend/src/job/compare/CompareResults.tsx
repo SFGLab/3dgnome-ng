@@ -12,7 +12,7 @@ import sheet from '../job.module.css'
 
 const cn = scoped(sheet)
 
-/** The whole number an axis reaches to, one at least. */
+/** Returns the whole number an axis reaches, one at least. */
 const reach = (values: number[]) => Math.max(1, Math.ceil(Math.max(0, ...values.map(Math.abs))))
 
 type Row = Compare['rows'][number]
@@ -21,9 +21,9 @@ type Tab = 'distance' | 'expression'
 type Fig = 'box' | 'scatter' | 'volcano'
 
 /**
- * What changed between two jobs, under their structures: the tables of every gene, one tab for
- * the 3D distance and one for the expression, and beside them the figures, each saved as a PNG by
- * its button, with the main values under them. The other job is compared against this one.
+ * The changes between two jobs, under their structures. It has the tables of every gene, one tab
+ * for the 3D distance and one for the expression. The figures are beside them, each saved as a PNG
+ * by its button, with the main values under them. The other job is compared against this one.
  */
 export function CompareResults({
   urls,

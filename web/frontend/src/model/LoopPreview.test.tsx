@@ -77,15 +77,15 @@ describe('LoopPreview', () => {
     )
     await screen.findByText('2 CTCF loops')
     const svg = container.querySelector('svg')!
-    // The view is 3.3 Mb over 780 units, so 78 px are 330 kb.
+    // The view is 3.3 Mb over 780 units and 78 px are 330 kb.
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 780, height: 150, right: 780, bottom: 150, x: 0, y: 0, toJSON: () => ({}) })
     const end = screen.getByRole('slider', { name: 'End of the region' })
     expect(end).toHaveAttribute('aria-valuenow', '12600000')
-    // jsdom's pointer events carry no position, so mouse events of the same names stand in.
+    // The pointer events of jsdom have no position. Mouse events of the same names stand in.
     const at = (el: Element, type: string, clientX: number) => fireEvent(el, new MouseEvent(type, { clientX, bubbles: true }))
     at(end, 'pointerdown', 520)
     at(end, 'pointermove', 442)
-    // While the edge moves the count follows it: the second CTCF loop ends at 12.4 Mb.
+    // While the edge moves the count follows it. The second CTCF loop ends at 12.4 Mb.
     expect(screen.getByText('1 CTCF loop')).toBeInTheDocument()
     expect(onRegion).not.toHaveBeenCalled()
     at(end, 'pointerup', 442)
@@ -111,7 +111,7 @@ describe('LoopPreview', () => {
     const svg = container.querySelector('svg')!
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 780, height: 150, right: 780, bottom: 150, x: 0, y: 0, toJSON: () => ({}) })
     const at = (el: Element, type: string, clientX: number) => fireEvent(el, new MouseEvent(type, { clientX, bubbles: true }))
-    // The end is dragged to the edge of the view, 1.1 Mb further, and stops 1.5 Mb after the start.
+    // The end is dragged to the edge of the view, 1.1 Mb further. It stops 1.5 Mb after the start.
     const end = screen.getByRole('slider', { name: 'End of the region' })
     at(end, 'pointerdown', 520)
     at(end, 'pointermove', 780)
@@ -142,13 +142,13 @@ describe('LoopPreview', () => {
     const svg = container.querySelector('svg')!
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 780, height: 150, right: 780, bottom: 150, x: 0, y: 0, toJSON: () => ({}) })
     const at = (el: Element, type: string, clientX: number) => fireEvent(el, new MouseEvent(type, { clientX, bubbles: true }))
-    // An edge of the region moves inwards alone: a drag outwards leaves the region as it is.
+    // An edge of the region moves inwards alone. A drag outwards leaves the region as it is.
     const end = screen.getByRole('slider', { name: 'End of the region' })
     at(end, 'pointerdown', 500)
     at(end, 'pointermove', 700)
     at(end, 'pointerup', 700)
     expect(onRegion).not.toHaveBeenCalled()
-    // 780 units are 4.5 Mb, so 130 units inwards are 750 kb.
+    // 780 units are 4.5 Mb and 130 units inwards are 750 kb.
     at(end, 'pointerdown', 500)
     at(end, 'pointermove', 370)
     at(end, 'pointerup', 370)

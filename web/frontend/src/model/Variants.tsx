@@ -15,7 +15,7 @@ type Props = {
   vcfUpload: UploadResult | null
   /** Sex, population and parents of the call set's samples, for a call set that has them. */
   sampleTable?: SampleRow[]
-  /** False until step 1 has a region. The variants are shown for a region, so the button waits for one. */
+  /** False until step 1 has a region. The variants are shown for a region and the button waits for one. */
   hasRegion?: boolean
   onChange: (patch: Partial<FormState>) => void
   onOpen: (mode: 'hosted' | 'upload', file: File | null) => void
@@ -24,14 +24,16 @@ type Props = {
 /** A call set with more samples than this gets a field to type in. */
 const LONG_LIST = 60
 
-/** Population, superpopulation and sex of a sample, the known ones. */
+/** Returns the population, the superpopulation and the sex of a sample, the known ones. */
 const describe = (r: SampleRow) => [r.population, r.superpopulation, r.sex].filter(Boolean).join(', ')
 
 /** A population of this many samples or fewer is listed whole. */
 const LISTED = 12
 
-/** The sample of a large call set, typed with the browser's own suggestions. The form takes the
- * sample once the text names one of the set's samples and has none while it does not. */
+/**
+ * The sample of a large call set, typed with the suggestions of the browser. The form takes the
+ * sample once the text is the name of a sample of the set and has none while it is not.
+ */
 function SampleSearch({ samples, sample, table, onChange, onText }: { samples: string[]; sample: string; table: Map<string, SampleRow>; onChange: (sample: string) => void; onText: (text: string) => void }) {
   const [text, setText] = useState(sample)
   useEffect(() => {

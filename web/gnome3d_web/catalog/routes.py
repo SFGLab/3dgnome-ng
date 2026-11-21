@@ -1,4 +1,5 @@
-"""The routes of the form: the catalog, the genes, a region, its hosted loops, the samples and the expression."""
+"""The routes of the form. They give the catalog, the genes, a region, its hosted
+loops, the samples and the expression."""
 
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ def api_catalog(site: Here) -> CatalogInfo:
 
 @router.get("/api/genes", response_model=list[GeneHit])
 def api_genes(site: Here, cell: str, q: str, limit: int = 8) -> JSONResponse:
-    """The suggestions of the region field."""
+    """Returns the suggestions of the region field."""
     return JSONResponse(genes.find(site.cell(cell), q, limit))
 
 
@@ -71,7 +72,7 @@ def api_preview(site: Here, cell: str, region: str) -> JSONResponse:
 
 @router.get("/api/sv_sets/{name}/samples", response_model=SampleTable)
 def api_sv_samples(site: Here, name: str) -> JSONResponse:
-    """Sex, population and parents of each sample of a call set that has the table."""
+    """Returns the sex, the population and the parents of each sample of a call set that has the table."""
     sv = site.catalog.sv_sets.get(name)
     if sv is None or sv.samples_table is None:
         return JSONResponse({"error": f"no sample table for {name!r}"}, 404)
@@ -80,7 +81,7 @@ def api_sv_samples(site: Here, name: str) -> JSONResponse:
 
 @router.get("/api/expression", response_model=ExpressionOptions)
 def api_expression(site: Here, cell: str, sv_set: str = "", sample: str = "") -> JSONResponse:
-    """The hosted expression a job of this cell type, and of this sample of a call set, can take."""
+    """Returns the hosted expression that a job of this cell type and of this sample of a call set can take."""
     catalog = site.catalog
     site.cell(cell)
     known = sv_set in catalog.sv_sets and sample in catalog.sv_sets[sv_set].samples

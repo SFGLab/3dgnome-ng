@@ -1,12 +1,14 @@
-/** The loops of a job as the loop views show them: the zoom, the ticks, the text of a loop and whether two are one. */
+/** The loops of a job as the loop views show them, with the zoom, the ticks, the text of a loop and the test that two are one. */
 import type { Loop } from '../api'
 import { bp, kb } from '../lib/format'
 
 /** The shortest part a zoom leaves, in bp. */
 const MIN_PART = 10_000
 
-/** A part of `bounds` scaled by `factor` about the position `at`, which keeps its place in the
- * part. A part as long as the bounds is the bounds. */
+/**
+ * Returns a part of `bounds` scaled by `factor` about the position `at`, which keeps its place in
+ * the part. A part as long as the bounds is the bounds.
+ */
 export function zoomed(part: [number, number], bounds: [number, number], at: number, factor: number): [number, number] {
   const full = bounds[1] - bounds[0]
   const width = Math.min(Math.max((part[1] - part[0]) * factor, Math.min(MIN_PART, full)), full)
@@ -15,13 +17,13 @@ export function zoomed(part: [number, number], bounds: [number, number], at: num
   return [Math.round(start), Math.round(start + width)]
 }
 
-/** One loop in words: its factor, its two anchors, its span and its PET count. */
+/** Returns one loop in words, with its factor, its two anchors, its span and its PET count. */
 export const describeLoop = (l: Loop) => `${l.factor} loop, ${l.chrom}:${bp(l.a[0])}-${bp(l.a[1])} to ${l.chrom}:${bp(l.b[0])}-${bp(l.b[1])}, ${kb(l.span)}, ${l.pets} PET${l.pets === 1 ? '' : 's'}`
 
-/** Whether two loops are the same loop, by factor and anchors. */
+/** Returns true for two loops that are the same loop, by factor and anchors. */
 export const sameLoop = (a: Loop, b: Loop) => a.factor === b.factor && a.a[0] === b.a[0] && a.a[1] === b.a[1] && a.b[0] === b.b[0] && a.b[1] === b.b[1]
 
-/** About five round positions across a span, in bp. */
+/** Returns about five round positions across a span, in bp. */
 export function ticks(start: number, end: number): number[] {
   const rough = (end - start) / 5
   const power = 10 ** Math.floor(Math.log10(Math.max(rough, 1)))

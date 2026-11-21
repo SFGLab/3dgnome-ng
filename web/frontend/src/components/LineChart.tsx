@@ -19,7 +19,7 @@ const TIME_TICKS: [number, string][] = [
   [3600, '1 h'],
 ]
 
-/** Seconds as the reader says them, seconds under a minute and minutes above. */
+/** Returns seconds in the words of a reader, seconds under a minute and minutes above. */
 function duration(seconds: number): string {
   return seconds < 60 ? `${seconds.toFixed(seconds < 10 ? 1 : 0)} s` : `${(seconds / 60).toFixed(1)} min`
 }
@@ -114,7 +114,8 @@ export function LineChart({
             )),
           )}
           {ends.map(({ l, y }) => {
-            // Names sit in one column right of the plot. A line that ends short of it gets a leader.
+            // The names are in one column right of the plot. A line that
+            // ends short of it gets a leader.
             const last = l.points[l.points.length - 1]
             const edge = W - PAD.right + 6
             return (

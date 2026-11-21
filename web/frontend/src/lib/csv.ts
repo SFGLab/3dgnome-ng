@@ -4,13 +4,13 @@ import { saveBlob } from './download'
 
 export type Cell = string | number | null | undefined
 
-/** A cell as CSV writes it: in quotes when it holds a comma, a quote or a line break. */
+/** Returns a cell in the form of CSV, in quotes when it holds a comma, a quote or a line break. */
 const cell = (v: Cell) => {
   const text = v === null || v === undefined ? '' : String(v)
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
-/** The text of a CSV file with a head line and one line for each row. */
+/** Returns the text of a CSV file with a head line and one line for each row. */
 export function csvText(head: string[], rows: Cell[][]): string {
   return [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n'
 }

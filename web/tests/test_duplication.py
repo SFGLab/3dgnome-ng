@@ -1,7 +1,4 @@
-"""A tandem duplication through the lift, the contacts, the sequence and the rules.
-
-    pytest web/tests/test_duplication.py
-"""
+"""A tandem duplication through the lift, the contacts, the sequence and the rules."""
 
 from __future__ import annotations
 
@@ -76,7 +73,7 @@ def test_the_sequence_has_the_duplicated_bases_twice(shared: SimpleNamespace) ->
 
 
 def test_the_loop_inside_is_there_twice_the_copy_one_length_on() -> None:
-    # Two loops: one inside the duplicated interval, one wholly before it.
+    # Two loops, one inside the duplicated interval and one wholly before it.
     clusters = [
         ["chr1", 10_000, 10_500, "chr1", 20_000, 20_500, "R", "L", 10],
         ["chr1", 52_000, 52_500, "chr1", 58_000, 58_500, "R", "L", 8],

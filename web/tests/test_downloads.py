@@ -1,7 +1,4 @@
-"""The files a visitor downloads from a job state no path of the server.
-
-    pytest web/tests/test_downloads.py
-"""
+"""The files a visitor downloads from a job state no path of the server."""
 
 from __future__ import annotations
 
@@ -40,8 +37,8 @@ def site(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
     vcf = c.post("/api/uploads", data={"kind": "vcf"}, files={"file": ("demo.vcf.gz", (data / "svs" / "demo.vcf.gz").read_bytes())}).json()["id"]
     private = c.post("/api/jobs", data={**FORM, "sample": "P1", "haplotype": "0", "vcf_upload": vcf}).json()["url"]
     shared = c.post("/api/jobs", data={**FORM, "expression": "LINES"}).json()["url"]
-    # An engine states the files it reads in its log, and a failed job keeps the end of the log
-    # and the error in its status.
+    # An engine states the files it reads in its log. A failed job keeps the end of the log and the
+    # error in its status.
     job = root / "results" / "private" / private.split("/")[-1]
     with (job / "engine.log").open("a") as log:
         log.write(f"config {job}/inputs/config.ini\n")

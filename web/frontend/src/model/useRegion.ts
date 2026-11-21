@@ -12,7 +12,7 @@ export function useDebounced<T>(value: T, ms: number): T {
   return v
 }
 
-/** The region field, resolving a gene name or coordinates through the API as the user types. */
+/** Resolves the text of the region field, a gene name or coordinates, through the API as the user types. */
 export function useRegion(cell: string, text: string) {
   const q = useDebounced(text.trim(), 250)
   return useQuery({ ...asked.region(cell, q), enabled: q.length > 1, retry: false })

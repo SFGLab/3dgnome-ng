@@ -32,8 +32,10 @@ type Props = {
   selected?: string | null
 }
 
-/** The Genes tab: every marked gene with its nearest enhancer, the 3D distance over the
- * ensemble and the loop joining them and a histogram of the distances. */
+/**
+ * The Genes tab. It has every marked gene with its nearest enhancer, the 3D distance over the
+ * ensemble and the loop joining them and a histogram of the distances.
+ */
 export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, filter, onSelect, selected }: Props) {
   const [text, setText] = useState(filter)
   const [chip, setChip] = useState<Chip>('all')

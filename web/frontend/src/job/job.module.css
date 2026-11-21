@@ -1,7 +1,7 @@
 .job-page {
   display: grid;
   grid-template-columns: 320px 1fr;
-  /* The screen less the header, 59px, and the footer, 55px. */
+  /* The screen less the header of 59px and the footer of 55px. */
   min-height: calc(100vh - 114px);
 }
 
@@ -172,7 +172,7 @@
   padding: 0;
 }
 
-/* The structures sit inside their folder: set in from it, with a line down the folder's side. */
+/* The structures are inside their folder, set in from it, with a line down the side of the folder. */
 .files .models > ul {
   max-height: 190px;
   overflow-y: auto;
@@ -312,7 +312,7 @@
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  /* Named with the panel, so it wins over the rule that hides the button on a wide screen. */
+  /* The selector has the panel. It wins over the rule that hides the button on a wide screen. */
   .job-side .side-fold-toggle {
     display: inline-flex;
   }
@@ -327,8 +327,8 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  /* The toolbar lays itself out by the width of the view, not of the screen: the view is
-     narrow beside the cards on a wide screen too. */
+  /* The toolbar is laid out by the width of the view, not of the screen. The view is narrow beside
+     the cards on a wide screen too. */
   container: view / inline-size;
 }
 
@@ -416,7 +416,7 @@
   overflow: hidden;
 }
 
-/* With the loops over it the box is as tall as the screen leaves, so both are seen at once. */
+/* With the loops over it the box is as tall as the screen leaves. Both are seen at once. */
 .structure-view.with-above .view-box {
   height: clamp(380px, calc(100vh - 470px), 640px);
 }
@@ -916,7 +916,7 @@
   margin-bottom: 10px;
 }
 
-/* The controls of the toolbar share one height, so their boxes line up. */
+/* The controls of the toolbar share one height and their boxes line up. */
 .map-toolbar > select,
 .map-toolbar :global(.segmented),
 .locus-input {
@@ -1369,8 +1369,8 @@
   color: #FFFFFF;
 }
 
-/* The change of expression of two jobs: a line on what was computed, then the plot beside the table. */
-/* Under the two structures: the values and the tables, and the figures in a column beside them. */
+/* The change of expression of two jobs, a line on what was computed and then the plot beside the table. */
+/* Under the two structures are the values and the tables, with the figures in a column beside them. */
 .compare-results {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
@@ -1379,7 +1379,7 @@
   margin-top: 20px;
 }
 
-/* The figures are an accordion: one is open at a time and the rest show their titles. */
+/* The figures are an accordion. A closed figure shows its title. */
 .compare-figures {
   display: flex;
   flex-direction: column;
@@ -1458,7 +1458,7 @@
   min-width: 0;
 }
 
-/* A table keeps to its column: a long head wraps and the rest scrolls. */
+/* A table keeps to its column. A long head wraps and the rest scrolls. */
 .compare-scroll {
   overflow-x: auto;
 }
@@ -1478,7 +1478,7 @@
   white-space: nowrap;
 }
 
-/* The column on the right: the figures, and the main values under them. */
+/* The column on the right, with the figures and the main values under them. */
 .compare-side {
   display: flex;
   flex-direction: column;
@@ -1610,7 +1610,7 @@
   fill: var(--promoter);
 }
 
-/* The box plot of one gene: the box of each job, its median and a point for each structure. */
+/* The box plot of one gene, with the box of each job, its median and a point for each structure. */
 .expression-plot .quartiles {
   fill: var(--panel);
   stroke: var(--muted);
@@ -1698,7 +1698,7 @@
   font: 13px var(--mono);
 }
 
-/* The log has the screen under the header, down to the footer, and scrolls inside itself. */
+/* The log has the screen under the header, down to the footer. It scrolls inside itself. */
 .log-tail.live {
   flex: 1;
   min-height: 0;
@@ -1784,7 +1784,7 @@
   font-size: 12px;
 }
 
-/* The hovered bead: a ring in the hover colour around the bead, above the chain. */
+/* The hovered bead has a ring in the hover colour around it, above the chain. */
 .hover-ring {
   display: block;
   width: 26px;

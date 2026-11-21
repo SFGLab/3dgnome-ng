@@ -41,8 +41,9 @@ export const EMPTY_FORM: FormState = {
 }
 
 /**
- * The coordinates of a typed region longer than `maxSpan` bp. The server refuses such a region and
- * the form keeps it on the loops, where it can be shortened. Undefined for any other text.
+ * Returns the coordinates of a typed region longer than `maxSpan` bp. The
+ * server refuses such a region and the form keeps it on the loops, where it
+ * can be shortened. Undefined for any other text.
  */
 export function longRegion(text: string, maxSpan: number): Region | undefined {
   const m = /^(chr[0-9XYM]+):(\d+)-(\d+)$/.exec(text.replace(/,/g, '').trim())
@@ -53,12 +54,14 @@ export function longRegion(text: string, maxSpan: number): Region | undefined {
 }
 
 /**
- * The change of the form when the own data dialog is confirmed.
+ * Returns the change of the form when the own data dialog is confirmed.
  *
  * On your own cell type a job without loops of its own takes the loops of a listed cell type, the
- * first one unless another is chosen, and no enhancers unless a set is chosen. A table added in
- * the dialog becomes the expression of the job. A table taken away leaves the job without.
- * @param opened whether the dialog was opened to make your own cell type, and the step it opened on
+ * first one unless another is chosen. It takes no enhancers unless a set is chosen. A table added
+ * in the dialog becomes the expression of the job. A table taken away leaves the job without.
+ * @param form the form before the change
+ * @param own the uploads the dialog gives
+ * @param opened true for a dialog opened to make your own cell type, with the step it opened on
  * @param cells the listed cell types
  */
 export function withOwn(form: FormState, own: OwnChoice, opened: { cell: boolean; tab: string }, cells: string[]): Partial<FormState> {

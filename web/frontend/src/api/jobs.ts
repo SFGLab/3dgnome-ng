@@ -4,8 +4,8 @@ import { call, callText, query as q } from './http'
 import type { Annotations, Compare, Contacts, Distance, ExpressionCompare, GeneDistances, GeneRow, Loop, Picks, Structure, Summary } from './types'
 
 /**
- * The whole of a symmetric map from the form the server sends, each pair of bins once: row `i`
- * of that form holds the cells of the columns from `i` to the last.
+ * Returns the whole of a symmetric map from the form the server sends, each pair of bins once. Row
+ * `i` of that form holds the cells of the columns from `i` to the last.
  */
 export function square(once: number[][]): number[][] {
   const n = once.length
@@ -19,7 +19,7 @@ export function square(once: number[][]): number[][] {
   return m
 }
 
-/** The endpoints of one job, `kind` jobs for a shared job and p for a private one. */
+/** Returns the endpoints of one job, `kind` jobs for a shared job and p for a private one. */
 export function jobApi(kind: 'jobs' | 'p', key: string) {
   const base = `/api/${kind}/${key}`
   return {
@@ -45,10 +45,10 @@ export function jobApi(kind: 'jobs' | 'p', key: string) {
 
 export type JobApi = ReturnType<typeof jobApi>
 
-/** The query of a comparison of two jobs, with the enhancers both have when `shared`. */
+/** Returns the query of a comparison of two jobs, with the enhancers both have when `shared`. */
 const pair = (a: string, b: string, shared: boolean, more: Record<string, string> = {}) => new URLSearchParams({ a, b, ...more, ...(shared ? { shared: '1' } : {}) })
 export const compareJobs = (a: string, b: string, shared = false) => call<Compare>(`/api/compare?${pair(a, b, shared)}`)
-/** The enhancer to promoter distance of one gene in each structure of two jobs. */
+/** Returns the enhancer to promoter distance of one gene in each structure of two jobs. */
 export const compareGene = (a: string, b: string, gene: string, shared = false) => call<GeneDistances>(`/api/compare/gene?${pair(a, b, shared, { gene })}`)
 
 export const compareExpression = (a: string, b: string, shared = false) => call<ExpressionCompare>(`/api/compare/expression?${pair(a, b, shared)}`)

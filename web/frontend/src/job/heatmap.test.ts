@@ -7,7 +7,7 @@ const M = [
   [1, 3, 8],
 ]
 
-/** A map whose contacts fall off as one over the separation, with empty rows and columns. */
+/** Returns a map whose contacts fall off as one over the separation, with empty rows and columns. */
 function decay(n: number, empty: number[] = []): number[][] {
   return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (empty.includes(i) || empty.includes(j) || i === j ? 0 : 1 / Math.abs(i - j))))
 }

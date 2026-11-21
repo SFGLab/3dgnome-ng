@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 
-/** One energy term on a small polymer: the chain before the term acts on it and after. Dark
- * beads are anchors. The blue marks are the pair, the length or the radius the term reads. */
+/**
+ * One energy term on a small polymer, the chain before the term acts on it and after. Dark beads
+ * are anchors. The blue marks are the pair, the length or the radius the term reads.
+ */
 type Pt = [number, number]
 
 /** A state of the small polymer. `hot` beads are the ones the term acts on. */
@@ -34,8 +36,10 @@ function Motif({ from, to }: { from: Pt; to: Pt }) {
   )
 }
 
-/** A loop along the genome: the line, its two anchors, the loop over them and the direction of
- * each motif under its anchor. The first motif points right. */
+/**
+ * A loop along the genome. It has the line, its two anchors, the loop over them and the direction
+ * of each motif under its anchor. The first motif points right.
+ */
 function Genome({ second }: { second: 'left' | 'right' }) {
   const chevron = (x: number, right: boolean) => <path className="sk-chevron" d={right ? `M${x - 3} 17l5 4l-5 4` : `M${x + 3} 17l-5 4l5 4`} />
   return (
@@ -127,9 +131,9 @@ const SKETCHES: Record<string, { text: string; before?: ReactNode; after?: React
     before: <Chain anchors={[0, 5]} hot={[2, 3]} pts={[[6, 58], [22, 24], [38, 60], [54, 24], [70, 60], [86, 30]]} />,
     after: <Chain anchors={[0, 5]} hot={[2, 3]} pts={[[6, 58], [20, 42], [38, 32], [56, 32], [72, 42], [86, 58]]} />,
   },
-  // After the figure of 3D-GNOME. A motif on the reverse strand points against the chain. Motifs
-  // that face each other along the genome are side by side in a hairpin and motifs of one direction
-  // in a loop of a full turn.
+  // The drawing follows the figure of the 3D-GNOME paper. A motif on the reverse strand points
+  // against the chain. Motifs that face each other along the genome are side by side in a hairpin
+  // and motifs of one direction in a loop of a full turn.
   'chain:CTCF orientation': {
     text: 'Turns the chain at the two anchors of a CTCF loop until their motifs point the same way in space. Motifs that face each other along the genome give a hairpin and motifs of one direction give a loop of a full turn.',
     whole: (
@@ -180,11 +184,12 @@ const SKETCHES: Record<string, { text: string; before?: ReactNode; after?: React
   },
 }
 
-/** The sketch of one term: the small polymer before the term acts, an arrow and the polymer after.
- * Its sentence is the picture's description.
+/**
+ * The sketch of one term. It has the small polymer before the term acts, an arrow and the polymer
+ * after. Its sentence is the description of the picture.
  *
  * @param phase anchor for the anchor energy, chain for the chain energy
- * @param name the term's name in the phase's table
+ * @param name the name of the term in the table of the phase
  */
 export function TermSketch({ phase, name }: { phase: 'anchor' | 'chain'; name: string }) {
   const s = SKETCHES[`${phase}:${name}`]

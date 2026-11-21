@@ -1,4 +1,5 @@
-"""The routes of a job page, for a shared and for a private job, and of the comparison of two jobs."""
+"""The routes of a job page, for a shared and for a private job. The module also has the routes of the
+comparison of two jobs."""
 
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ router = APIRouter(responses=REFUSALS)
 
 
 def job_routes(kind: str) -> APIRouter:
-    """The routes of the page of one job. `kind` is the address of the job, jobs or p."""
+    """Returns the routes of the page of one job. `kind` is the address of the job, jobs or p."""
     routes = APIRouter(prefix=f"/api/{kind}/{{key}}", responses=REFUSALS)
 
     @routes.get("/summary", name=f"{kind}_summary", response_model=Summary)
@@ -66,8 +67,8 @@ def job_routes(kind: str) -> APIRouter:
         d = job_of(site, kind, key)
         req = store.request(d)
         ct = site.catalog.cell_types.get(str(req.get("cell_type", "")))
-        # The cell type's deep map stands for the Hi-C only where the job read that cell type's
-        # hosted map: not with own contacts, not with a predicted background.
+        # The deep map of the cell type stands for the Hi-C only for a job that read the hosted map
+        # of that cell type. A job with own contacts or a predicted background keeps its own.
         deep = ct is not None and ct.hic_url and not (req.get("own") or {}).get("contacts") and req.get("background", "hic") == "hic"
         try:
             return packed_json(
@@ -96,7 +97,7 @@ def api_compare(site: Here, a: str, b: str, shared: int = 0) -> JSONResponse:
 
 @router.get("/api/compare/gene", response_model=GeneDistances)
 def api_compare_gene(site: Here, a: str, b: str, gene: str, shared: int = 0) -> JSONResponse:
-    """The distances of one gene in the structures of two jobs."""
+    """Returns the distances of one gene in the structures of two jobs."""
     out = compare.compare_gene(job_at(site, a), job_at(site, b), gene, shared == 1)
     return JSONResponse(out) if out else JSONResponse({"error": f"{gene} is not a gene of both jobs"}, 404)
 

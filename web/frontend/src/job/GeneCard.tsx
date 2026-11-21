@@ -6,7 +6,7 @@ import sheet from './job.module.css'
 
 const cn = scoped(sheet)
 
-/** The Selected gene card: the gene's nearest enhancer by mean 3D distance over the ensemble. */
+/** The Selected gene card, with the nearest enhancer of the gene by mean 3D distance over the ensemble. */
 export function GeneCard({ row, chrom, onOpenGenes }: { row: GeneRow; chrom: string; onOpenGenes: (gene: string) => void }) {
   return (
     <section className={cn('side-card')} aria-label="Selected gene">

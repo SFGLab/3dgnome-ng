@@ -1,7 +1,4 @@
-"""Catalog loading and region parsing.
-
-    pytest web/tests/test_catalog.py
-"""
+"""Catalog loading and region parsing."""
 
 from __future__ import annotations
 

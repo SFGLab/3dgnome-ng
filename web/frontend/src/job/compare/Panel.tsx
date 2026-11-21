@@ -92,8 +92,10 @@ export function Panel({
   gene: string | null
   link?: CameraLink
   linkId: string
-  /** The enhancer the comparison measures the selected gene to in this job, and its distance. Null for a gene
-   * the comparison does not hold, which is then not marked. */
+  /**
+   * The enhancer of the selected gene in the comparison for this job and its distance. Null for a gene the
+   * comparison does not hold, which is then not marked.
+   */
   pair?: { bead?: number; mean: number; sd: number } | null
   choices?: Choice[]
   onPick?: (url: string) => void
@@ -114,14 +116,15 @@ export function Panel({
   const points = useMemo(() => (structure.data?.chain ?? []).map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure.data])
   const row = pair === null ? undefined : genes.data?.find((r) => r.gene === gene)
   const enhancerBead = pair?.bead ?? row?.enhancer_bead
-  // The selected gene's promoter and enhancer, marked A and B as on the Structure tab.
+  // The promoter and the enhancer of the selected gene, marked A and B as on the Structure tab.
   const markers =
     row && structure.data
       ? [row.promoter_bead, enhancerBead!]
           .filter((k) => structure.data!.beads[k])
           .map((k, i) => ({ label: 'AB'[i], at: [structure.data!.beads[k][2], structure.data!.beads[k][3], structure.data!.beads[k][4]] as [number, number, number] }))
       : []
-  // The chain at the selected gene's promoter and enhancer is solid and the rest see through.
+  // The chain at the promoter and the enhancer of the selected gene is
+  // solid and the rest see through.
   const focus = useMemo(
     () => (row && structure.data ? focusRanges(structure.data, [row.promoter_bead, enhancerBead!]) : undefined),
     [structure.data, row?.promoter_bead, enhancerBead], // eslint-disable-line react-hooks/exhaustive-deps

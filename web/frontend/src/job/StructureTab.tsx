@@ -19,7 +19,7 @@ import sheet from './job.module.css'
 
 const cn = scoped(sheet)
 
-/** What a measured position is: a gene's TSS, an enhancer or a plain coordinate. */
+/** Returns the kind of a measured position, the TSS of a gene, an enhancer or a plain coordinate. */
 function describe(pos: number, chrom: string, ann: Annotations): string {
   const gene = ann.genes.find((g) => Math.abs(g.tss - pos) <= 5000)
   if (gene) return `${gene.name} TSS, ${chrom}:${bp(pos)}`
@@ -29,7 +29,7 @@ function describe(pos: number, chrom: string, ann: Annotations): string {
 
 const mid = (s: Structure, k: number) => Math.round((s.beads[k][0] + s.beads[k][1]) / 2)
 
-/** The card of a selected loop: its factor, its two anchors, its span and its PET count. */
+/** The card of a selected loop, with its factor, its two anchors, its span and its PET count. */
 function LoopCard({ loop }: { loop: Loop }) {
   return (
     <section className={cn('side-card')} aria-label="Selected loop">
@@ -60,8 +60,10 @@ type Props = {
   onLoop?: (loop: Loop | null) => void
 }
 
-/** The Structure tab: the selected structure in 3D, its loops in two dimensions under it,
- * measurement between two beads over the ensemble and the card of a selected gene or loop. */
+/**
+ * The Structure tab. It has the selected structure in 3D, its loops in two dimensions under it,
+ * measurement between two beads over the ensemble and the card of a selected gene or loop.
+ */
 export function StructureTab({ api, summary, selected, gene: geneProp, onGene, onOpenGenes = () => {}, loop: loopProp, onLoop }: Props) {
   const [mode, setMode] = useState<Mode>('elements')
   const [measure, setMeasure] = useState(false)
@@ -80,7 +82,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
   const genes = useQuery(askedOf(api).genes())
   const row = genes.data?.find((r) => r.gene === gene)
   const s = structure.data
-  // A selected loop is its two anchors: the beads that hold the middles of its two ends.
+  // A selected loop is its two anchors, the beads that hold the middles of its two ends.
   const loopBeads = s && loop ? [beadAt(s.beads, (loop.a[0] + loop.a[1]) / 2), beadAt(s.beads, (loop.b[0] + loop.b[1]) / 2)] : null
   const pair = row ? [row.promoter_bead, row.enhancer_bead] : (loopBeads ?? picks)
   const distance = useQuery({ ...askedOf(api).distance(s && pair.length === 2 ? mid(s, pair[0]) : 0, s && pair.length === 2 ? mid(s, pair[1]) : 0), enabled: !!s && pair.length === 2 })

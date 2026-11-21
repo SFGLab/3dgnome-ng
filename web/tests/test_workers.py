@@ -1,7 +1,4 @@
-"""The local queue: a fixed set of slots, one GPU per slot, jobs waiting for a free slot.
-
-    pytest web/tests/test_workers.py
-"""
+"""The local queue, a fixed set of slots with one GPU per slot and jobs that wait for a free slot."""
 
 from __future__ import annotations
 
@@ -27,7 +24,7 @@ FAKE = [sys.executable, str(Path(__file__).resolve().parent / "fake_engine.py")]
 
 
 def most_at_once(spans: list[tuple[float, float, str]], gpu: str | None = None) -> int:
-    """The largest number of spans running at one moment, on one GPU when given."""
+    """Returns the largest number of spans running at one moment, on one GPU when given."""
     events = sorted([(a, 1) for a, _, g in spans if gpu in (None, g)] + [(b, -1) for _, b, g in spans if gpu in (None, g)])
     now = best = 0
     for _, step in events:
@@ -89,8 +86,8 @@ def test_a_slot_keeps_serving_after_a_job_that_raises(shared: SimpleNamespace) -
 
 def test_a_restart_queues_again_the_running_and_the_waiting_job(shared: SimpleNamespace) -> None:
     root = shared.root
-    # A restart: one job was running, one waited with its request on disk, one waited without
-    # it and one had finished.
+    # A restart with one job running, one waiting with its request on disk, one waiting without it
+    # and one finished.
     results = root / "restart"
     def left(name: str, state: str, request: bool, kind: str = "jobs") -> Path:
         job = results / kind / name
@@ -123,10 +120,10 @@ def test_each_slot_has_its_share_of_the_cores() -> None:
     assert slot_cores(cores, 1, 2, 100) == cores, "a count above the cores of the server is all of them"
     # The cores of a container are not always 0 to n - 1.
     assert slot_cores([4, 5, 6, 7, 12, 13], 1, 2) == [7, 12, 13], "the cores are the ones the server may use, in order"
-    # Three slots of 24 cores on 36: the second slot starts at core 24 and goes on from core 0.
+    # Three slots of 24 cores on 36. The second slot starts at core 24 and goes on from core 0.
     assert slot_cores(cores, 1, 3, 24) == [*range(12), *range(24, 36)], "sets that do not fit beside each other overlap: " + str(slot_cores(cores, 1, 3, 24))
     assert slot_cores([0], 3, 4) == [0] and slot_cores([], 0, 2) == [], "one core serves every slot and no cores is no pinning"
-    # Eight slots on 36 cores: the division leaves four cores, one more for each of the first four slots.
+    # Eight slots on 36 cores. The division leaves four cores, one more for each of the first four slots.
     eight = [slot_cores(cores, i, 8) for i in range(8)]
     assert [len(c) for c in eight] == [5, 5, 5, 5, 4, 4, 4, 4] and sorted(c for s in eight for c in s) == cores, "no core is left without a slot and none is in two: " + str([len(c) for c in eight])
 
@@ -161,7 +158,7 @@ def test_the_workers_of_the_site_are_four_variables_of_the_environment(monkeypat
     pool = float(eight.engine_env("0")["GNOME3D_GPU_POOL_GIB"])
     assert pool == 1.35 and 4 * (pool + 0.5) < 8.0, "four engines with their pools fit a card of 8 GiB: " + str(pool)
     monkeypatch.setenv("WORKERS_PER_GPU", "2")
-    # A card of unknown size: the share of JAX is divided.
+    # The share of JAX is divided for a card of unknown size.
     monkeypatch.setattr(settings, "card_gib", lambda gpu: None)
     assert four.engine_env("1") == {"CUDA_VISIBLE_DEVICES": "1", "XLA_PYTHON_CLIENT_MEM_FRACTION": "0.3750"}, "without the size of the card two jobs halve the pool JAX takes: " + str(four.engine_env("1"))
     monkeypatch.setenv("GPU_POOL_GIB", "1.5")
@@ -240,7 +237,7 @@ def test_a_job_goes_to_rq_by_the_name_of_work_and_a_worker_runs_it_on_a_claimed_
     assert state(first) == state(second) == "queued" and (second / "request.json").is_file(), "a job given to rq has its request and the status queued on disk"
     job = waiting[0]
     assert (job.queue, job.at, job.timeout) == ("gnome3d", "redis://queue:6379/0", 6 * 3600), "the job is on the queue gnome3d at REDIS_URL with six hours to run: " + str(job)
-    # A job that waits in Redis names the function by its module and its name.
+    # A job that waits in Redis refers to the function by its module and its name.
     assert job.func is work and (work.__module__, work.__qualname__) == ("gnome3d_web.jobs.workers", "work"), "an rq worker finds the function as gnome3d_web.jobs.workers.work"
     assert job.args == (asdict(req), str(first)), "with the request and the directory of the job"
     assert queue.ahead(first) == 0 and queue.ahead(second) == 1 and queue.ahead(s.jobs_dir / "other0000001") is None, "a job knows the jobs that wait before it"

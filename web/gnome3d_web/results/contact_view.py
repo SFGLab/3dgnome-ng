@@ -17,7 +17,7 @@ from .views import ExploreError, loop_files, positions
 
 
 def _read_deep(url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """The bin pairs of a window of a remote deep map, bin starts and raw counts."""
+    """Reads the bin pairs of a window of a remote deep map, bin starts and raw counts."""
     kind = remote.check_link(url, allow_private)
     size, final = remote.probe(url, allow_private)
     w = remote.read_window(final, kind, chrom, start, end, size, allow_private, res=res)
@@ -25,9 +25,9 @@ def _read_deep(url: str, chrom: str, start: int, end: int, res: int, allow_priva
 
 
 def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> np.ndarray:
-    """A deep map's window on the job's grid. The pixels of the job's whole region are read once
-    per resolution and kept in the job directory. Zooming and panning cut windows from them
-    instead of reading the remote file again."""
+    """Returns the window of a deep map on the grid of the job. The pixels
+    of the whole region of the job are read once per resolution and kept in
+    the job directory. Zooming and panning cut windows from them."""
     whole = read_region(str(store.status(job).get("region") or ""))
     rs, re_ = (whole.start, whole.end) if whole else (start, end)
     cache = job / f"explore_deep_{chrom}_{rs}_{re_}_{res}.npz"
@@ -49,23 +49,30 @@ def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, a
 
 
 def _span(bp: int) -> str:
-    """A separation in words, megabases from one up."""
+    """Returns a separation in words, megabases from one up."""
     return f"{bp / 1e6:g} Mb" if bp >= 1_000_000 else f"{bp // 1000} kb"
 
 
 def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> ContactMaps:
-    """Two contact maps of a window on one grid with two agreements of the halves, the rank
+    """Returns two contact maps of a window on one grid with two agreements of the halves, the rank
     agreement per distance and the stratum adjusted correlation. Each map is symmetric and is
-    returned with each pair of bins once, as `_once` writes it.
+    returned with each pair of bins once, in the form of `_once`.
 
-    @param hic_url a deep map of the cell type in place of the job's own input contacts
-    @param hic_name the deep map's name for the labels
+    @param job the directory of the job
+    @param region the window, chr:start-end
+    @param res the bin size in bp
+    @param upper the kind of map of the upper half, as in hic, model or loops_ctcf
+    @param lower the kind of map of the lower half
+    @param norm raw or ice
+    @param hic_url a deep map of the cell type in place of the input contacts of the job
+    @param hic_name the name of the deep map for the labels
+    @param allow_private true to read a deep map at a private address, for tests
     """
     asked = read_region(region)
     if asked is None:
         raise ExploreError(f"{region!r} is not chr:start-end")
     chrom, start, end = asked.chrom, asked.start, asked.end
-    # The window is cut to the job's region: outside it there are no beads to count.
+    # The window is cut to the region of the job. No bead is outside it.
     whole = read_region(str(store.status(job).get("region") or ""))
     if whole:
         if chrom != whole.chrom or end <= whole.start or start >= whole.end:
@@ -122,7 +129,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     b, lb = one(lower)
     raw_a, raw_b = a, b
     if norm == "ice":
-        # A loop half is a list of loops, not a contact map and is never balanced.
+        # A loop half is a list of loops and no contact map. It is not balanced.
         a = a if upper in loop_sets else cm.ice(a)
         b = b if lower in loop_sets else cm.ice(b)
     elif norm != "raw":
@@ -143,8 +150,8 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         "lower": _once(b),
         "upper_label": la,
         "lower_label": lb,
-        # The agreement of the two halves shown, on raw values; Hi-C against the counted model is
-        # the validation battery's number.
+        # The agreement of the two halves shown is on raw values. Hi-C against the counted model is
+        # the number of the validation battery.
         "scc": cm.scc(raw_a, raw_b, res),
         "scc_about": (
             f"{hic_label} against this job's contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it"
@@ -166,6 +173,6 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
 
 
 def _once(m: np.ndarray) -> list[list[float]]:
-    """A symmetric map with each pair of bins once: row `i` holds the cells of the columns from
-    `i` to the last. Every map of contact_maps is symmetric and its answer is half as long this way."""
+    """Returns a symmetric map with each pair of bins once. Row `i` holds the cells of the columns from
+    `i` to the last. The answer is half as long this way."""
     return [np.round(m[i, i:], 6).tolist() for i in range(len(m))]

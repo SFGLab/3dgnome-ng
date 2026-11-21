@@ -7,7 +7,7 @@ import sheet from './model.module.css'
 
 const cn = scoped(sheet)
 
-/** Text that can be the start of a gene name: two characters or more that are not coordinates. */
+/** Returns true for text that can be the start of a gene name, two characters or more that are not coordinates. */
 const maybeGene = (text: string) => text.length >= 2 && !text.includes(':')
 
 /**
@@ -24,7 +24,7 @@ export function RegionField({ cell, value, quiet = false, onChange }: { cell: st
   const typed = useDebounced(text, 150)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
-  // The list scrolls, and the arrow keys bring the gene they reach into view.
+  // The list scrolls. The arrow keys bring the gene they reach into view.
   const list = useRef<HTMLUListElement>(null)
   useEffect(() => {
     list.current?.children[active]?.scrollIntoView?.({ block: 'nearest' })
@@ -67,7 +67,7 @@ export function RegionField({ cell, value, quiet = false, onChange }: { cell: st
           onChange={(e) => {
             const v = e.target.value
             setDraft(v)
-            // Coordinates, and an emptied field, reach the form at once.
+            // Coordinates and an emptied field reach the form at once.
             if (v.includes(':') || v.trim() === '') onChange(v)
             setOpen(true)
             setActive(0)

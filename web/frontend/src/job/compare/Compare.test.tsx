@@ -95,7 +95,7 @@ describe('Compare', () => {
     const table = await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
     expect(within(table).getByText('TNFRSF8, enhancer 385 kb away')).toBeInTheDocument()
     expect(within(table).getByText('2.4 times farther')).toBeInTheDocument()
-    // The two jobs are named by the loops they differ in, and every change says in which job it is.
+    // The two jobs have the names of the loops they differ in. Every change states its job.
     expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Gene', 'CTCF and RNAPII loops', 'CTCF loops', 'CTCF loops against CTCF and RNAPII loops', 'Mann-Whitney p'])
     expect(within(table).getByText('0.004')).toBeInTheDocument()
     // The selected gene has its values in a card and a box plot of its distance in the structures of both jobs.
@@ -108,7 +108,7 @@ describe('Compare', () => {
     expect([...box.querySelectorAll('.axis-title')].map((x) => x.textContent)).toEqual(['3D distance, bead units'])
     expect(within(box).getAllByText('4 structures')).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Save the figure Enhancer to promoter distance of TNFRSF8 as a PNG' })).toBeInTheDocument()
-    // The picture of a figure stands by itself: its title is written above it and it has a background.
+    // The picture of a figure stands by itself. Its title is above it and it has a background.
     const picture = standalone(box as unknown as SVGSVGElement, 'Enhancer to promoter distance of TNFRSF8')
     expect(picture.querySelector('text')!.textContent).toBe('Enhancer to promoter distance of TNFRSF8')
     expect(picture.querySelector('rect')!.getAttribute('fill')).toBeTruthy()
@@ -181,7 +181,7 @@ describe('Compare', () => {
         <Compare api={jobApi('jobs', KEY)} summary={withData} selected={1} gene="TNFRSF8" initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
       </QueryClientProvider>,
     )
-    // The main value is the rank correlation, as a card, and the text beside it is short.
+    // The main value is the rank correlation, as a card. The text beside it is short.
     const card = await screen.findByRole('region', { name: 'Expression against 3D distance' })
     expect(within(card).getByText('-0.41')).toHaveClass('big-value')
     expect(card).toHaveTextContent('Of the change of expression with the change of distance over 3 genes, the other job against this job. Tested with DESeq2.')
@@ -209,7 +209,8 @@ describe('Compare', () => {
     expect(heads.map((name) => within(block).getByRole('button', { name }).getAttribute('aria-expanded'))).toEqual(['false', 'true', 'false'])
     const scatter = within(block).getByRole('img', { name: 'Change of expression against change of distance for 3 genes' })
     expect(scatter.querySelectorAll(':scope > circle')).toHaveLength(3)
-    // Each plot names its two axes, says which job is over which, has ticks on both and a key of its marks.
+    // Each plot has the titles of its two axes, the job that is over the other, ticks on both axes and a
+    // key of its marks.
     expect([...scatter.querySelectorAll('.axis-title')].map((x) => x.textContent)).toEqual(['3D distance, log2 of the other job over this job', 'Expression, log2 of the other job over this job'])
     expect(scatter.querySelectorAll('.tick').length).toBeGreaterThan(5)
     expect(within(scatter).getByText('adjusted p under 0.05')).toBeInTheDocument()
@@ -313,7 +314,8 @@ describe('Compare', () => {
         <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene="TNFRSF8" initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
       </QueryClientProvider>,
     )
-    // By default each job has its own nearest enhancer, and the table says so where the two differ.
+    // By default each job has its own nearest enhancer. The table states it
+    // for a gene whose two enhancers differ.
     const table = await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
     expect(within(table).getByText('TNFRSF8, enhancer 20 kb away in GM12878, 849 bp in H1ESC')).toBeInTheDocument()
     expect(screen.getByText('Each job measures a gene to its own nearest enhancer. 1 of 1 genes have another enhancer in H1ESC than in GM12878.')).toBeInTheDocument()

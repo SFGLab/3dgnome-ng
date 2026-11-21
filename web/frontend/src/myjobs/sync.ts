@@ -1,9 +1,9 @@
 /**
  * One list of jobs on several browsers, joined by a sync code.
  *
- * The server keeps the list. A browser that has the code sends its jobs, takes back the merged
- * list and stores it as its own. A list made without private jobs never receives one and the
- * private jobs of a browser then stay in that browser.
+ * The server keeps the list. A browser that has the code sends its jobs, takes back the merged list
+ * and stores it as its own. A list made without private jobs does not receive one and the private
+ * jobs of a browser then stay in that browser.
  */
 import { useSyncExternalStore } from 'react'
 import { type ApiError, makeList, readList, sendJobs, type SharedList } from '../api'
@@ -12,7 +12,7 @@ import { JOBS_EDITED, mergeJobs, recentJobs, replaceJobs } from './recent'
 import { ROUTES } from '../routes'
 
 export type Sync = { code: string; private: boolean }
-/** `gone` says the server has no list for the code any more. */
+/** `gone` means that the server has no list for the code. */
 export type SyncStatus = { state: 'off' | 'syncing' | 'ok' | 'error'; at?: number; error?: string; gone?: boolean }
 
 const KEY = 'gnome3d.sync'
@@ -21,23 +21,23 @@ const LENGTH = 16
 const EVERY_MS = 30_000
 const FRESH_MS = 5_000
 
-/** The characters of a typed code that can be part of one, with O, I and L read as digits. */
+/** Returns the characters of a typed code that can be part of one, with O, I and L read as digits. */
 function bare(text: string): string {
   const up = text.toUpperCase().replace(/O/g, '0').replace(/[IL]/g, '1')
   return [...up].filter((ch) => ALPHABET.includes(ch)).join('').slice(0, LENGTH)
 }
 
-/** A code as it is shown while typed, in groups of four. */
+/** Returns a code in its shown form while it is typed, in groups of four. */
 export function formatCode(text: string): string {
   return bare(text).replace(/(.{4})(?=.)/g, '$1-')
 }
 
-/** A typed code in its shown form, or null while it is incomplete. */
+/** Returns a typed code in its shown form, or null while it is incomplete. */
 export function fullCode(text: string): string | null {
   return bare(text).length === LENGTH ? formatCode(text) : null
 }
 
-/** The link that opens My jobs on another computer with the code filled in. */
+/** Returns the link that opens My jobs on another computer with the code filled in. */
 export const joinLink = (code: string) => `${window.location.origin}${BASE}${ROUTES.jobs}?sync=${code}`
 
 export function syncState(): Sync | null {
@@ -49,7 +49,7 @@ export function syncState(): Sync | null {
   }
 }
 
-/** The jobs of this browser that a list takes. */
+/** Returns the jobs of this browser that a list takes. */
 export const sendable = (list: { private: boolean }) => recentJobs().filter((j) => list.private || !j.url.startsWith('/p/'))
 
 let status: SyncStatus = { state: 'off' }
@@ -72,7 +72,7 @@ export async function createList(includePrivate: boolean): Promise<SharedList> {
   return adopt(await makeList(sendable({ private: includePrivate }), includePrivate))
 }
 
-/** Joins the list of a code: the jobs of this browser go to it and its jobs come here. */
+/** Joins the list of a code. The jobs of this browser go to it and its jobs come here. */
 export async function joinList(code: string): Promise<SharedList> {
   const list = await readList(fullCode(code) ?? code)
   return adopt(await sendJobs(list.code, sendable(list)))
@@ -130,7 +130,7 @@ export function startSync(): void {
   void syncNow()
 }
 
-/** Ends the upkeep of startSync and forgets the status. For tests. */
+/** Ends the upkeep of startSync and forgets the status. It is for tests. */
 export function resetSync(): void {
   stop?.()
   stop = null
@@ -142,5 +142,5 @@ const watch = (w: () => void) => {
   return () => void watchers.delete(w)
 }
 
-/** The state of the sync, for a component. */
+/** Returns the state of the sync, for a component. */
 export const useSyncStatus = () => useSyncExternalStore(watch, () => status)

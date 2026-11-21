@@ -1,4 +1,4 @@
-"""The pages of the app: the built frontend for every address that is no route of the server."""
+"""The pages of the app. The built frontend answers every address that is no route of the server."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ PAGES = {"", "model", "jobs", "examples", "method", "results", "help", "cite", "
 
 
 def known(site: Site, path: str) -> bool:
-    """Whether an address is a page of the app or the page of a job the site has."""
+    """Returns true for an address that is a page of the app or the page of a job the site has."""
     path = path.strip("/")
     if path in PAGES:
         return True
@@ -24,8 +24,8 @@ def known(site: Site, path: str) -> bool:
 
 
 def serve(app: FastAPI, site: Site) -> None:
-    """Adds the assets of the build and the route of every other address. Called after every
-    other route is added: a path no route above answers is a client route of the frontend."""
+    """Adds the assets of the build and the route of every other address. Call it after every other
+    route is added. A path that no earlier route answers is a client route of the frontend."""
     s = site.settings
     index_html = s.frontend_dist / "index.html"
     if (s.frontend_dist / "assets").is_dir():
@@ -33,7 +33,7 @@ def serve(app: FastAPI, site: Site) -> None:
 
     @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
     def frontend(path: str) -> HTMLResponse:
-        # A job's own page is the app's; the paths below it are the server's.
+        # The page of a job is a page of the app. The paths below it are routes of the server.
         if path.startswith(("api/", "assets/")) or re.match(r"(jobs|p)/[^/]+/", path):
             raise HTTPException(404)
         if not index_html.is_file():
@@ -46,12 +46,11 @@ def serve(app: FastAPI, site: Site) -> None:
                 f"Build with BASE_PATH={s.base_path or '/'} npm run build in web/frontend, or set BASE_PATH to match.",
                 503,
             )
-        # The features config.json turns off reach the app in the page itself. It never draws
-        # one first.
+        # The features that config.json turns off reach the app in the page itself. The app does not
+        # draw one of them first.
         off = site.config.get().hidden
         if off:
             html = html.replace("<head>", f'<head><meta name="site-hide" content="{",".join(off)}">', 1)
-        # The page names its scripts by their hash. A browser asks for the page anew each time. A
-        # new deployment is seen on the next load.
-        # An address the site does not have is answered with the app and the status 404.
+        # The page refers to its scripts by their hash. A browser asks for the page anew each time.
+        # A new deployment is seen on the next load.
         return HTMLResponse(html, 200 if known(site, path) else 404, headers={"Cache-Control": "no-cache"})

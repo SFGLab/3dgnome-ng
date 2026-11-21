@@ -27,7 +27,7 @@ KEY = re.compile(r"[A-Za-z0-9_-]{8,64}")
 
 
 def find(root: Path, key: str) -> Path | None:
-    """The directory of the job of a key under `root`, None for a key the site has no job of."""
+    """Returns the directory of the job of a key under `root`, None for a key without a job."""
     job = root / key
     if not KEY.fullmatch(key) or not ((job / "status.json").is_file() or (job / "request.json").is_file()):
         return None
@@ -35,12 +35,12 @@ def find(root: Path, key: str) -> Path | None:
 
 
 def read_json(path: Path) -> dict:
-    """A JSON file of a job, empty for a file the job does not have."""
+    """Reads a JSON file of a job, empty for a file the job does not have."""
     return json.loads(path.read_text()) if path.is_file() else {}
 
 
 def write_json(path: Path, value: object) -> None:
-    """Write a JSON file whole. A job page reads a job's files while the job runs and a file
+    """Writes a JSON file whole. A job page reads the files of a job while the job runs and a file
     written in place is empty for a moment."""
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(value, indent=2))
@@ -48,12 +48,12 @@ def write_json(path: Path, value: object) -> None:
 
 
 def request(job: Path) -> dict:
-    """The request of a job as it is on disk, with the places of its uploads."""
+    """Returns the request of a job as it is on disk, with the places of its uploads."""
     return read_json(job / "request.json")
 
 
 def status(job: Path) -> Status:
-    """The status of a job. A job without the file waits."""
+    """Returns the status of a job. A job without the file waits."""
     kept = read_json(job / "status.json")
     return cast(Status, kept) if kept else {"state": "queued"}
 
@@ -79,24 +79,26 @@ def queued(job: Path) -> None:
 
 
 def taken(job: Path) -> bool:
-    """Whether a directory holds a job that waits, runs or is finished. A failed job leaves its key to the next request."""
+    """Returns true for a directory that holds a job that waits, runs or is finished. A failed
+    job leaves its key to the next request."""
     return (job / "status.json").is_file() and status(job).get("state") in ("running", "done", "queued")
 
 
 def member(p: Path) -> tuple[int, str]:
-    """A structure file's member number, from the engine's `_s<k>.cif` suffix, for natural order."""
+    """Returns the member number of a structure file, from the `_s<k>.cif` suffix the engine gives
+    it, for natural order."""
     m = re.search(r"_s(\d+)\.cif$", p.name)
     return (int(m.group(1)) if m else 0, p.name)
 
 
 def structures(job: Path) -> list[Path]:
-    """The job's structure files in member order."""
+    """Returns the structure files of the job in member order."""
     names = read_json(job / "marks.json").get("models", [])
     return [job / "models" / n for n in names]
 
 
 def read_cif(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Positions, starts, ends and an anchor mask of a gnome3d cif, in genomic order."""
+    """Reads the positions, the starts, the ends and an anchor mask of a gnome3d cif, in genomic order."""
     rows = [ln.split() for ln in Path(path).read_text().splitlines() if ln.startswith("ATOM")]
     pos = np.array([[float(r[10]), float(r[11]), float(r[12])] for r in rows])
     start = np.array([int(r[16]) for r in rows])
@@ -107,12 +109,12 @@ def read_cif(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray
 
 
 def tail(path: Path, n: int = 30) -> str:
-    """The last n lines of a file."""
+    """Returns the last n lines of a file."""
     return "\n".join(path.read_text(errors="replace").splitlines()[-n:]) if path.is_file() else ""
 
 
 def log_end(path: Path, n: int) -> str:
-    """The last n lines of a log, read from its end so a long log costs little."""
+    """Returns the last n lines of a log. It reads the end of the file alone."""
     if not path.is_file():
         return ""
     with path.open("rb") as f:
@@ -122,8 +124,8 @@ def log_end(path: Path, n: int) -> str:
 
 
 def sizes(paths: Iterable[Path]) -> list[FileSize]:
-    """The name and the size of each file. A job writes a file under a second name and renames it,
-    and that second file can be gone between the listing and the reading of its size."""
+    """Returns the name and the size of each file. A job writes a file under a second name and
+    renames it. That second file can be gone between the listing and the reading of its size."""
     out: list[FileSize] = []
     for p in paths:
         with contextlib.suppress(FileNotFoundError):
@@ -133,7 +135,7 @@ def sizes(paths: Iterable[Path]) -> list[FileSize]:
 
 
 def public_request(req: dict) -> RequestStated:
-    """The request without the server's paths of uploaded files."""
+    """Returns the request without the paths of uploaded files on the server."""
     out = cast(RequestStated, {k: v for k, v in req.items() if k not in ("upload_vcf", "own", "expression")})
     # The source of the expression by its id. The table of an upload has a path on the server.
     if req.get("expression"):
@@ -150,15 +152,15 @@ def public_request(req: dict) -> RequestStated:
 
 
 def public_log(text: str, job: Path) -> str:
-    """A log with the job's directory on the server cut from every path. A private job's
-    location on disk is not shown."""
+    """Returns a log with the directory of the job on the server cut from every path. The location
+    of a private job on disk is not shown."""
     for p in {str(job.resolve()), str(job)}:
         text = text.replace(p + "/", "").replace(p, ".")
     return text
 
 
 def public_status(job: Path) -> Status:
-    """The status of a job without the paths of the server in its error and its log."""
+    """Returns the status of a job without the paths of the server in its error and its log."""
     out = status(job)
     error, end = out.get("error"), out.get("log_tail")
     if error:
@@ -169,8 +171,8 @@ def public_status(job: Path) -> Status:
 
 
 def public_file(job: Path, name: str) -> bytes | None:
-    """The request, the status or the log of a job as a download has it, without the paths of
-    the server. None for every other file, which a download has as it is on disk."""
+    """Returns the request, the status or the log of a job as a download has it, without the paths
+    of the server. None for every other file, which a download has as it is on disk."""
     if name == "request.json":
         return json.dumps(public_request(request(job)), indent=2).encode()
     if name == "status.json":
@@ -181,37 +183,37 @@ def public_file(job: Path, name: str) -> bytes | None:
 
 
 def log_text(job: Path) -> str:
-    """The engine log."""
+    """Returns the engine log without the paths of the server."""
     path = job / "engine.log"
     return public_log(path.read_text(errors="replace"), job) if path.is_file() else ""
 
 
-# The files of a job a visitor may have beside its structures. Every other file of a job
-# directory is the site's own: an upload, the inputs of the engine, a kept answer of a page.
+# The files of a job a visitor may have beside its structures. Every other file of a job directory
+# is the site's own. Such a file is an upload, an input of the engine or a kept answer of a page.
 PUBLIC = ("engine.log", "ep.tsv", "expression.json", "expression.tsv", "hicdiffusion.bedpe", "marks.json", "request.json", "status.json")
 STRUCTURE = re.compile(r"[A-Za-z0-9_.:-]+\.cif")
 
 
 def public_files(job: Path) -> list[Path]:
-    """The files of a job a visitor may have, the structures last in member order. The summary
-    lists them, a download serves one of them by its name and the zip holds them all."""
+    """Returns the files of a job a visitor may have, the structures last in member order. The
+    summary lists them, a download serves one of them by its name and the zip holds them all."""
     models = job / "models"
     found = sorted((p for p in models.glob("*.cif") if STRUCTURE.fullmatch(p.name)), key=member) if models.is_dir() else []
     return [p for p in (job / name for name in PUBLIC) if p.is_file()] + found
 
 
 def listed(job: Path) -> list[FileSize]:
-    """The public files of a job beside its structures, each with its size."""
+    """Returns the public files of a job beside its structures, each with its size."""
     return sizes(p for p in public_files(job) if p.parent == job)
 
 
 def download(job: Path, name: str) -> Path | None:
-    """The public file of a job a download names, None for every other name."""
+    """Returns the public file of a job by its name, None for every other name."""
     return next((p for p in public_files(job) if p.name == name), None)
 
 
 def zip_bytes(job: Path) -> bytes:
-    """The public files of a job as one zip, its structures under models/."""
+    """Returns the public files of a job as one zip, its structures under models/."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for p in sorted(public_files(job)):
@@ -225,8 +227,8 @@ def zip_bytes(job: Path) -> bytes:
 
 
 def sweep_private(results_dir: Path, retention_days: int) -> list[str]:
-    """Remove private jobs and uploads older than the retention period, as the form promises
-    users and return their names. Shared jobs are never removed here."""
+    """Removes private jobs and uploads older than the retention period and returns their names.
+    Shared jobs are not removed here."""
     gone = []
     cutoff = time.time() - retention_days * 86400
     for root in (results_dir / "private", results_dir / "uploads"):

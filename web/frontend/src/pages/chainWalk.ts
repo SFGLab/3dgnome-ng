@@ -1,9 +1,9 @@
-/** The chain of the page of an address the site lacks: 404 steps folded at random. */
+/** The chain of the page of an address the site lacks, 404 steps folded at random. */
 
 /** The size of the drawing of the chain, in its own units. */
 export const SIZE = 420
 
-/** A chain of `steps` steps of one length, each in a direction of its own, scaled to fit its drawing. */
+/** Returns a chain of `steps` steps of one length, each in a direction of its own, scaled to fit its drawing. */
 export function walk(steps: number, random: () => number = Math.random): [number, number][] {
   const points: [number, number][] = [[0, 0]]
   let turn = random() * Math.PI * 2

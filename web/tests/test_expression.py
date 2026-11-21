@@ -1,7 +1,4 @@
-"""Gene expression beside a job: the tables, the level of a gene and the contrast of two jobs.
-
-    pytest web/tests/test_expression.py
-"""
+"""Gene expression beside a job, with the tables, the level of a gene and the contrast of two jobs."""
 
 from __future__ import annotations
 
@@ -26,7 +23,7 @@ HAS_DESEQ = importlib.util.find_spec("pydeseq2") is not None
 
 
 def counts_table(rng: np.random.Generator, columns: dict[str, float], up: dict[str, float]) -> pd.DataFrame:
-    """Counts of 400 genes named by name. ALPHA and BETA are the genes of the test region. `up`
+    """Returns counts of 400 genes by name. ALPHA and BETA are the genes of the test region. `up`
     multiplies the mean of a gene in the columns whose scale is not one."""
     names = ["ALPHA", "BETA"] + [f"GENE{i}" for i in range(398)]
     mean = rng.uniform(20, 2000, len(names))

@@ -1,4 +1,4 @@
-"""Run one job outside the queue and print its final status.
+"""Runs one job outside the queue and prints its final status.
 
     PYTHONPATH=web:web/vendor DATA_DIR=... python web/scripts/run_job.py <out dir> GM12878 chr1:11500000-12600000 \\
         --factors RNAPII --background none --structures 3 --set distance.polymer_exponent=0.3

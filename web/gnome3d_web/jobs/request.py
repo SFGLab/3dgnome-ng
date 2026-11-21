@@ -42,19 +42,19 @@ class JobRequest:
     overrides: dict[str, str] = field(default_factory=_no_overrides)
     background: str = "hic"
     own: dict[str, object] = field(default_factory=_no_own)
-    # The expression of the job: the path of its table, its columns, the kind, the unit, the label
-    # and the source. Empty for a job without expression.
+    # The expression of the job by its source, its columns, the kind, the unit and the label. Empty
+    # for a job without expression.
     expression: dict[str, object] = field(default_factory=_no_own)
 
     def __post_init__(self) -> None:
-        # The old form sent HiCDiffusion as a flag; request.json files of that form still read.
+        # A request.json of the first form of the site has HiCDiffusion as a flag.
         if self.hicdiffusion:
             self.background, self.hicdiffusion = "hicdiffusion", False
         self.n_models = int(self.n_models)
 
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
-    """The request with its region resolved. Equivalent requests compare equal."""
+    """Returns the request with its region resolved. Equivalent requests compare equal."""
     region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), ANY_SPAN)
     d = asdict(req)
     d["region"] = str(region)

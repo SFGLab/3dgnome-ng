@@ -20,7 +20,7 @@ def _plural(n: int, one: str, many: str | None = None) -> str:
 
 
 def _change(kind: str, before: dict, after_loops: list, factor: str) -> str:
-    """The words for what one variant did to the loops of one factor."""
+    """Returns the words for the change one variant made to the loops of one factor."""
     keyed = {(lp.ref_a, lp.ref_b): lp for lp in after_loops if lp.ref_a and lp.ref_b}
     removed = [k for k in before if k not in keyed]
     kept_anchors = {r for lp in after_loops for r in (lp.ref_a, lp.ref_b) if r}
@@ -50,8 +50,8 @@ def _change(kind: str, before: dict, after_loops: list, factor: str) -> str:
 
 
 def combine_changes(by_factor: list[tuple[str, str]]) -> str:
-    """One sentence for the changes of several loop factors: one verb is summed with the split
-    by factor, different changes are listed and a factor without change is left out."""
+    """Returns one sentence for the changes of several loop factors. One verb is summed with the
+    split by factor, different changes are listed and a factor without change is left out."""
     real = [(f, w) for f, w in by_factor if not w.startswith("no ")]
     if not real:
         return by_factor[0][1] if by_factor else "no anchor inside"
@@ -64,8 +64,9 @@ def combine_changes(by_factor: list[tuple[str, str]]) -> str:
 
 
 def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype: int, own_loops: list[tuple[str, Path]] | None = None, own_anchors: Path | None = None) -> VariantCheck:  # noqa: ANN001, PLR0913
-    """The effect of the variants of a sample on one haplotype on the loops of a region, one
-    variant at a time, with the counts applied and skipped. Own loops replace the cell type's.
+    """Returns the effect of the variants of a sample on one haplotype on
+    the loops of a region, one variant at a time, with the counts applied
+    and skipped. Own loops replace those of the cell type.
 
     @raises UnknownSample when the sample is not in the VCF
     """

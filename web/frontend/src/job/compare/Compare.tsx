@@ -13,8 +13,10 @@ import sheet from '../job.module.css'
 
 const cn = scoped(sheet)
 
-/** The compare view: this job and another side by side, with the changes between them below,
- * `CompareResults`. The other side starts empty with its list of jobs open. */
+/**
+ * The compare view. This job and another are side by side, with the changes between them below,
+ * `CompareResults`. The other side starts empty with its list of jobs open.
+ */
 export function Compare({
   api,
   summary,

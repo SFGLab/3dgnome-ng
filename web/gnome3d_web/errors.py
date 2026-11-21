@@ -1,10 +1,10 @@
-"""The two ways the site says no to a request before any work starts."""
+"""The two refusals of a request before any work starts."""
 
 from __future__ import annotations
 
 
 class UnknownCell(Exception):
-    """A request names a cell type the catalog lacks. The answer is 404."""
+    """A request for a cell type the catalog lacks. The answer is 404."""
 
     def __init__(self, name: str) -> None:
         super().__init__(f"unknown cell type {name!r}")

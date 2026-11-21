@@ -212,11 +212,10 @@ export const REFERENCES: Reference[] = [
 export type Accession = { id: string; url: string }
 
 /**
- * A row of the Cite page's data table.
- * `accessions` are the records the data came from, the experiment or set first and its files
- * after it. `pending` says what is still to be recorded and stands in the accession column.
- * A row without `ref` has no confirmed source to cite yet. A row with `feature` is shown while
- * that feature of the site is on.
+ * A row of the data table of the Cite page. `accessions` are the records the data came from, the
+ * experiment or set first and its files after it. `pending` states what is still to be recorded and
+ * is shown in the accession column. A row without `ref` has no confirmed source to cite yet. A row
+ * with `feature` is shown while that feature of the site is on.
  */
 export type DataSource = { data: string; usedFor: string; accessions: Accession[]; note?: string; pending?: string; label: string; ref?: string; feature?: Part }
 
@@ -310,12 +309,12 @@ export const DATA_SOURCES: DataSource[] = [
   { data: 'HiCDiffusion model', usedFor: 'contact background from sequence', accessions: [], note: 'The checkpoints of the authors.', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
 ]
 
-/** The link of a reference, its DOI or its URL. */
+/** Returns the link of a reference, its DOI or its URL. */
 export function referenceLink(r: Reference): string | undefined {
   return r.doi ? `https://doi.org/${r.doi}` : r.url
 }
 
-/** A reference as one line of plain text. */
+/** Returns a reference as one line of plain text. */
 export function referenceText(r: Reference): string {
   const link = r.doi ? ` doi:${r.doi}` : r.url ? ` ${r.url}` : ''
   return `${r.authors}. ${r.title}. ${r.venue} (${r.year}).${link}`

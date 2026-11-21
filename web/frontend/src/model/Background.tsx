@@ -16,7 +16,7 @@ type Props = {
   onChange: (b: BackgroundId) => void
 }
 
-/** Step 4, the contact background: the cell type's Hi-C, a HiCDiffusion prediction or none. */
+/** Step 4, the contact background. It is the Hi-C of the cell type, a HiCDiffusion prediction or none. */
 export function Background({ value, region, available, limitMb = 2, lymphoblastoid, onChange }: Props) {
   const tooLong = region !== undefined && region.end - region.start > limitMb * 1e6
   const reason = !available ? 'HiCDiffusion is not set up on this server.' : tooLong ? `HiCDiffusion predicts regions up to ${limitMb} Mb.` : ''

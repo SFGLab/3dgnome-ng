@@ -1,7 +1,4 @@
-"""One job end to end with a stand in engine, the cache key and the failure path.
-
-    pytest web/tests/test_jobs.py
-"""
+"""One job end to end with a stand in engine, the cache key and the failure path."""
 
 from __future__ import annotations
 

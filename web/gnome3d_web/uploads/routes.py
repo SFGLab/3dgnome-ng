@@ -1,4 +1,5 @@
-"""The routes of the uploads: a file, a link to a contact map and the loops of an upload in a region."""
+"""The routes of the uploads. They take a file and a link to a contact map and give the loops of an
+upload in a region."""
 
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ router = APIRouter(responses={**REFUSALS, 413: {"model": Refusal}, 503: {"model"
 
 
 def region_of(site: Site, cell: str, text: str) -> tuple[str, int, int] | None:
-    """The region an upload is checked against, None when the form has none yet."""
+    """Returns the region an upload is checked against, None when the form has none yet."""
     if not text:
         return None
     r = parse_region(text, site.base_cell(cell).genes(), site.max_span())

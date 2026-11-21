@@ -16,7 +16,7 @@ const ROUTES: [Route, string, string, typeof Link2][] = [
   ['bedpe', 'BEDPE of the region', 'upload', Upload],
 ]
 
-/** A contact map with its check: name and size over the summary, or the refusal and its fix. */
+/** A contact map with its check, name and size over the summary, or the refusal and its fix. */
 function ContactCard({ entry, onRemove }: { entry: Entry; onRemove: () => void }) {
   const r = entry.result
   const bad = !!entry.failure || r?.ok === false
@@ -37,7 +37,7 @@ function ContactCard({ entry, onRemove }: { entry: Entry; onRemove: () => void }
   )
 }
 
-/** The contacts step: a map by link, a local .hic read in the browser, or a BEDPE of the region. */
+/** The contacts step, with a map by link, a local .hic read in the browser or a BEDPE of the region. */
 export function ContactsStep({
   region,
   maxMb,

@@ -2,14 +2,16 @@ import { saveBlob, saveUrl } from '../../lib/download'
 
 /** Saving a figure of the page as a PNG file. */
 
-// What a figure's style sheet sets and a picture of it must carry in its own attributes.
+// The properties that the style sheet of a figure sets and a picture of it
+// must have in its own attributes.
 const STYLES = ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'opacity', 'font-size', 'font-family', 'font-weight', 'text-anchor']
 const SCALE = 3
 const TITLE = 26
 
 /**
- * A copy of an SVG figure that stands by itself: every element has the styles the page computed
- * for it, the figure has the background of its place on the page and its title is written above it.
+ * Returns a copy of an SVG figure that stands by itself. Every element has
+ * the styles the page computed for it, the figure has the background of its
+ * place on the page and its title is above it.
  */
 export function standalone(svg: SVGSVGElement, title: string): SVGSVGElement {
   const [, , w, h] = (svg.getAttribute('viewBox') ?? '0 0 340 270').split(/\s+/).map(Number)

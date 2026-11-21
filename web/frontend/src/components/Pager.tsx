@@ -5,8 +5,10 @@ import sheet from './pager.module.css'
 
 const cn = scoped(sheet)
 
-/** Over a table: the rows shown, the rows per page, Previous and Next. Nothing for a table that
- * fits the smallest page. */
+/**
+ * The controls over a table, which are the rows shown, the rows per page, Previous and Next.
+ * Nothing for a table that fits the smallest page.
+ */
 export function Pager<T>({ page, noun }: { page: Page<T>; noun: string }) {
   if (page.total <= PAGE_SIZES[0]) return null
   const from = page.at * page.size + 1

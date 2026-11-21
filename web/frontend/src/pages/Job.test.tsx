@@ -75,7 +75,7 @@ describe('Job explorer', () => {
     // Every file the summary lists is a download of the panel.
     for (const f of SUMMARY_DONE.files) expect(screen.getByRole('link', { name: f.name })).toHaveAttribute('href', `/jobs/${KEY}/files/${f.name}`)
     expect(within(screen.getByRole('list', { name: 'Structure files' })).getAllByRole('listitem')).toHaveLength(SUMMARY_DONE.models.length)
-    // Every file in one archive is the Download all button of the tabs, and the list does not repeat it.
+    // Every file in one archive is the Download all button of the tabs. The list does not repeat it.
     expect(screen.queryByRole('link', { name: /all files, zip/ })).not.toBeInTheDocument()
   })
 
@@ -200,10 +200,10 @@ describe('Job explorer', () => {
       </QueryClientProvider>,
     )
     const bar = await screen.findByRole('progressbar', { name: 'Progress of the job' })
-    // inputs 5, then modelling's 85 by two fifths: 5 + 34 = 39
+    // The inputs are 5 and two fifths of the 85 of modelling are 34, together 39.
     expect(bar).toHaveAttribute('aria-valuenow', '39')
     expect(screen.getByText('Modelling the structures, 2 of 5 written')).toBeInTheDocument()
-    // Every stage of the job, each with the time it took: 12 s in the queue, 8 s on the inputs,
+    // Every stage of the job, each with the time it took, 12 s in the queue, 8 s on the inputs and
     // 30 s of modelling so far. The stage to come has no time.
     const log = screen.getByRole('list', { name: 'Stages of the job' })
     const rows = within(log).getAllByRole('listitem')

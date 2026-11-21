@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import '../styles/doc.css'
 
 /**
- * A page of the site that is a document: the list of its sections on the side, its title and its
- * lead, then its sections.
+ * A page of the site that is a document. It has the list of its sections on the side, its title and
+ * its lead, then its sections.
  * @param sections the id of a section of the page, or the path of another page, each with its label
  * @param wide a reading column for tables and figures
  */

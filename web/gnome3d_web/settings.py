@@ -15,20 +15,20 @@ GPU_POOL_GIB  the GPU memory pool of the engine of one job, in GiB. One worker o
 ENGINE_CMD    the command that starts the engine, default ENGINE_PYTHON -m gnome3d.cli
 RETENTION_DAYS  how long a private job is kept, default 14
 MAX_REGION_MB   the longest region the form accepts, in Mb, default 20. limits.region_mb of the
-                site's config.json stands over it
+                site's config.json replaces it
 FRONTEND_DIST   the frontend build, default web/frontend/dist
 BASE_PATH     the path the site is served under, /new for a site at /new/, default the root.
               The frontend is built with the same value
 MAX_STRUCTURES  the most structures a job may ask for, default 100
 UPLOAD_MAX_MB   the largest upload, in MB, default 200
 LINK_READS    how many contact map links the server reads at once, default 4
-LINK_ALLOW_PRIVATE  1 lets a contact map link point at a private or loopback address, for tests;
-              off by default
+LINK_ALLOW_PRIVATE  1 lets a contact map link point at a private or loopback address, for
+              tests. Off by default
 SITE_CONFIG   the site's config.json, default DATA_DIR/config.json. It holds the feature flags
               and the limits of a job, see siteconfig.py. A site without the file shows
               everything and keeps the default limits
 HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the parts of the
-              HiCDiffusion step, see hicdiffusion.py; it is offered when every part is in place
+              HiCDiffusion step, see engine/hicdiffusion.py. The step is offered when every part is in place
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ POOL_SHARE = 0.9
 
 @functools.cache
 def card_gib(gpu: str | None) -> float | None:
-    """The memory of a card in GiB, of the smallest card of this process for None, from
+    """Returns the memory of a card in GiB, of the smallest card of this process for None, from
     nvidia-smi. None on a machine without it."""
     cmd = ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits", *(["-i", gpu] if gpu is not None else [])]
     try:
@@ -71,7 +71,7 @@ class EnvError(ValueError):
 
 
 def _whole(name: str, default: int | None) -> int | None:
-    """A variable that is a whole number of 1 or more, `default` when it is unset or empty."""
+    """Reads a variable that is a whole number of 1 or more, `default` when it is unset or empty."""
     text = os.environ.get(name, "").strip()
     if not text:
         return default
@@ -81,7 +81,7 @@ def _whole(name: str, default: int | None) -> int | None:
 
 
 def base_path(text: str) -> str:
-    """A base path as a prefix with a leading slash and no trailing one. The root is empty."""
+    """Returns a base path as a prefix with a leading slash and no trailing one. The root is empty."""
     inner = text.strip().strip("/")
     return f"/{inner}" if inner else ""
 
@@ -143,8 +143,9 @@ class Settings:
         return [gpu for _ in range(self.workers_per_gpu) for gpu in self.gpus]
 
     def engine_env(self, gpu: str | None = None) -> dict[str, str]:
-        """The variables of the engine of one job: its card, all cards of the process for None,
-        and its GPU memory pool. A pool set in the environment of the process itself stays."""
+        """Returns the variables of the engine of one job, which are its card
+        and its GPU memory pool. None leaves the engine all cards of the
+        process. A pool set in the environment of the process itself stays."""
         env = {"CUDA_VISIBLE_DEVICES": gpu} if gpu is not None else {}
         if "GNOME3D_GPU_POOL_GIB" in os.environ or "XLA_PYTHON_CLIENT_MEM_FRACTION" in os.environ:
             return env
@@ -156,7 +157,8 @@ class Settings:
             if pool >= 1:
                 env["GNOME3D_GPU_POOL_GIB"] = f"{pool:.2f}"
             else:
-                # A card of unknown size, or one too small for a pool of 1 GiB each: the share of JAX is divided.
+                # The share of JAX is divided for a card of unknown size or one too
+                # small for a pool of 1 GiB each.
                 env["XLA_PYTHON_CLIENT_MEM_FRACTION"] = f"{JAX_POOL_SHARE / n:.4f}"
         return env
 

@@ -5,7 +5,7 @@
 #   SITE=/srv/gnome3d/data E3D=~/enhancer3d/data HIC_SINGLETONS=data HGSVC=data/_hgsvc \
 #     bash web/scripts/build_site_data.sh
 #
-# Inputs: data/<LINE>/ with the production CTCF anchors and the outputs of
+# The inputs are data/<LINE>/ with the production CTCF anchors and the outputs of
 # playground/rnapii/crosscell_prep.py, <LINE>_hic_25kb_singletons.bedpe under HIC_SINGLETONS,
 # GENCODE v40 basic and the EnhancerAtlas beds under E3D, the HGSVC VCF under HGSVC.
 set -euo pipefail

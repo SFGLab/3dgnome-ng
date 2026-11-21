@@ -32,7 +32,8 @@ class Status(TypedDict):
 
 
 class OwnStated(TypedDict):
-    """The own data of a request as a job page states it: the factors of the loops and what else came."""
+    """The own data of a request as a job page states it, the factors of the
+    loops and the kinds of the other files."""
 
     loops: list[str]
     anchors: bool

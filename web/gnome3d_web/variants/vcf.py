@@ -23,8 +23,8 @@ KINDS = ("DEL", "INS", "INV", "DUP")
 
 
 def _lines(vcf: Path, region: Region) -> Iterator[str]:
-    """The VCF's header line and the records of the region's chromosome, through tabix when
-    the file is indexed."""
+    """Returns the header line of the VCF and the records of the chromosome of the region, through
+    tabix when the file is indexed."""
     if Path(f"{vcf}.tbi").is_file() and shutil.which("tabix"):
         yield subprocess.run(["tabix", "-H", str(vcf)], capture_output=True, text=True, check=True).stdout.splitlines()[-1]
         out = subprocess.run(["tabix", str(vcf), str(region)], capture_output=True, text=True, check=True).stdout
@@ -54,8 +54,7 @@ class UnknownSample(Exception):
 
 
 class Record(TypedDict):
-    """A variant a sample carries: the variant, its type, its position in the VCF, its length,
-    the genotype and whether the first and the second haplotype carry it."""
+    """A variant a sample carries."""
 
     sv: SV
     type: str
@@ -66,7 +65,7 @@ class Record(TypedDict):
 
 
 def _info(text: str) -> dict[str, str]:
-    """The INFO column of a record by key. A flag has an empty value."""
+    """Returns the INFO column of a record by key. A flag has an empty value."""
     out = {}
     for part in text.split(";"):
         key, _, value = part.partition("=")
@@ -75,9 +74,8 @@ def _info(text: str) -> dict[str, str]:
 
 
 def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[Record], dict[str, int]]:
-    """The records of one sample inside the region with their genotype and haplotypes, in the
-    order of the file. Also returns the count of records of other types, by type. The preview of
-    the variants and the job both take the variants from here.
+    """Returns the records of one sample inside the region with their genotype and haplotypes, in
+    the order of the file. Also returns the count of records of other types, by type.
 
     @raises UnknownSample when the sample is not a column of the VCF
     """
@@ -118,8 +116,8 @@ def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[Record
 
 
 def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV], int]:
-    """The sample's two haplotypes' variants in the region and the number of records the sample
-    carries there that are skipped for an unsupported type.
+    """Returns the variants of the two haplotypes of the sample in the region and the number of
+    records the sample carries there that are skipped for an unsupported type.
 
     @raises UnknownSample when the sample is not a column of the VCF
     """

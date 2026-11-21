@@ -5,7 +5,7 @@ import sheet from './job.module.css'
 
 const cn = scoped(sheet)
 
-/** The Find a gene field: Enter selects the gene of that name, case insensitive. */
+/** The Find a gene field. Enter selects the gene of that name, case insensitive. */
 export function FindGene({ names, onFind }: { names: string[]; onFind: (gene: string) => void }) {
   const [text, setText] = useState('')
   const [miss, setMiss] = useState(false)

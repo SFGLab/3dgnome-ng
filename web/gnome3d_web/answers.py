@@ -1,4 +1,4 @@
-"""The parts of an answer that every route shares: errors, a packed JSON body and the base path."""
+"""The parts of an answer that every route shares. They are the errors, a packed JSON body and the base path."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .context import Site
 
 
 class Refusal(TypedDict):
-    """The body of an answer that is no success: the message, the form field it concerns and the fix."""
+    """The body of an answer that is no success. It has the message, the form field it concerns and the fix."""
 
     error: str
     field: NotRequired[str]
@@ -35,10 +35,9 @@ REFUSALS: dict[int | str, dict[str, Any]] = {400: {"model": Refusal}, 404: {"mod
 
 
 def packed_json(request: Request, value: object) -> Response:
-    """Returns a JSON answer, gzipped for a client that takes gzip. For an answer of megabytes.
-
-    Level 1 takes the contact map of 800 bins from 11 MB to under 5 MB in a fifth of a second.
-    A higher level saves a tenth more and takes several times as long.
+    """Returns a JSON answer, gzipped for a client that takes gzip. It is for an answer of
+    megabytes. Level 1 takes the contact map of 800 bins from 11 MB to under 5 MB in a fifth of a
+    second. A higher level saves a tenth more and takes several times as long.
     """
     body = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
     headers = {"Vary": "Accept-Encoding"}
@@ -67,7 +66,7 @@ class StripBase:
 
 
 def handle_errors(app: FastAPI) -> None:
-    """Answers a refused request with 400, its message and its field, and an unknown cell type with 404."""
+    """Answers a refused request with 400, its message and its field. Answers an unknown cell type with 404."""
 
     @app.exception_handler(Refused)
     def refused(_: Request, e: Refused) -> JSONResponse:
@@ -79,7 +78,7 @@ def handle_errors(app: FastAPI) -> None:
 
 
 def job_of(site: Site, kind: str, key: str) -> Path:
-    """The directory of the job of an address, or the answer 404."""
+    """Returns the directory of the job of an address, or answers 404."""
     job = site.job(kind, key)
     if job is None:
         raise HTTPException(404)
@@ -87,7 +86,7 @@ def job_of(site: Site, kind: str, key: str) -> Path:
 
 
 def job_at(site: Site, url: str) -> Path:
-    """The directory of the job a page names by its path, `/jobs/<key>` or `/p/<token>`, or the answer 404."""
+    """Returns the directory of the job of a page path, `/jobs/<key>` or `/p/<token>`, or answers 404."""
     _, kind, key = (url.split("/", 2) + ["", ""])[:3]
     if not url.startswith("/") or kind not in ("jobs", "p"):
         raise HTTPException(404)

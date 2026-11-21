@@ -1,6 +1,6 @@
 /**
- * The stretch drawn around a region: the region with its own length on either side, from 0. The
- * stretch is `cap` bp at most. A region that leaves less room gets less on either side, and a
+ * The stretch drawn around a region, which is the region with its own length on either side, from
+ * 0. The stretch is `cap` bp at most. A region that leaves less room gets less on either side. A
  * region of `cap` or more is drawn from a little before its start.
  */
 export function around(start: number, end: number, cap = Infinity): [number, number] {

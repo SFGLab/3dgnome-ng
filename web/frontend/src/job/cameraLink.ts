@@ -1,4 +1,4 @@
-/** A camera state shared by several scenes: one scene's rotation and zoom is applied to the others. */
+/** A camera state shared by several scenes. The rotation and zoom of one scene is applied to the others. */
 export type CameraState = { position: number[]; target: number[]; zoom: number }
 
 export function makeCameraLink() {

@@ -64,7 +64,7 @@ export interface paths {
         };
         /**
          * Api Compare Gene
-         * @description The distances of one gene in the structures of two jobs.
+         * @description Returns the distances of one gene in the structures of two jobs.
          */
         get: operations["api_compare_gene_api_compare_gene_get"];
         put?: never;
@@ -84,7 +84,7 @@ export interface paths {
         };
         /**
          * Api Expression
-         * @description The hosted expression a job of this cell type, and of this sample of a call set, can take.
+         * @description Returns the hosted expression that a job of this cell type and of this sample of a call set can take.
          */
         get: operations["api_expression_api_expression_get"];
         put?: never;
@@ -104,7 +104,7 @@ export interface paths {
         };
         /**
          * Api Genes
-         * @description The suggestions of the region field.
+         * @description Returns the suggestions of the region field.
          */
         get: operations["api_genes_api_genes_get"];
         put?: never;
@@ -618,7 +618,7 @@ export interface paths {
         };
         /**
          * Api Sv Samples
-         * @description Sex, population and parents of each sample of a call set that has the table.
+         * @description Returns the sex, the population and the parents of each sample of a call set that has the table.
          */
         get: operations["api_sv_samples_api_sv_sets__name__samples_get"];
         put?: never;
@@ -1190,7 +1190,8 @@ export interface components {
         };
         /**
          * OwnStated
-         * @description The own data of a request as a job page states it: the factors of the loops and what else came.
+         * @description The own data of a request as a job page states it, the factors of the
+         *     loops and the kinds of the other files.
          */
         OwnStated: {
             /** Anchors */
@@ -1252,7 +1253,7 @@ export interface components {
         };
         /**
          * Refusal
-         * @description The body of an answer that is no success: the message, the form field it concerns and the fix.
+         * @description The body of an answer that is no success. It has the message, the form field it concerns and the fix.
          */
         Refusal: {
             /** Error */

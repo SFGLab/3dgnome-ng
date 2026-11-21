@@ -33,14 +33,13 @@ Job = ListedJob
 
 
 def new_code() -> str:
-    """A fresh sync code, K7M2-9QXD-4THP-W3RZ."""
+    """Returns a fresh sync code, as in K7M2-9QXD-4THP-W3RZ."""
     return "-".join("".join(secrets.choice(ALPHABET) for _ in range(GROUP)) for _ in range(GROUPS))
 
 
 def normalise(text: str) -> str | None:
-    """A typed code in its shown form, or None when it cannot be a code.
-
-    Case, spaces and dashes do not matter and O, I and L read as the digits they resemble.
+    """Returns a typed code in its shown form, or None when it cannot be a code. Case, spaces and
+    dashes do not matter and O, I and L read as the digits they resemble.
     """
     bare = re.sub(r"[\s-]", "", text).upper().translate(_LOOKALIKE)
     if len(bare) != GROUPS * GROUP or any(ch not in ALPHABET for ch in bare):
@@ -53,10 +52,10 @@ def _stamp(job: Job) -> float:
 
 
 def clean(jobs: object, private: bool) -> list[Job]:
-    """The well formed entries of a list a browser sent, newest first.
+    """Returns the well formed entries of a list a browser sent, newest first.
 
     @param jobs the entries as parsed JSON
-    @param private whether the list takes private jobs
+    @param private true for a list that takes private jobs
     @return entries with a job route, texts cut to MAX_TEXT, at most MAX_JOBS
     """
     out: dict[str, Job] = {}
@@ -80,7 +79,7 @@ def clean(jobs: object, private: bool) -> list[Job]:
 
 
 def merge(a: list[Job], b: list[Job]) -> list[Job]:
-    """Both lists as one, newest first. A job on both keeps the entry edited last."""
+    """Returns both lists as one, newest first. A job on both keeps the entry edited last."""
     out = {j["url"]: j for j in a}
     for j in b:
         if j["url"] not in out or _stamp(j) > _stamp(out[j["url"]]):
@@ -114,7 +113,7 @@ class Lists:
         return code, record
 
     def read(self, code: str) -> dict[str, Any] | None:
-        """The record of a code in its shown form, or None when no list has it."""
+        """Returns the record of a code in its shown form, or None when no list has it."""
         p = self._path(code)
         return json.loads(p.read_text()) if p.is_file() else None
 

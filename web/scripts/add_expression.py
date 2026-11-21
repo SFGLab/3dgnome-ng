@@ -2,7 +2,7 @@
 
     python web/scripts/add_expression.py <site data dir> <tables dir>
 
-The tables directory is the output of `make_expression_tables.py`: one table for each source
+The tables directory is the output of `make_expression_tables.py`. It has one table for each source
 and `expression.json` with their catalog entries. A table goes to `expression/<NAME>.tsv`. The
 catalog is first copied to `catalog.json.before-expression`. A table or an entry that exists
 is refused. A cell type of an entry that the catalog does not hold is refused too.

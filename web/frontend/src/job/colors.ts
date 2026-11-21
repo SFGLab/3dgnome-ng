@@ -19,8 +19,10 @@ const hex = (rgb: number[]) => `#${rgb.map((v) => Math.round(v).toString(16).pad
 
 const rgb = (c: string) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16))
 
-/** The chromatin colour toned by position, lighter at the region's start and darker at its end.
- * One flat grey made strands that cross each other read as one mass. */
+/**
+ * Returns the chromatin colour toned by position, lighter at the start of the region and darker at
+ * its end. Strands that cross each other read as one mass in one flat grey.
+ */
 export function chromatinAt(base: string, t: number): string {
   const c = rgb(base)
   const light = c.map((v) => v + 0.45 * (255 - v))
@@ -44,7 +46,7 @@ export function colorAt(mode: Mode, bp: number, ctx: ColorContext): string {
   return chromatinAt(palette.chromatin, t)
 }
 
-/** The palette from the page's tokens, with the design's values where a token is missing. */
+/** Reads the palette from the tokens of the page, with the values of the design for a missing token. */
 export function readPalette(): Palette {
   const css = typeof window === 'undefined' ? null : getComputedStyle(document.documentElement)
   const v = (name: string, fallback: string) => css?.getPropertyValue(name).trim() || fallback

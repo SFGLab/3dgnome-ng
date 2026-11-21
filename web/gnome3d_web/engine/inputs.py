@@ -39,8 +39,8 @@ def _no_loops() -> list[tuple[str, Path]]:
 
 @dataclass
 class Own:
-    """A job's own files: loops per factor and anchors, contacts and enhancers in place of the
-    cell type's. Without anchors the loop ends are the anchors."""
+    """The own files of a job. They are loops per factor and anchors, contacts and enhancers in
+    place of those of the cell type. Without anchors the loop ends are the anchors."""
 
     loops: list[tuple[str, Path]] = field(default_factory=_no_loops)
     anchors: Path | None = None
@@ -49,7 +49,7 @@ class Own:
 
 
 def _loop_end_anchors(paths: list[Path], chrom: str) -> pd.DataFrame:
-    """The ends of the loops on a chromosome, overlapping ends merged, orientation N."""
+    """Returns the ends of the loops on a chromosome, overlapping ends merged, orientation N."""
     spans = []
     for p in paths:
         t = _read(p, chrom, 7)
@@ -78,11 +78,11 @@ def _read(path: Path, chrom: str, ncol: int) -> pd.DataFrame:
 
 
 def _thin_to_hosted(sing: pd.DataFrame, cell: CellType, chrom: str) -> pd.DataFrame:
-    """Own contacts thinned to the contacts per Mb of the cell type's hosted map on the
-    chromosome, over the span the own contacts cover. Every route of own contacts meets here,
-    so a deep map and a shallow one give the engine the density its maps are read at."""
+    """Thins own contacts to the contacts per Mb of the hosted map of the cell type on the
+    chromosome, over the span the own contacts cover. A deep map and a shallow one give the engine
+    the density of its hosted maps."""
     span = (int(sing[5].max()) - int(sing[1].min())) / 1e6
-    # At least one contact, or a short span would be thinned to nothing.
+    # At least one contact is kept. A short span would be thinned to nothing.
     target = max(1, round(hosted_density(cell.path("singletons"), chrom) * span))
     seed = int.from_bytes(hashlib.blake2b(f"{chrom} {len(sing)} {int(sing[6].sum())}".encode(), digest_size=8).digest(), "little")
     out = sing.copy()
@@ -91,7 +91,8 @@ def _thin_to_hosted(sing: pd.DataFrame, cell: CellType, chrom: str) -> pd.DataFr
 
 
 def _clusters(loops: pd.DataFrame, anchors: pd.DataFrame) -> list[list]:
-    """Loops as the rules' nine columns, orientation from the anchor holding each end's midpoint."""
+    """Returns loops as the nine columns of the rules, with the orientation of the anchor that holds
+    the midpoint of each end."""
     starts = anchors[1].to_numpy()
     ends = anchors[2].to_numpy()
     orient = anchors[3].astype(str).to_numpy() if anchors.shape[1] > 3 else np.full(len(anchors), "N")
@@ -105,7 +106,7 @@ def _clusters(loops: pd.DataFrame, anchors: pd.DataFrame) -> list[list]:
 
 
 def _snap(loops: pd.DataFrame, anchors: pd.DataFrame) -> pd.DataFrame:
-    """Own loops with each end replaced by the anchor holding its midpoint, when one does."""
+    """Returns own loops with each end replaced by the anchor that holds its midpoint, when one does."""
     starts = anchors[1].to_numpy()
     ends = anchors[2].to_numpy()
     out = loops.copy()
@@ -121,11 +122,10 @@ def _snap(loops: pd.DataFrame, anchors: pd.DataFrame) -> pd.DataFrame:
 def loop_network(
     cell: CellType, region: Region, factors: str, own_loops: list[tuple[str, Path]], own_anchors: Path | None
 ) -> tuple[pd.DataFrame, int, list[tuple[str, list[list]]]]:
-    """The anchors of the region's chromosome, the length the rules give that chromosome and the
-    loops of each factor on those anchors. Own loops replace the loops of the cell type and each
-    of their ends is moved to the anchor that holds its midpoint. RNAPII alone keeps the anchors
-    that hold an end of an RNAPII loop, without their orientation. The job and the preview of the
-    variants both rewire these loops."""
+    """Returns the anchors of the chromosome of the region, the length the rules give that
+    chromosome and the loops of each factor on those anchors. Own loops replace the loops of the
+    cell type and each of their ends is moved to the anchor that holds its midpoint. RNAPII alone
+    keeps the anchors that hold an end of an RNAPII loop, without their orientation."""
     chrom = region.chrom
     if own_loops:
         anchors = _read(own_anchors, chrom, 4) if own_anchors else _loop_end_anchors([p for _, p in own_loops], chrom)
@@ -160,8 +160,8 @@ def build_inputs(
     background: str = "hic",
     own: Own | None = None,
 ) -> Inputs:
-    """Write the inputs for one haplotype under `out` and return the config and the region in
-    the haplotype's coordinates. `hic` is a predicted HiCDiffusion window and its reference start.
+    """Writes the inputs for one haplotype under `out` and returns the config and the region in the
+    coordinates of the haplotype. `hic` is a predicted HiCDiffusion window and its reference start.
     `background` none turns off the contact terms and keeps the singletons for the exponent fit.
     RNAPII alone has its loop ends as anchors, orientation N and no CTCF orientation term."""
     out.mkdir(parents=True, exist_ok=True)

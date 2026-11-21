@@ -12,7 +12,7 @@ const cn = scoped(sheet1, sheet2)
 const W = 1000
 const H = 70
 
-/** A position in megabases with no more digits than the step between ticks needs. */
+/** Returns a position in megabases with no more digits than the step between ticks needs. */
 const mb = (v: number, step: number) => `${(v / 1e6).toFixed(step >= 1e6 ? 0 : step >= 1e5 ? 1 : step >= 1e4 ? 2 : 3)}`
 
 type Props = {
@@ -25,8 +25,7 @@ type Props = {
   onSelect?: (index: number | null) => void
   /** A part of the region another view shows, drawn as a box. */
   window?: [number, number]
-  /** A drag along the view asks for that part, and so does the wheel, which scales the part in
-   * use about the pointer. */
+  /** A drag along the view asks for that part. The wheel does too and scales the part in use about the pointer. */
   onWindow?: (start: number, end: number) => void
   /** The stretch a zoom out may reach, the whole region where `region` is a part of it. */
   bounds?: [number, number]
@@ -39,9 +38,9 @@ type Props = {
 }
 
 /**
- * The loops of a region in two dimensions: the genome as a line and every loop as an arc between
- * its anchors, taller for a longer loop.
- * An arc can be selected and a drag selects a part of the region. The view only reports both.
+ * The loops of a region in two dimensions. The genome is a line and every loop an arc between its
+ * anchors, taller for a longer loop. An arc can be selected and a drag selects a part of the
+ * region. The view only reports both.
  */
 export function LoopView({ chrom, region, loops, selected = null, onSelect, window, onWindow, bounds, cursor = null, onReset, hint = '' }: Props) {
   const [start, end] = region
@@ -49,16 +48,16 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
   const x = (p: number) => ((p - start) / width) * W
   const svg = useRef<SVGSVGElement>(null)
   const [over, setOver] = useState<number | null>(null)
-  // The dragged part is drawn from the state and read from the ref on release, since a release
-  // can come before the redraw that the last move asked for.
+  // The dragged part is drawn from the state and read from the ref on release. A release can come
+  // before the redraw that the last move asked for.
   const [brush, setBrush] = useState<[number, number] | null>(null)
   const dragged = useRef<[number, number] | null>(null)
   const drag = useRef<number | null>(null)
-  // The loop the pointer went down on. The view takes the pointer for a drag, so a click never
-  // reaches the arc and the release decides between a click on it and a drag.
+  // The loop under the pointer at the press. The view takes the pointer for a drag and no click
+  // reaches the arc. The release decides between a click on it and a drag.
   const pressed = useRef<number | null>(null)
-  // The loops that reach into the region, longest first so a short arc is drawn over a long one
-  // and stays easy to point at.
+  // The loops that reach into the region, longest first. A short arc is drawn over a long one and
+  // stays easy to point at.
   const shown = useMemo(
     () =>
       loops
@@ -70,8 +69,8 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
   const longest = Math.max(1, ...shown.map((r) => r.b - r.a))
   const arc = (a: number, b: number) => {
     const [xa, xb] = [x(a), x(b)]
-    // The longest loop in view fills the height and the others grow with the root of their
-    // span, so short loops are still seen beside long ones.
+    // The longest loop in view fills the height and the others grow with the root of their span.
+    // Short loops are still seen beside long ones.
     const h = Math.max(6, Math.sqrt((b - a) / longest) * (H - 6))
     return `M ${xa} ${H} A ${(xb - xa) / 2} ${h} 0 0 1 ${xb} ${H}`
   }
@@ -79,8 +78,8 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
     const box = svg.current!.getBoundingClientRect()
     return box.width ? Math.min(1, Math.max(0, (clientX - box.left) / box.width)) : 0
   }
-  // The wheel scales the part in use, the box where there is one and the view otherwise. A
-  // native listener, since React's wheel handler is passive and cannot stop the page scrolling.
+  // The wheel scales the part in use, the box when there is one and the view otherwise. The
+  // listener is native. The wheel handler of React is passive and cannot stop the page scrolling.
   const wheel = useRef<(e: WheelEvent) => void>(() => {})
   wheel.current = (e) => {
     if (!onWindow) return
@@ -101,8 +100,7 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
   const named = over ?? selected
   return (
     <div className={cn('loop-view')}>
-      {/* The line that says what the view does, or names the loop under the pointer or the selected
-          one, with the two buttons at its end. */}
+      {/* The line with the use of the view, or with the loop under the pointer or the selected one. The two buttons are at its end. */}
       <div className={cn('loop-view-head')}>
         <p className={cn('loop-view-line')}>
           {named !== null && loops[named] ? <span className="mono">{`${named === selected ? 'Selected: ' : ''}${describeLoop(loops[named])}`}</span> : hint}

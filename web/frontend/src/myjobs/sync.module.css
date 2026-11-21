@@ -78,8 +78,8 @@
   cursor: default;
 }
 
-/* A link of the panel has the size and weight of the panel's text and differs by its colour
-   alone, so a block of the panel holds two text styles at most. */
+/* A link of the panel has the size and weight of the text of the panel and differs by its colour
+   alone. A block of the panel holds two text styles at most. */
 :global(.sync-link) {
   display: inline-flex;
   align-items: center;

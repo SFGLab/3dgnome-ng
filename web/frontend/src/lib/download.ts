@@ -1,6 +1,6 @@
 /** Saves a file from the page to the visitor's computer. */
 
-/** Saves what a URL of the page holds, a data address or an object address, under a file name. */
+/** Saves the content of a URL of the page, a data address or an object address, under a file name. */
 export function saveUrl(url: string, name: string): void {
   const link = document.createElement('a')
   link.href = url

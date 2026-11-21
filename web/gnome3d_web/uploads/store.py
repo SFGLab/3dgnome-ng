@@ -1,4 +1,4 @@
-"""The stored file of an upload, its record and what the dialog is told about it."""
+"""The stored file of an upload, its record and the answer the dialog gets about it."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ def result(d: Path, c: Check) -> UploadResult:
 
 
 def preview(d: Path, region: tuple[str, int, int]) -> list[LoopDrawn]:
-    """The loops of a loops upload inside a region, as anchor midpoints and the count."""
+    """Returns the loops of a loops upload inside a region, as anchor midpoints and the count."""
     out = []
     for _, cols in records(data_file(d)):
         if len(cols) >= 7 and cols[0] == cols[3] == region[0] and whole(cols[6]) is not None:
@@ -89,13 +89,13 @@ ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
 
 
 def find(root: Path, uid: str) -> Path | None:
-    """The directory of an upload under `root`, None for an id the site has no upload of."""
+    """Returns the directory of an upload under `root`, None for an id without an upload."""
     d = root / uid
     return d if ID.fullmatch(uid) and (d / "meta.json").is_file() else None
 
 
 def usable(root: Path, uid: object, kind: str, field: str) -> Path:
-    """The directory of an upload that exists, holds `kind` and passed its check.
+    """Returns the directory of an upload that exists, holds `kind` and passed its check.
 
     @raises Refused on `field` otherwise
     """
@@ -111,7 +111,7 @@ def usable(root: Path, uid: object, kind: str, field: str) -> Path:
 
 
 def own_data(root: Path, raw: object, cell_types: set[str]) -> dict:
-    """The upload directories a request names as its own data, each checked to exist, to be of
+    """Returns the upload directories of the own data of a request, each checked to exist, to be of
     its kind and to have passed its check.
 
     @raises Refused on the field own otherwise

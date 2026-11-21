@@ -4,7 +4,7 @@ import { mockApi } from './api'
 
 type Stored = { private: boolean; jobs: RecentJob[] }
 
-/** A stand-in for the list API that keeps its lists in memory. Returns the lists and the mock. */
+/** Makes a stand-in for the list API that keeps its lists in memory. Returns the lists and the mock. */
 export function mockLists(initial: Record<string, Stored> = {}, newCode = 'AAAA-BBBB-CCCC-DDDD') {
   const lists: Record<string, Stored> = { ...initial }
   const take = (l: Stored, jobs: RecentJob[]) => jobs.filter((j) => l.private || !j.url.startsWith('/p/'))

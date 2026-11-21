@@ -18,7 +18,7 @@ function clamp(x: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, x))
 }
 
-/** A number setting: a box for the value and a slider over its range. */
+/** A number setting, with a box for the value and a slider over its range. */
 function NumberSetting({ s, value, onChange }: { s: Setting; value: string; onChange: (v: string) => void }) {
   const lo = s.lo ?? 0
   const hi = s.hi ?? 1

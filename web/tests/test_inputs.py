@@ -1,7 +1,4 @@
-"""Engine inputs for one request.
-
-    pytest web/tests/test_inputs.py
-"""
+"""Engine inputs for one request."""
 
 from __future__ import annotations
 

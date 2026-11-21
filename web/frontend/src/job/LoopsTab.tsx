@@ -12,8 +12,10 @@ import sheet from './job.module.css'
 
 const cn = scoped(sheet)
 
-/** The Loops tab: every loop the engine read, with its factor, ends, span and PET count. A row
- * can be shown in the model, where its two anchors are marked. */
+/**
+ * The Loops tab. It has every loop the engine read, with its factor, ends, span and PET count. A
+ * row can be shown in the model, with its two anchors marked.
+ */
 export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) => void }) {
   const loops = useQuery(askedOf(api).loops())
   const sorted = useMemo(() => [...(loops.data ?? [])].sort((a, b) => a.a[0] - b.a[0]), [loops.data])

@@ -4,8 +4,10 @@ import sheet from './job.module.css'
 
 const cn = scoped(sheet)
 
-/** The Distance A to B card: the mean and SD over the ensemble, the value in this structure,
- * a dot per structure and the two positions. */
+/**
+ * The Distance A to B card, with the mean and SD over the ensemble, the value in this structure, a
+ * dot per structure and the two positions.
+ */
 export function DistanceCard({ d, current, labels }: { d: Distance; current: number; labels: [string, string] }) {
   const lo = Math.min(...d.values)
   const hi = Math.max(...d.values)

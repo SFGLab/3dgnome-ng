@@ -1,7 +1,4 @@
-"""Enhancer and promoter marks on model beads and the distance table.
-
-    pytest web/tests/test_marks.py
-"""
+"""Enhancer and promoter marks on model beads and the distance table."""
 
 from __future__ import annotations
 

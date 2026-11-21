@@ -1,7 +1,7 @@
 import type { Reference } from '../content/references'
 import { referenceLink } from '../content/references'
 
-/** One reference: title, authors, venue and its DOI or URL. */
+/** One reference with its title, authors, venue and its DOI or URL. */
 export function ReferenceEntry({ r }: { r: Reference }) {
   const link = referenceLink(r)
   return (

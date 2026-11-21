@@ -1,4 +1,4 @@
-"""The submission of a job: a request is checked, its uploads are copied into the job and the job is queued."""
+"""The submission of a job. A request is checked, its uploads are copied into the job and the job is queued."""
 
 from __future__ import annotations
 
@@ -23,12 +23,13 @@ from .workers import enqueue
 def create_job(site: Site, fields: dict[str, str]) -> str:
     """Checks a job request, queues its job and returns the url of the job.
 
-    A request on hosted data has a key. Without the field `fresh` the job of that key is
-    returned when the site holds one, which is how an example opens the same job for
-    everyone. With `fresh` set to 1 the request starts a job of its own.
+    A request on hosted data has a key. Without the field `fresh` the job of that key is returned
+    when the site holds one. An example opens the same job for everyone this way. With `fresh` set
+    to 1 the request starts a job of its own.
 
-    @param fields the form fields of a job request, overrides as JSON text. The field vcf_upload
-        names an uploaded VCF, which makes the job private.
+    @param site the site that takes the request
+    @param fields the form fields of a job request, overrides as JSON text. The field vcf_upload has
+        the id of an uploaded VCF, which makes the job private.
     @raises Refused with the field the request fails on
     """
     s, catalog, uploads = site.settings, site.catalog, site.settings.uploads_dir
@@ -115,7 +116,7 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
 
 def private_job(site: Site, req: JobRequest, own_dirs: dict, vcf: Path | None, own_table: tuple[expression.Table, list[str], dict[str, object]] | None) -> str:
     """Starts the job of a request with uploads under a random token. The table, the own data and
-    the VCF are copied into the job, and the request has their places there."""
+    the VCF are copied into the job. The request has their places there."""
     token = secrets.token_urlsafe(18)
     job = site.settings.private_dir / token
     job.mkdir(parents=True)
@@ -147,9 +148,10 @@ def put_vcf(vcf: Path, job: Path) -> Path:
 
 
 def own_expression(uploads: Path, fields: dict[str, str]) -> tuple[expression.Table, list[str], dict[str, object]]:
-    """The uploaded expression table of a job request, the columns the request takes and what
-    they are. The field expression_upload names the upload, expression_columns the samples
-    as a JSON list, every sample when empty, and expression_kind counts or values."""
+    """Returns the uploaded expression table of a job request, the columns the request takes and the
+    record of what they are. The field expression_upload has the id of the upload and
+    expression_kind is counts or values. The field expression_columns has the samples as a JSON
+    list, every sample when empty."""
     if not fields.get("expression_upload"):
         raise Refused("Your own expression needs a table. Upload one, or choose no expression.", "expression")
     d = upload_store.usable(uploads, fields["expression_upload"], "expression", "expression")

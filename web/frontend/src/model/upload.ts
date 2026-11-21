@@ -1,12 +1,12 @@
 import type { UploadResult } from '../api'
 
-/** An uploaded expression table, the samples of it the job takes and what its values are. */
+/** An uploaded expression table, the samples of it the job takes and the kind of its values. */
 export type OwnExpression = { upload: UploadResult; columns: string[]; kind: 'counts' | 'values' }
 
 /**
- * The uploads a job uses in place of the data of a listed cell type, and its expression table. On your own cell type
- * loopsFrom and enhancersFrom give a listed cell type whose loops or enhancers it takes,
- * enhancersFrom none for no enhancers.
+ * The uploads a job uses in place of the data of a listed cell type and its expression
+ * table. On your own cell type loopsFrom and enhancersFrom give a listed cell type whose
+ * loops or enhancers it takes, enhancersFrom none for no enhancers.
  */
 export type OwnChoice = {
   loops: { factor: string; upload: UploadResult }[]
@@ -21,8 +21,11 @@ export type OwnChoice = {
 
 export const NO_OWN: OwnChoice = { loops: [], anchors: null, contacts: null, enhancers: null }
 
-/** The data of the own data card, named as the data of a listed cell type is: each factor of the
- * loops, the contacts and the enhancers. A set taken from a listed cell type has its name. */
+/**
+ * Returns the data of the own data card under the names of the data of a listed cell type, which
+ * are each factor of the loops, the contacts and the enhancers. A set taken from a listed cell type
+ * has its name.
+ */
 export function ownData(own: OwnChoice): string[] {
   return [
     ...own.loops.map((l) => l.factor),
@@ -33,7 +36,7 @@ export function ownData(own: OwnChoice): string[] {
   ]
 }
 
-/** The uploads as the JSON field own of POST /api/jobs. */
+/** Returns the uploads as the JSON field own of POST /api/jobs. */
 export function ownField(own: OwnChoice): string {
   return JSON.stringify({
     loops: own.loops.map((l) => ({ factor: l.factor, upload: l.upload.id })),
@@ -45,7 +48,7 @@ export function ownField(own: OwnChoice): string {
   })
 }
 
-/** The factor a loops file most likely holds, read from its name and CTCF for the first file. */
+/** Returns the factor a loops file most likely holds, read from its name and CTCF for the first file. */
 export function guessFactor(name: string, index: number): string {
   const n = name.toUpperCase()
   if (/RNAP|POL2|POLII/.test(n)) return 'RNAPII'

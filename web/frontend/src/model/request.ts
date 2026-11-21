@@ -1,7 +1,7 @@
 /**
- * The request of a job, in the one place that states its fields: from the form to the body the
- * server takes, from an example and from the request of an earlier job to the form, and the step
- * of the form each field belongs to.
+ * The request of a job, in the one place that states its fields. The module turns the form into the
+ * body the server takes and an example or the request of an earlier job into the form. It has the
+ * step of the form of each field.
  */
 import type { Summary } from '../api'
 import type { Example } from './examples'
@@ -26,7 +26,9 @@ export const FIELD_STEP: Record<string, number> = {
 }
 
 /**
- * The form as the multipart body of POST /api/jobs.
+ * Returns the form as the multipart body of POST /api/jobs.
+ * @param form the form
+ * @param overrides the changed settings, keyed section.key
  * @param fresh starts a job of its own, also when the site holds a job of the same request. The
  *   form asks so. An example does not and opens the held job, the same for every visitor.
  */
@@ -55,7 +57,7 @@ export function toFormData(form: FormState, overrides: Record<string, string>, f
   return d
 }
 
-/** The form filled with an example. */
+/** Returns the form filled with an example. */
 export function fromExample(e: Example): FormState {
   return {
     ...EMPTY_FORM,
@@ -69,10 +71,10 @@ export function fromExample(e: Example): FormState {
 }
 
 /**
- * The form filled with the request of a job, to start another job from it. The files a job read
- * from uploads are not part of its request as the site shows it and are left out: the loops,
- * the contacts and the enhancers of your own data, an uploaded VCF and an uploaded expression table. A job on your own cell
- * type gets the listed cell type its loops came from, or the first one.
+ * Returns the form filled with the request of a job, to start another job from it. The files a job read from uploads are
+ * not part of its request as the site shows it and are left out. They are the loops, the contacts and the enhancers of your
+ * own data, an uploaded VCF and an uploaded expression table. A job on your own cell type gets the listed cell type its
+ * loops came from, or the first one.
  */
 export function fromRequest(r: Summary['request'], cells: string[]): FormState {
   const factors: Factors = r.factors === 'CTCF' || r.factors === 'RNAPII' ? r.factors : 'CTCF+RNAPII'
@@ -94,5 +96,5 @@ export function fromRequest(r: Summary['request'], cells: string[]): FormState {
   }
 }
 
-/** Whether a job read files from uploads, which a form filled from its request lacks. */
+/** Returns true for a job that read files from uploads, which a form filled from its request lacks. */
 export const readUploads = (r: Summary['request']) => !!r.own || (!r.sv_set && !!r.sample) || r.expression === 'upload'

@@ -69,7 +69,7 @@
   }
 }
 
-/* These pages have no side panel, so the reading column takes the left gutter itself. */
+/* These pages have no side panel and the reading column takes the left gutter itself. */
 :global(.doc-page).my-jobs {
   padding-left: 48px;
 }

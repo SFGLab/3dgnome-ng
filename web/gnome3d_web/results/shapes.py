@@ -41,7 +41,7 @@ class Summary(TypedDict):
     models: list[FileSize]
     expression: ExpressionStated | None
     stages: list[Stage]
-    # The clock the stages are timed on. A page counts the time of the running stage from it.
+    # The clock that times the stages. A page counts the time of the running stage from it.
     now: float
     structures_done: int
     structures_asked: int | None
@@ -142,7 +142,7 @@ class GeneRow(TypedDict):
 
 class ContactMaps(TypedDict):
     bins: list[int]
-    # Each pair of bins once: row i has the cells of the columns from i to the last.
+    # Each pair of bins once. Row i has the cells of the columns from i to the last.
     upper: list[list[float]]
     lower: list[list[float]]
     upper_label: str

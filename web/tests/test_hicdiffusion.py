@@ -1,7 +1,4 @@
-"""The HiCDiffusion step: what the server lacks and one job through it with a stand in model.
-
-    pytest web/tests/test_hicdiffusion.py
-"""
+"""The HiCDiffusion step, the parts the server lacks and one job through it with a stand in model."""
 
 from __future__ import annotations
 
@@ -23,7 +20,7 @@ FAKE_MODEL = f"{PY} {Path(__file__).resolve().parent / 'fake_hicdiffusion.py'}"
 
 
 def make_parts(root: Path) -> dict[str, str]:
-    """A checkout, two checkpoints and a 3 Mb chr1 with its index, as the four variables."""
+    """Makes a checkout, two checkpoints and a 3 Mb chr1 with its index, as the four variables."""
     repo, models, ref = root / "hicdiffusion", root / "models", root / "ref"
     for d in (repo, models, ref):
         d.mkdir()
@@ -178,8 +175,8 @@ def test_the_catalog_offers_hicdiffusion(shared: SimpleNamespace) -> None:
     m = c.get(f"/api{url}/contacts", params={"region": "chr1:0-2000000", "res": 25000, "upper": "hicdiffusion", "lower": "model", "norm": "raw"})
     j = m.json()
     assert m.status_code == 200 and j["upper_label"].startswith("HiCDiffusion"), "the contact map takes the prediction as a half: " + m.text[:200]
-    # A flat prediction of 3.482 a pixel puts (25000 / 8192) squared pixels into a 25 kb bin.
-    # Row 3 of the half starts at column 3: the pair of bins 3 and 10 is its eighth cell.
+    # A flat prediction of 3.482 a pixel puts (25000 / 8192) squared pixels into a 25 kb bin. Row 3
+    # of the half starts at column 3 and the pair of bins 3 and 10 is its eighth cell.
     assert abs(j["upper"][3][7] - 3.482 * (25000 / 8192) ** 2) < 1e-3, "a bin of the half holds the predicted counts of its pixels: " + str(j["upper"][3][7])
 
     plain = c.post("/api/jobs", data=form | {"background": "hic", "region": "chr1:0-1900000"})

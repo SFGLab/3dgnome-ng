@@ -10,14 +10,16 @@ const json = (method: string, body: unknown, keepalive = false): RequestInit => 
 })
 const at = (code: string) => `/api/lists/${encodeURIComponent(code)}`
 
-/** The list of a code, read without joining it. */
+/** Reads the list of a code without joining it. */
 export const readList = (code: string) => call<SharedList>(at(code))
 
-/** Makes a list of jobs on the server and gives its code. */
+/** Makes a list of jobs on the server and returns its code. */
 export const makeList = (jobs: ListedJob[], includePrivate: boolean) => call<SharedList>('/api/lists', json('POST', { jobs, private: includePrivate }))
 
 /**
- * Sends jobs to a list and gives the merged list.
+ * Sends jobs to a list and returns the merged list.
+ * @param code the code of the list
+ * @param jobs the jobs of this browser
  * @param keepalive lets the request finish after the page is left, for a job added on submit
  */
 export const sendJobs = (code: string, jobs: ListedJob[], keepalive = false) => call<SharedList>(at(code), json('PUT', { jobs }, keepalive))

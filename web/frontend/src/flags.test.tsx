@@ -7,7 +7,7 @@ import { Cite } from './pages/Cite'
 import { Help } from './pages/Help'
 import { Results } from './pages/Results'
 
-/** The tag the server writes into the page for the features its `config.json` turns off. */
+/** Adds the tag the server puts into the page for the features its `config.json` turns off. */
 function hide(parts: string) {
   const meta = document.createElement('meta')
   meta.name = 'site-hide'

@@ -26,7 +26,7 @@ const NAMES: Record<string, string> = {
   CNV: 'Copy number change',
 }
 
-/** A length in bp, kb or Mb. */
+/** Returns a length in bp, kb or Mb. */
 function basePairs(n: number): string {
   if (n < 1000) return `${n} bp`
   if (n < 1_000_000) return `${(n / 1000).toFixed(1)} kb`
@@ -79,8 +79,10 @@ function Track({ cell, region, factors, own, rows }: { cell: string; region: Reg
   )
 }
 
-/** The structural variants dialog: a hosted call set or an uploaded VCF, its sample and
- * haplotype and the change each variant makes to the loops of the region. */
+/**
+ * The structural variants dialog. It has a hosted call set or an uploaded VCF, its sample and
+ * haplotype and the change each variant makes to the loops of the region.
+ */
 export function VariantsDialog(props: {
   catalog: Catalog
   cell: string
@@ -102,7 +104,7 @@ export function VariantsDialog(props: {
   const [upload, setUpload] = useState<UploadResult | null>(props.upload ?? null)
   const [failure, setFailure] = useState('')
   const [svSet, setSvSet] = useState(props.svSet || Object.keys(catalog.sv_sets)[0] || '')
-  // One sample for each source, so a look at the other source does not lose the choice.
+  // One sample for each source. A look at the other source does not lose the choice.
   const [chosen, setChosen] = useState<Record<VariantsMode, string>>({ hosted: props.mode === 'hosted' ? props.sample : '', upload: props.mode === 'upload' ? props.sample : '' })
   const sample = chosen[mode]
   const setSampleOf = (of: VariantsMode, value: string | ((s: string) => string)) => setChosen((all) => ({ ...all, [of]: typeof value === 'function' ? value(all[of]) : value }))
@@ -125,7 +127,7 @@ export function VariantsDialog(props: {
     return () => {
       live = false
     }
-    // The upload belongs to the file alone; the region only words its check.
+    // The upload belongs to the file alone. The region only words its check.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file])
 

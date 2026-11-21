@@ -1,4 +1,4 @@
-/* The frame of the title page: the content starts at the left edge of that frame. */
+/* The frame of the title page. The content starts at the left edge of that frame. */
 .not-found {
   display: grid;
   grid-template-columns: minmax(0, 560px) minmax(0, 440px);

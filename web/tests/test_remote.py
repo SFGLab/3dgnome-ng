@@ -1,10 +1,7 @@
-"""Contact maps by link: range requests, the window of an .mcool read over HTTP, the refusals and
-the thinning to the density of the hosted maps.
+"""Contact maps by link. The tests cover range requests, the window of an .mcool read over HTTP, the
+refusals and the thinning to the density of the hosted maps.
 
-    pytest web/tests/test_remote.py
-
-A .hic link is checked by hand against a public 4DN file. There is no writer for a
-.hic fixture.
+A .hic link is checked by hand against a public 4DN file. There is no writer for a .hic fixture.
 """
 
 from __future__ import annotations
@@ -24,8 +21,8 @@ from fixture import make_data
 
 
 def serve(root: Path, ranges: bool, html: bool = False, head: bool = True, slow: float = 0.0) -> tuple[ThreadingHTTPServer, str]:
-    """A file server on a free port that answers range requests, or answers every request whole.
-    Without head it refuses HEAD requests, as an S3 link signed for GET does."""
+    """Starts a file server on a free port that answers range requests, or answers every request
+    whole. Without head it refuses HEAD requests, as an S3 link signed for GET does."""
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: object) -> None:
@@ -89,7 +86,7 @@ def serve(root: Path, ranges: bool, html: bool = False, head: bool = True, slow:
 
 
 def write_mcool(singletons: Path, out: Path) -> None:
-    """The fixture's contact pairs as a multi resolution cooler at 5 and 25 kb."""
+    """Writes the contact pairs of the fixture as a multi resolution cooler at 5 and 25 kb."""
     import cooler
 
     t = pd.read_csv(singletons, sep="\t", header=None)

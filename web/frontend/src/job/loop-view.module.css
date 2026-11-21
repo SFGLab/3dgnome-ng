@@ -35,7 +35,7 @@
   stroke: var(--rnapii);
 }
 
-/* With a loop selected the others step back. */
+/* With a loop selected the others are drawn faint. */
 .loop-arc.dimmed {
   opacity: 0.18;
 }
@@ -63,8 +63,8 @@
   pointer-events: none;
 }
 
-/* The line over the arcs and the buttons at its end. Two lines high, so the view does not move
-   when a short line replaces a long one. */
+/* The line over the arcs and the buttons at its end. It is two lines high and the view does not
+   move when a short line replaces a long one. */
 .loop-view-head {
   display: flex;
   align-items: center;

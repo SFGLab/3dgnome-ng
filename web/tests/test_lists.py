@@ -1,7 +1,4 @@
-"""Job lists shared by a sync code: the code, the merge and the endpoints.
-
-    pytest web/tests/test_lists.py
-"""
+"""Job lists shared by a sync code, with the code, the merge and the endpoints."""
 
 from __future__ import annotations
 

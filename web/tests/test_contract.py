@@ -1,10 +1,8 @@
 """The answers of the site against the shapes its interface declares.
 
-    pytest web/tests/test_contract.py
-
 The app describes every route and the shape of its answers at /openapi.json. The types of the
-frontend are generated from that description. Each test here asks a route and compares the
-answer with the declared shape: every key declared, no key undeclared, every value of its type.
+frontend are generated from that description. Each test here asks a route and compares the answer
+with the declared shape. Every key is declared, no key is undeclared and every value has its type.
 The last test fails for a route no test of this file has asked.
 """
 
@@ -29,7 +27,7 @@ NOT_JSON = {("get", "/jobs/{key}/files/{name}"), ("get", "/p/{key}/files/{name}"
 
 
 def mismatch(value: Any, schema: dict[str, Any], spec: dict[str, Any], at: str = "") -> str:
-    """The first place a value departs from a JSON schema of the description, empty when it conforms."""
+    """Returns the first place a value departs from a JSON schema of the description, empty when it conforms."""
     if "$ref" in schema:
         return mismatch(value, spec["components"]["schemas"][schema["$ref"].rsplit("/", 1)[-1]], spec, at)
     if "anyOf" in schema:

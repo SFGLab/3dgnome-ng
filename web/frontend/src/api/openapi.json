@@ -1203,7 +1203,7 @@
     "type": "object"
    },
    "OwnStated": {
-    "description": "The own data of a request as a job page states it: the factors of the loops and what else came.",
+    "description": "The own data of a request as a job page states it, the factors of the\nloops and the kinds of the other files.",
     "properties": {
      "anchors": {
       "title": "Anchors",
@@ -1364,7 +1364,7 @@
     "type": "object"
    },
    "Refusal": {
-    "description": "The body of an answer that is no success: the message, the form field it concerns and the fix.",
+    "description": "The body of an answer that is no success. It has the message, the form field it concerns and the fix.",
     "properties": {
      "error": {
       "title": "Error",
@@ -2499,7 +2499,7 @@
   },
   "/api/compare/gene": {
    "get": {
-    "description": "The distances of one gene in the structures of two jobs.",
+    "description": "Returns the distances of one gene in the structures of two jobs.",
     "operationId": "api_compare_gene_api_compare_gene_get",
     "parameters": [
      {
@@ -2595,7 +2595,7 @@
   },
   "/api/expression": {
    "get": {
-    "description": "The hosted expression a job of this cell type, and of this sample of a call set, can take.",
+    "description": "Returns the hosted expression that a job of this cell type and of this sample of a call set can take.",
     "operationId": "api_expression_api_expression_get",
     "parameters": [
      {
@@ -2683,7 +2683,7 @@
   },
   "/api/genes": {
    "get": {
-    "description": "The suggestions of the region field.",
+    "description": "Returns the suggestions of the region field.",
     "operationId": "api_genes_api_genes_get",
     "parameters": [
      {
@@ -4921,7 +4921,7 @@
   },
   "/api/sv_sets/{name}/samples": {
    "get": {
-    "description": "Sex, population and parents of each sample of a call set that has the table.",
+    "description": "Returns the sex, the population and the parents of each sample of a call set that has the table.",
     "operationId": "api_sv_samples_api_sv_sets__name__samples_get",
     "parameters": [
      {

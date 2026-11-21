@@ -17,10 +17,10 @@ import sheet from '../job/job.module.css'
 
 const cn = scoped(sheet)
 
-/** Whether the server answered that it has no such job. */
+/** Returns true for an answer of the server that it has no such job. */
 const missing = (error: unknown) => error instanceof ApiError && error.status === 404
 
-/** The explorer of one job: its side panel, its tabs and its state while it is not done. */
+/** The explorer of one job, with its side panel, its tabs and its state while it is not done. */
 export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: number }) {
   const { key = '' } = useParams()
   const api = useMemo(() => jobApi(kind, key), [kind, key])
@@ -37,7 +37,8 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const [loop, setLoop] = useState<Loop | null>(null)
   const summary = useQuery({
     ...askedOf(api).summary(),
-    // A finished job is not asked for again, and neither is a job the site does not have.
+    // A finished job is not asked for again. A job the site does not have
+    // is not asked for again either.
     refetchInterval: (q) => ((q.state.data && ['done', 'failed'].includes(q.state.data.state)) || missing(q.state.error) ? false : pollMs),
     retry: (failures, error) => !missing(error) && failures < 3,
   })

@@ -28,15 +28,16 @@ from .request import JobRequest
 from .store import member, read_cif, set_status, tail, write_json
 
 
-# After the name of a gene's second copy in a tandem duplication.
+# The suffix of the name of the second copy of a gene in a tandem duplication.
 COPY = ", second copy"
 
 
 def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, cell_enhancers: bool = True):  # noqa: ANN001, ANN202
-    """The genes and enhancers of the cell type on `chrom` in the coordinates of the haplotype.
+    """Returns the genes and enhancers of the cell type on `chrom` in the
+    coordinates of the haplotype.
 
     Those inside a deletion are dropped. Those inside a duplication are there twice and the second
-    copy of a gene has `COPY` after its name. An enhancers upload replaces the cell type's.
+    copy of a gene has `COPY` after its name. An enhancers upload replaces those of the cell type.
     """
     L = Lift(svs)
     genes = cell.genes()
@@ -60,8 +61,8 @@ def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, ce
     return genes, pd.concat([enh[(enh[1] >= 0) & (enh[2] > 0)], second], ignore_index=True)
 
 
-# Starts a command on a set of cores: the cores as the first argument, the command after it. The
-# process takes the cores and becomes the command, and every thread of the command has them.
+# Starts a command on a set of cores. The cores are the first argument and the command comes after
+# it. The process takes the cores and becomes the command. Every thread of the command has them.
 _ON_CORES = "import os, sys; os.sched_setaffinity(0, {int(c) for c in sys.argv[1].split(',')}); os.execvp(sys.argv[2], sys.argv[2:])"
 
 
@@ -81,10 +82,10 @@ def run_job(
     env_extra: dict[str, str] | None = None,
     cores: list[int] | None = None,
 ) -> Path:
-    """Run one job in `job` and return that directory. `engine` is the command that starts
-    the engine, `python -m gnome3d.cli` from `ENGINE_PYTHON` by default. `env_extra` is added to
-    the engine's environment, the GPU of a queue slot for example. `cores` are the cores the
-    engine runs on, every core of this process when None."""
+    """Runs one job in `job` and returns that directory. `engine` is the command that starts the
+    engine, `python -m gnome3d.cli` from `ENGINE_PYTHON` by default. `env_extra` is added to the
+    environment of the engine, the GPU of a queue slot for example. `cores` are the cores the engine
+    runs on, every core of this process when None."""
     job.mkdir(parents=True, exist_ok=True)
     write_json(job / "request.json", asdict(req))
     set_status(job, state="running", stage="inputs", started=time.time())
@@ -115,7 +116,7 @@ def run_job(
             hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
             hic = cond, region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
-        # The table of an upload is in the job since the request. A hosted table is read here,
+        # The table of an upload is in the job from the request on. A hosted table is read here,
         # from the place the catalog gives its source.
         if req.expression and req.expression.get("source") != expression.UPLOAD:
             e = req.expression
@@ -165,7 +166,7 @@ def run_job(
                     "promoters": marks.promoters,
                     "enhancers": marks.enhancers,
                     "models": [c.name for c in cifs],
-                    # haplotype coordinates; a promoter is its TSS and a kilobase either side
+                    # Haplotype coordinates. A promoter is its TSS and a kilobase on either side.
                     "elements": [
                         {"kind": "promoter", "name": str(g.name), "start": int(g.tss) - 1000, "end": int(g.tss) + 1000}
                         for g in rows(genes)

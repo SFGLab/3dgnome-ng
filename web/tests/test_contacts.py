@@ -1,7 +1,4 @@
-"""Contact maps of a job, ICE balancing and the stratum adjusted correlation.
-
-    pytest web/tests/test_contacts.py
-"""
+"""Contact maps of a job, ICE balancing and the stratum adjusted correlation."""
 
 from __future__ import annotations
 
@@ -36,7 +33,7 @@ from gnome3d_web.contacts import (
 
 
 def square(once: list[list[float]]) -> np.ndarray:
-    """The whole map of an answer, which holds each pair of bins once: row i from column i on."""
+    """Returns the whole map of an answer, which holds each pair of bins once, row i from column i on."""
     n = len(once)
     m = np.zeros((n, n))
     for i, row in enumerate(once):
@@ -46,7 +43,8 @@ def square(once: list[list[float]]) -> np.ndarray:
 
 
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
-    """legacy/validation/metrics/hic.py _scc, copied: whole diagonals weighted by length and both spreads."""
+    """Computes the stratum adjusted correlation of the validation battery, from whole diagonals weighted by
+    length and both spreads."""
     num = den = 0.0
     for dd in range(1, min(max_sep_bins, A.shape[0] - 1) + 1):
         a, b = np.diagonal(A, dd), np.diagonal(B, dd)
@@ -174,7 +172,7 @@ def test_every_kind_of_map_is_symmetric(sums_and_rng: SimpleNamespace) -> None:
 
 def test_the_longest_job_fits_a_map_at_25_kb() -> None:
     longest = 20_000_000
-    # A start off the grid of the bins adds a bin, and insertions add their bases to the region.
+    # A start off the grid of the bins adds a bin. Insertions add their bases to the region.
     for start, extra in ((120_184_079, 0), (120_184_079, 5_253), (0, 0), (37_615_000, 500_000)):
         n = len(bins_for(start, start + longest + extra, 25_000))
         assert n <= MAX_BINS, f"a job of {longest + extra:,} bp from {start:,} has {n} bins at 25 kb, over {MAX_BINS}"

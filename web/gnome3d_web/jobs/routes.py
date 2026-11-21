@@ -1,4 +1,4 @@
-"""The routes of a job: its submission, its status and its files."""
+"""The routes of a job. They take its submission and give its status and its files."""
 
 from __future__ import annotations
 

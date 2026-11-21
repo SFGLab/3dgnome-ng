@@ -29,7 +29,8 @@ describe('chain geometry', () => {
 })
 
 describe('pickOnChain', () => {
-  // Screen x, y in pixels, distance from the camera and the tube's drawn radius in pixels there.
+  // Screen x, y in pixels, distance from the camera and the drawn radius of
+  // the tube in pixels there.
   it('takes the tube under the cursor between two beads far apart on screen', () => {
     const chain: [number, number, number, number][] = [
       [0, 100, 10, 6],

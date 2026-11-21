@@ -5,9 +5,9 @@ export const DARKEST: [number, number, number] = [110, 18, 8]
 const STOPS: [number, number, number][] = [[255, 255, 255], [241, 120, 60], DARKEST]
 
 /**
- * The expected contact at each separation, the mean over pairs whose rows both hold contacts. From
- * three bins apart it is the median of the neighbouring separations. The main diagonal is left
- * empty.
+ * Returns the expected contact at each separation, the mean over pairs whose rows both hold
+ * contacts. From three bins apart it is the median of the neighbouring separations. The main
+ * diagonal is left empty.
  */
 function expected(m: number[][]): number[][] {
   const n = m.length
@@ -49,7 +49,7 @@ function pearson(m: number[][]): number[][] {
   return centred.map((a) => centred.map((b) => a.reduce((s, v, k) => s + v * b[k], 0)))
 }
 
-/** The rows of a map with no contact off the diagonal, a bin with no bead or no read. */
+/** Returns the rows of a map with no contact off the diagonal, a bin with no bead or no read. */
 export function emptyRows(m: number[][]): boolean[] {
   return m.map((row, i) => !row.some((v, j) => j !== i && v > 0))
 }
@@ -64,7 +64,7 @@ export function transform(m: number[][], show: Show): number[][] {
 const BLUE: [number, number, number] = [42, 110, 200]
 const RED: [number, number, number] = [192, 38, 27]
 
-/** A two sided ramp for a change: white at 0, blue below and red above, full at +-span. */
+/** Returns a two sided ramp for a change, white at 0, blue below and red above, full at +-span. */
 export function diverging(v: number, span: number): [number, number, number] {
   const t = Math.max(-1, Math.min(1, span > 0 ? v / span : 0))
   const end = t < 0 ? BLUE : RED
@@ -72,7 +72,7 @@ export function diverging(v: number, span: number): [number, number, number] {
   return [0, 1, 2].map((k) => Math.round(255 + u * (end[k] - 255))) as [number, number, number]
 }
 
-/** The ramp colour of a value between lo and hi, on a log scale when asked. */
+/** Returns the ramp colour of a value between lo and hi, on a log scale when asked. */
 export function colour(v: number, lo: number, hi: number, log: boolean): [number, number, number] {
   // A true log spreads a map of values below one as it spreads a map of counts. A lower end of
   // zero takes a floor of a thousandth of the upper end.
@@ -86,7 +86,7 @@ export function colour(v: number, lo: number, hi: number, log: boolean): [number
   return STOPS[i].map((c, k) => Math.round(c + u * (STOPS[i + 1][k] - c))) as [number, number, number]
 }
 
-/** A high percentile of the nonzero values, the default top of the colour range. */
+/** Returns a high percentile of the nonzero values, the default top of the colour range. */
 export function percentile(m: number[][], p: number): number {
   const xs = m
     .flat()
@@ -95,8 +95,10 @@ export function percentile(m: number[][], p: number): number {
   return xs.length ? xs[Math.min(xs.length - 1, Math.floor(p * xs.length))] : 1
 }
 
-/** The default colour range of one half: from the 5th to the 99th percentile of its nonzero
- * values on a log scale, from zero on a linear one. */
+/**
+ * Returns the default colour range of one half, from the 5th to the 99th percentile of its nonzero
+ * values on a log scale and from zero on a linear one.
+ */
 export function halfRange(m: number[][], log: boolean): [number, number] {
   const hi = percentile(m, 0.99)
   const lo = log ? Math.min(percentile(m, 0.05), hi / 10) : 0
@@ -106,9 +108,9 @@ export function halfRange(m: number[][], log: boolean): [number, number] {
 const cents = (v: number) => Math.round(v * 100) / 100
 
 /**
- * The two halves of a map as a view draws them and the colour range of each. Each half has a
- * range of its own. A range typed in is the range of the upper half, and the lower half keeps
- * the same share of its own spread.
+ * Returns the two halves of a map as a view draws them and the colour range of each. Each half has
+ * a range of its own. A range typed in is the range of the upper half. The lower half keeps the
+ * same share of its own spread.
  */
 export function shownMaps(up: number[][], low: number[][], show: Show, log: boolean, range: [number, number] | null) {
   const upper = transform(up, show)

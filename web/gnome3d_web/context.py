@@ -1,7 +1,4 @@
-"""The site a request is answered by: its settings, its hosted data, its limits and its jobs.
-
-The module is not named site or http, which are modules of Python.
-"""
+"""The site that answers a request, with its settings, its hosted data, its limits and its jobs."""
 
 from __future__ import annotations
 
@@ -46,17 +43,17 @@ class Site:
         )
 
     def max_span(self) -> int:
-        """The longest region of a job in bp, from config.json or else from MAX_REGION_MB."""
+        """Returns the longest region of a job in bp, from config.json or else from MAX_REGION_MB."""
         mb = self.config.get().region_mb
         return self.settings.max_span if mb is None else int(mb * 1_000_000)
 
     def hicdiffusion_span(self) -> int:
-        """The longest region of a job with a HiCDiffusion background in bp."""
+        """Returns the longest region of a job with a HiCDiffusion background in bp."""
         mb = self.config.get().hicdiffusion_mb
         return HICDIFFUSION_SPAN if mb is None else int(mb * 1_000_000)
 
     def cell(self, name: str) -> CellType:
-        """The cell type of a request.
+        """Returns the cell type of a request.
 
         @raises UnknownCell for a name the catalog lacks
         """
@@ -65,13 +62,13 @@ class Site:
         return self.catalog.cell_types[name]
 
     def base_cell(self, name: str) -> CellType:
-        """The cell type whose genes and hosted data a request reads: the named one, or the first
-        of the catalog for a request on a user's own cell type."""
+        """Returns the cell type whose genes and hosted data a request reads. It is the cell type of
+        the request, or the first of the catalog for a request on a user's own cell type."""
         return self.catalog.cell_types.get(name) or next(iter(self.catalog.cell_types.values()))
 
     def job(self, kind: str, key: str) -> Path | None:
-        """The directory of a job the site has, by its address: `jobs` and the key of a shared
-        job, `p` and the token of a private one."""
+        """Returns the directory of a job the site has, by its address. The address is `jobs` and
+        the key of a shared job or `p` and the token of a private one."""
         return store.find(self.settings.jobs_dir if kind == "jobs" else self.settings.private_dir, key)
 
 

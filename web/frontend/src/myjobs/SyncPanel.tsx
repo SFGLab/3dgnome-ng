@@ -178,9 +178,9 @@ function JoinForm({ initial, onDone, onCancel }: { initial: string; onDone: () =
 }
 
 /**
- * The sync of My jobs: make a code, enter one, or see the code this browser has.
- * @param initialCode a code from the page's link, which opens the form to enter it
- * @param onCodeUsed called once the link's code was joined or put aside
+ * The sync of My jobs. A visitor makes a code, enters one or sees the code this browser has.
+ * @param initialCode a code from the link of the page, which opens the form to enter it
+ * @param onCodeUsed called once the code of the link was joined or put aside
  */
 export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: string; onCodeUsed?: () => void }) {
   const status = useSyncStatus()

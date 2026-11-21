@@ -19,7 +19,7 @@ OUT = Path(__file__).resolve().parents[1] / "frontend" / "src" / "api" / "openap
 
 
 def described() -> str:
-    """The description as the file has it."""
+    """Returns the description in the form of the file."""
     return json.dumps(interface().openapi(), indent=1, sort_keys=True) + "\n"
 
 

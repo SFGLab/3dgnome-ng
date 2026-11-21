@@ -4,9 +4,9 @@ import { createPortal } from 'react-dom'
 import '../styles/dialog.css'
 
 /**
- * The frame of a dialog: the backdrop, the head with the title and the line under it, and the
- * Escape key, which closes it. The body and the foot are the caller's.
- * @param id the id of the title, by which the dialog is named
+ * The frame of a dialog. It has the backdrop, the head with the title and the line under it and the
+ * Escape key, which closes it. The caller gives the body and the foot.
+ * @param id the id of the title, which labels the dialog
  * @param name the class of this dialog beside `dialog`
  * @param closeButton a close button in the head
  * @param inBody the dialog is added to the body of the page, above a page that clips its content

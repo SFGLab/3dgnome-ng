@@ -1,7 +1,4 @@
-"""SVs from a VCF for one sample and region.
-
-    pytest web/tests/test_variants.py
-"""
+"""SVs from a VCF for one sample and region."""
 
 from __future__ import annotations
 

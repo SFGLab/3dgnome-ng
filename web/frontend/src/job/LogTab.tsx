@@ -7,7 +7,7 @@ import sheet from './job.module.css'
 
 const cn = scoped(sheet)
 
-/** The Log tab: the engine's log of the job. */
+/** The Log tab, the engine log of the job. */
 export function LogTab({ api }: { api: JobApi }) {
   const log = useQuery(askedOf(api).log())
   if (log.isError) return <Unanswered of={log} />

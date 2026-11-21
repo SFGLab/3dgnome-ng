@@ -6,8 +6,9 @@ const cn = scoped(sheet)
 
 
 /**
- * A structure drawn flat: its beads in drawing units from A, each with a depth step, the two marked
- * beads and the distance between them over the ensemble. Written by web/scripts/make_previews.py.
+ * A structure drawn flat. It has its beads in drawing units from A, each
+ * with a depth step, the two marked beads and the distance between them
+ * over the ensemble. web/scripts/make_previews.py writes it.
  */
 export type PreviewData = { points: number[][]; a: number; b: number; mean: number; sd: number; n: number; structure: number; here: number }
 
@@ -19,7 +20,7 @@ const REACH = 5
 
 const r1 = (v: number) => Math.round(v * 10) / 10
 
-/** The chain from bead i to the next as a smooth piece: a Catmull-Rom segment written as a cubic. */
+/** Returns the chain from bead i to the next as a smooth piece, a Catmull-Rom segment in the form of a cubic. */
 function piece(pts: number[][], i: number): string {
   const p0 = pts[Math.max(0, i - 1)]
   const p1 = pts[i]

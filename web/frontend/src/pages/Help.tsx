@@ -52,7 +52,7 @@ const SETTINGS = [
   ['hard_wall', 'no', 'yes', 'stops chains passing through each other'],
 ]
 
-/** The sample input files: the data of the TNFRSF8 example, chr1:11,500,000-12,600,000 in GM12878, as files to upload. */
+/** The sample input files, the data of the TNFRSF8 example, chr1:11,500,000-12,600,000 in GM12878, as files to upload. */
 const SAMPLES: [string, string, string][] = [
   ['anchors.bed', anchorsFile, 'the loop anchors with their CTCF motif orientation'],
   ['ctcf_loops.bedpe', ctcfFile, '22 CTCF ChIA-PET loops'],
@@ -109,7 +109,7 @@ function QA({ q, a }: { q: string; a: string }) {
   )
 }
 
-/** The finished jobs of the examples, as links: the sample output of the site. */
+/** The finished jobs of the examples as links, the sample output of the site. */
 function SampleOutput() {
   const { open, busy, error } = useOpenExample()
   return (

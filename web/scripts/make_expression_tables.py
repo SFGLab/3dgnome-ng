@@ -12,8 +12,8 @@ ENCODE     read counts of featureCounts, one table for each cell line with a col
            replicate. The three tables must hold the same genes. A column gets the name of its
            cell line and of its ENCODE file.
 TRIOS      read counts of the nine people of three 1000 Genomes trios, one library each, from
-           the ENA study PRJEB11271, with the genes by name. The columns are named by family
-           and member and get the sample ids.
+           the ENA study PRJEB11271, with the genes by name. The columns have the family and
+           the member as their name and get the sample ids.
 MAGE       TMM values of 731 lymphoblastoid lines of the 1000 Genomes panel, from the file
            `TMM.filtered.TSS.MAGE.v1.0.bed.gz` of MAGE v1.0.
 GEUVADIS   RPKM of 462 lymphoblastoid lines, from `GD660.GeneQuantRPKM.txt.gz` of E-GEUV-1. A
@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pandas as pd
 
-# The columns of the trio counts by sample: the family, then daughter, mother or father.
+# The columns of the trio counts by sample, the family and then daughter, mother or father.
 TRIOS = {
     "hcs_f": "HG00512", "hcs_m": "HG00513", "hcs_d": "HG00514",
     "pur_f": "HG00731", "pur_m": "HG00732", "pur_d": "HG00733",
@@ -41,7 +41,7 @@ TRIOS = {
 
 
 def encode(tables: dict[str, Path]) -> tuple[pd.DataFrame, dict[str, object]]:
-    """The replicates of every cell line in one table, with the length of each gene."""
+    """Returns the replicates of every cell line in one table, with the length of each gene."""
     out: pd.DataFrame | None = None
     columns: dict[str, list[str]] = {}
     for cell, path in tables.items():

@@ -10,7 +10,7 @@ import sheet2 from './owndata.module.css'
 
 const cn = scoped(sheet1, sheet2)
 
-/** The loops step: one file per factor with its name and its check, and the loops of the files in the region. */
+/** The loops step. It has one file per factor with its name and its check and the loops of the files in the region. */
 export function LoopsStep({
   cell,
   region,

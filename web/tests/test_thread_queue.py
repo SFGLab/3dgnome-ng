@@ -1,7 +1,4 @@
-"""The app with the queue of threads in the web process, the queue of the single container.
-
-    pytest web/tests/test_thread_queue.py
-"""
+"""The app with the queue of threads in the web process, the queue of the single container."""
 
 from __future__ import annotations
 
@@ -36,7 +33,7 @@ def site(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
 
 
 def finished(c: Any, url: str) -> dict[str, Any]:
-    """The summary of a job once it is done or failed, within a minute."""
+    """Returns the summary of a job once it is done or failed, within a minute."""
     until = time.time() + 60
     while True:
         summary = c.get(f"/api{url}/summary").json()
@@ -109,8 +106,8 @@ def test_the_summary_of_a_job_being_written_lists_no_half_written_file(tmp_path:
     from gnome3d_web.jobs import store
     from gnome3d_web.results import views
 
-    # A job writes a file under a second name and renames it. A page that asks for the summary at
-    # that moment got an error from the file that was gone.
+    # A job writes a file under a second name and renames it. A summary at that moment must not fail
+    # on the file that is gone.
     (tmp_path / "status.json").write_text(json.dumps({"state": "running"}))
     (tmp_path / "status.json.tmp").write_text("{")
     assert [f["name"] for f in views.summary(tmp_path, None)["files"]] == ["status.json"], "the summary lists the files and not the one being written"  # type: ignore[union-attr]

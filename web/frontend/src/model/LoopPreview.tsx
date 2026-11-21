@@ -11,7 +11,7 @@ const cn = scoped(sheet)
 const W = 780
 const H = 150
 const AXIS = 75
-/** The shortest region a drag leaves, and the step positions are rounded to, in bp. */
+/** The shortest region a drag leaves and the step of a rounded position, in bp. */
 const MIN_SPAN = 20_000
 const STEP = 1_000
 
@@ -19,7 +19,7 @@ const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word
 const mb = (n: number) => `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)} Mb`
 const round = (p: number) => Math.round(p / STEP) * STEP
 
-/** Whether a region is drawn well in a view: inside it and between an eighth and seven tenths of it. */
+/** Returns true for a region that is drawn well in a view, inside it and between an eighth and seven tenths of it. */
 const fits = (start: number, end: number, view: [number, number]) => {
   const share = (end - start) / (view[1] - view[0])
   return start >= view[0] && end <= view[1] && share >= 0.125 && share <= 0.7
@@ -39,8 +39,8 @@ type Drag = { kind: 'start' | 'end' | 'move'; at: number; from: [number, number]
 export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegion }: { cell: string; region: Region; factors: Factors; maxSpan?: number; onRegion?: (text: string) => void }) {
   // The server draws three times the longest region at most.
   const cap = 3 * maxSpan
-  // The view moves only when the region no longer fits it, so the picture stays still while the
-  // region is dragged inside it.
+  // The view moves only when the region no longer fits it. The picture stays still while the region
+  // is dragged inside it.
   const [view, setView] = useState<[number, number]>(() => around(region.start, region.end, cap))
   const [chrom, setChrom] = useState(region.chrom)
   useEffect(() => {
@@ -86,8 +86,8 @@ export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegio
     return view[0] + (box.width ? (clientX - box.left) / box.width : 0) * width
   }
   /**
-   * The region a drag gives, kept inside the view, at least the shortest span long and at most
-   * the longest. An edge of a region that is too long already moves inwards alone.
+   * Returns the region a drag gives, kept inside the view, at least the shortest span long and at
+   * most the longest. An edge of a region that is too long already moves inwards alone.
    */
   const dragged = (d: Drag, p: number): [number, number] => {
     const [a, b] = d.from
@@ -123,7 +123,7 @@ export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegio
     setMoved(null)
     if (next && onRegion && (next[0] !== region.start || next[1] !== region.end)) onRegion(text(next[0], next[1]))
   }
-  /** The arrow keys move an edge by a hundredth of the view. */
+  /** Moves an edge by a hundredth of the view at an arrow key. */
   const nudge = (kind: 'start' | 'end') => (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
     e.preventDefault()

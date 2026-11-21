@@ -2,7 +2,7 @@
 export type RecentJob = { url: string; label: string; name: string; at: number; edited?: number }
 
 const KEY = 'gnome3d.recentJobs'
-// Enough for a working session; older jobs stay reachable by their links.
+// Enough for a working session. Older jobs stay reachable by their links.
 export const MAX = 50
 
 /** Fired on the window after the stored list changed, by this page or by a sync. */
@@ -21,10 +21,10 @@ export function recentJobs(): RecentJob[] {
 
 const stamp = (j: RecentJob) => j.edited ?? j.at
 
-/** The name this browser gave a job, empty without one. */
+/** Returns the name this browser gave a job, empty without one. */
 export const nameOf = (url: string) => recentJobs().find((j) => j.url === url)?.name ?? ''
 
-/** Two lists as one, newest first. A job on both keeps the entry edited last. */
+/** Returns two lists as one, newest first. A job on both keeps the entry edited last. */
 export function mergeJobs(a: RecentJob[], b: RecentJob[]): RecentJob[] {
   const out = new Map(a.map((j) => [j.url, j]))
   for (const j of b) {

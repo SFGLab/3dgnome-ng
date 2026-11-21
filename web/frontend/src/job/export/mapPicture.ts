@@ -1,6 +1,6 @@
 import { regionText } from '../../lib/region'
 
-/** The picture of a contact map that the page saves: the map with its region, its two halves and its axes. */
+/** The picture of a contact map that the page saves, the map with its region, its two halves and its axes. */
 
 export type MapInfo = {
   chrom: string
@@ -18,13 +18,13 @@ const TOP = 76
 const RIGHT = 28
 const BOTTOM = 56
 
-/** A position as megabases with two decimals. */
+/** Returns a position as megabases with two decimals. */
 const mb = (bp: number) => `${(bp / 1e6).toFixed(2)} Mb`
 
 /**
- * A canvas with the drawn map at 1200 pixels a side or more, each bin a square of whole pixels,
- * and around it the region and the bin size, what is above and below the diagonal, and five
- * positions on each axis.
+ * Returns a canvas with the drawn map at 1200 pixels a side or more, each bin a square of whole
+ * pixels. Around it are the region and the bin size, the halves above and below the diagonal and
+ * five positions on each axis.
  */
 export function mapPicture(map: HTMLCanvasElement, info: MapInfo): HTMLCanvasElement | null {
   const scale = Math.max(1, Math.ceil(MAP / map.width))

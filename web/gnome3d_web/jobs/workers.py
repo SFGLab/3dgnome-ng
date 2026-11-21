@@ -1,10 +1,10 @@
-"""Running jobs: at once in a request, on a local pool of slots in the web process, one card per slot, or in rq workers.
+"""The running of jobs. A job runs at once in its request, on a local pool of slots in the web process with one card per
+slot, or in an rq worker.
 
-`Settings` has the workers of the site: the cards, the jobs at once on a card, the cores of a
-job and its GPU memory pool. The local pool has one slot for each job at once, `Settings.slots`.
-The engine of a job runs on the cores of its slot, `slot_cores`, and two jobs at once do not
-share cores. An engine takes as many threads as it has cores. An rq worker is one slot. Its
-container gives it its card, and it takes a free slot for each job, `claim_slot`, for its cores.
+`Settings` has the workers of the site, which are the cards, the jobs at once on a card, the cores of a job and its GPU
+memory pool. The local pool has one slot for each job at once, `Settings.slots`. The engine of a job runs on the cores
+of its slot, `slot_cores`. Two jobs at once do not share cores. An engine takes as many threads as it has cores. An rq
+worker is one slot. Its container gives it its card. It takes a free slot for each job, `claim_slot`, for its cores.
 """
 
 from __future__ import annotations
@@ -31,17 +31,17 @@ log = logging.getLogger(__name__)
 
 
 def server_cores() -> list[int]:
-    """The cores this process may use, in order. Empty on a system that cannot pin a process."""
+    """Returns the cores this process may use, in order. Empty on a system that cannot pin a process."""
     return sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else []
 
 
 def slot_cores(cores: list[int], slot: int, slots: int, per_job: int | None = None) -> list[int]:
-    """The cores of the job that runs on one slot.
+    """Returns the cores of the job that runs on one slot.
 
     Each slot has the next `per_job` cores of the server. With more cores asked for than the
     server has for every slot, the sets of the slots overlap. A `per_job` of all the cores gives
-    every job the whole server. Without `per_job` the cores are divided between the slots, and
-    the first slots get one core more where the division leaves a rest.
+    every job the whole server. Without `per_job` the cores are divided between the slots.
+    The first slots get one core more where the division leaves a rest.
 
     Parameters
     ----------
@@ -97,11 +97,11 @@ def claim_slot(root: Path, total: int) -> Iterator[int | None]:
 def work(
     req_dict: dict[str, object], job_dir: str, gpu: str | None = None, engine: list[str] | None = None, slot: tuple[int, int] | None = None
 ) -> str:
-    """The function a worker runs, with everything it needs read from the environment. `gpu`
-    is the only GPU the engine sees, all of the worker's GPUs when None. `slot` is the index of
-    the slot of the local pool and the number of its slots, and gives the engine the cores of
-    that slot. An rq worker has no slot of its own and takes a free one for the job, so the
-    engines of the workers of one server share no core."""
+    """Runs a job in a worker, with everything it needs read from the environment. `gpu` is the only
+    GPU the engine sees, every GPU of the worker when None. `slot` is the index of the slot of the
+    local pool and the number of its slots. It gives the engine the cores of that slot. An rq worker
+    has no slot of its own and takes a free one for the job. The engines of the workers of one
+    server share no core."""
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
     request = JobRequest(**req_dict)  # type: ignore[arg-type]
@@ -146,15 +146,15 @@ class LocalPool:
         self._jobs.join()
 
     def position(self, job_dir: str) -> int | None:
-        """The number of waiting jobs in front of a job, None when it is not waiting."""
+        """Returns the number of waiting jobs in front of a job, None when it is not waiting."""
         with self._jobs.mutex:
             waiting = [d for _, d in self._jobs.queue]
         return waiting.index(job_dir) if job_dir in waiting else None
 
 
 class Inline:
-    """Runs a job inside the request that submits it. A request returns after its job. For
-    development and tests."""
+    """Runs a job inside the request that submits it. A request returns
+    after its job. It is for development and tests."""
 
     def start(self, req: JobRequest, job: Path) -> None:
         work(asdict(req), str(job))
@@ -167,8 +167,7 @@ class Inline:
 
 
 class Threads:
-    """Runs jobs in threads of the web process, on the local pool. The queue of the single
-    container."""
+    """Runs jobs in threads of the web process, on the local pool. It is the queue of the single container."""
 
     def __init__(self, s: Settings) -> None:
         self._results = s.results_dir
@@ -185,8 +184,8 @@ class Threads:
 
 
 class Rq:
-    """Gives jobs to rq workers through Redis. The workers keep their jobs through a restart of
-    the web process. A waiting job names `work` by its module and its name."""
+    """Gives jobs to rq workers through Redis. The workers keep their jobs through a restart of the
+    web process. A waiting job refers to `work` by its module and its name."""
 
     NAME = "gnome3d"
     TIMEOUT = 6 * 3600
@@ -220,7 +219,7 @@ JobQueue = Inline | Threads | Rq
 
 
 def queue_of(s: Settings) -> JobQueue:
-    """The queue the setting QUEUE names."""
+    """Returns the queue of the setting QUEUE."""
     if s.queue == "inline":
         return Inline()
     return Threads(s) if s.queue == "thread" else Rq(s)
@@ -228,7 +227,7 @@ def queue_of(s: Settings) -> JobQueue:
 
 def enqueue(queue: JobQueue, req: JobRequest, job_dir: Path) -> None:
     """Puts a job on the queue. Its request and its first status are on disk from the moment it
-    waits, and a restart finds a waiting job by its status."""
+    waits. A restart finds a waiting job by its status."""
     job_dir.mkdir(parents=True, exist_ok=True)
     write_json(job_dir / "request.json", asdict(req))
     queued(job_dir)

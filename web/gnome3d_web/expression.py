@@ -1,13 +1,13 @@
-"""Gene expression beside a job: a table of genes by samples, the value of a gene in a job and
-the contrast of two jobs.
+"""Gene expression beside a job. The module has a table of genes by samples, the value of a gene in
+a job and the contrast of two jobs.
 
-A table holds read counts or values that are normalised already, TMM or RPKM. Counts of two
-jobs with two or more samples each are compared with DESeq2, by PyDESeq2. Any other pair of
-tables of one kind gives a log2 ratio and no p-value.
+A table holds read counts or values that are normalised already, TMM or RPKM. Counts of two jobs
+with two or more samples each are compared with DESeq2, by PyDESeq2. Any other pair of tables of one
+kind gives a log2 ratio and no p-value.
 
-A table is tab or comma separated. Its first column names the gene, by Ensembl id or by name,
-and every other numeric column is a sample. A column `length` gives the length of the gene in
-bp. The output of featureCounts is read as it is.
+A table is tab or comma separated. Its first column has the gene, by Ensembl id or by name. Every
+other numeric column is a sample. A column `length` gives the length of the gene in bp. The output
+of featureCounts is read as it is.
 """
 
 # pandas states the type of a column and of a selection too loosely for these checks.
@@ -49,7 +49,7 @@ def _no_groups() -> dict[str, list[str]]:
 @dataclass
 class Source:
     """A hosted table. `cell_types` gives the columns of each cell type it holds. With `people`
-    every other column is a person, named as the call sets name their samples."""
+    every other column is a person, under the name the call sets give their samples."""
 
     name: str
     label: str
@@ -75,7 +75,7 @@ class Table:
 
 def read_table(path: Path, samples: list[str] | None = None) -> Table:
     """Reads a table of genes by samples. With `samples` it reads those columns alone, beside the
-    genes and their lengths, which keeps a table of hundreds of samples quick to read."""
+    genes and their lengths."""
     try:
         head = pd.read_csv(path, sep="\t", comment="#", nrows=0)
         sep = "\t" if head.shape[1] >= 2 else ","
@@ -110,7 +110,7 @@ def read_table(path: Path, samples: list[str] | None = None) -> Table:
 
 
 def check_counts(table: Table, columns: list[str], name: str) -> None:
-    """Raises when the columns are not read counts: whole numbers, none below zero."""
+    """Raises when the columns are not read counts, which are whole numbers and none below zero."""
     part = table.data[columns]
     if (part < 0).any().any() or not np.allclose(part.to_numpy(), np.round(part.to_numpy())):
         raise ExpressionError(
@@ -119,7 +119,7 @@ def check_counts(table: Table, columns: list[str], name: str) -> None:
 
 
 def write_job(job: Path, table: Table, columns: list[str], meta: dict[str, object]) -> None:
-    """Writes the samples of a job with every gene of the table, and what they are."""
+    """Writes the samples of a job with every gene of the table and the record of what they are."""
     missing = [c for c in columns if c not in table.data.columns]
     if missing:
         raise ExpressionError(f"the expression table has no column {', '.join(missing)}")
@@ -131,8 +131,7 @@ def write_job(job: Path, table: Table, columns: list[str], meta: dict[str, objec
 
 
 class Meta(TypedDict):
-    """expression.json of a job: the source of the table, what the page calls it, counts or values,
-    the unit of values, the column the genes are named by and the samples."""
+    """The record of the expression of a job, expression.json."""
 
     source: NotRequired[str]
     label: NotRequired[str]
@@ -143,7 +142,7 @@ class Meta(TypedDict):
 
 
 def job_meta(job: Path) -> Meta | None:
-    """What the expression of a job is, None for a job without it."""
+    """Returns the record of the expression of a job, None for a job without it."""
     p = job / META
     return json.loads(p.read_text()) if p.is_file() and (job / TABLE).is_file() else None
 
@@ -156,8 +155,8 @@ def _job_table(job: Path) -> Table:
 
 
 def level(table: Table, kind: str) -> tuple[pd.Series, str]:
-    """The level of each gene over the samples and its unit: TPM for counts with gene lengths,
-    counts per million for counts without and the mean for values."""
+    """Returns the level of each gene over the samples and its unit. The unit is TPM for counts with
+    gene lengths, counts per million for counts without and the mean for values."""
     if kind != "counts":
         return table.data.mean(axis=1), ""
     if table.length is not None and (table.length > 0).all():
@@ -167,7 +166,7 @@ def level(table: Table, kind: str) -> tuple[pd.Series, str]:
 
 
 def job_levels(job: Path) -> tuple[dict[str, float], str, str] | None:
-    """The level of every gene of a job, the unit and the key the genes are named by."""
+    """Returns the level of every gene of a job, the unit and the key of the genes."""
     meta = job_meta(job)
     if meta is None:
         return None
@@ -177,7 +176,7 @@ def job_levels(job: Path) -> tuple[dict[str, float], str, str] | None:
 
 
 def size_factors(counts: pd.DataFrame) -> pd.Series:
-    """The size factor of each sample, the median over genes of its count over the geometric
+    """Returns the size factor of each sample, the median over genes of its count over the geometric
     mean of the gene, as DESeq2 computes it. Genes with a zero count in a sample are left out."""
     logs = np.log(counts.where(counts > 0))
     ref = logs.mean(axis=1, skipna=False)
@@ -188,7 +187,7 @@ def size_factors(counts: pd.DataFrame) -> pd.Series:
 
 
 def _ratio(a: pd.DataFrame, b: pd.DataFrame, counts: bool) -> pd.DataFrame:
-    """log2 of the level in b over the level in a, with one added to both for counts and the
+    """Returns log2 of the level in b over the level in a, with one added to both for counts and the
     smallest positive value for values."""
     if counts:
         both = pd.concat([a, b], axis=1)
@@ -203,7 +202,7 @@ def _ratio(a: pd.DataFrame, b: pd.DataFrame, counts: bool) -> pd.DataFrame:
 
 
 def _deseq(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
-    """DESeq2 of b against a over the genes with ten reads or more in all samples together."""
+    """Runs DESeq2 of b against a over the genes with ten reads or more in all samples together."""
     from pydeseq2.dds import DeseqDataSet  # noqa: PLC0415
     from pydeseq2.ds import DeseqStats  # noqa: PLC0415
 
@@ -222,8 +221,8 @@ def _deseq(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
 
 
 def _by_name(table: Table, names: dict[str, str], counts: bool) -> Table:
-    """A table of Ensembl ids as a table of gene names. A gene without a name is left out. Two
-    ids of one name are added for counts and averaged for values."""
+    """Turns a table of Ensembl ids into a table of gene names. A gene without a name is left out.
+    Two ids of one name are added for counts and averaged for values."""
     named = table.data.copy()
     named.index = pd.Index([names.get(str(g)) for g in named.index], name="name")
     named = named[named.index.notna()]
@@ -232,9 +231,8 @@ def _by_name(table: Table, names: dict[str, str], counts: bool) -> Table:
 
 
 class Contrast(TypedDict):
-    """What a comparison of the expression of two jobs is: deseq2, ratio or none, the reason of a
-    mode other than deseq2, the labels of the two tables, the column their genes are named by and
-    the samples on each side."""
+    """The comparison of the expression of two jobs. `mode` is deseq2, ratio or none and `reason`
+    explains a mode other than deseq2."""
 
     mode: Literal["deseq2", "ratio", "none"]
     reason: str
@@ -257,13 +255,11 @@ class _Labels(TypedDict):
 
 
 def contrast(a: Path, b: Path, cache: Path, names: Callable[[], dict[str, str]] | None = None) -> Tested:
-    """The expression of job b against job a, gene by gene.
-
-    Returns `mode`, deseq2, ratio or none, the `reason` of a mode other than deseq2 and `genes`,
-    for each gene `[log2 fold change, adjusted p or None, level in a, level in b]`. The genes are
-    named as the tables name them, `key`. The result of a pair of tables is kept in `cache`.
-    One table by Ensembl id and one by name are compared by name, with `names`, the name of
-    each id.
+    """Compares the expression of job b against job a, gene by gene. Returns `mode`, deseq2, ratio
+    or none, the `reason` of a mode other than deseq2 and `genes`, for each gene `[log2 fold change,
+    adjusted p or None, level in a, level in b]`. The genes have the names of the tables, by `key`.
+    The result of a pair of tables is kept in `cache`. One table by Ensembl id and one by name are
+    compared by name, with `names`, the name of each id.
     """
     ma, mb = job_meta(a), job_meta(b)
     if ma is None or mb is None:

@@ -21,11 +21,13 @@ const cn = scoped(sheet)
 const WITH = previews.rnapii as PreviewData
 const WITHOUT = previews.ctcf as PreviewData
 const spread = (d: PreviewData) => `${d.mean.toFixed(1)} ± ${d.sd.toFixed(1)}`
-/** The hero's picture in its own pixels: a point on the promoter and one on the enhancer, the
- * letter beside each where the picture is empty and the middle of the distance's box. */
+/**
+ * The picture of the hero in its own pixels, with a point on the promoter and one on the enhancer,
+ * the letter beside each on an empty part of the picture and the middle of the box of the distance.
+ */
 const HERO = { a: [354, 397], b: [705, 196], letterA: [350, 452], letterB: [668, 150], box: [525, 232] } as const
 
-/** The part of each drawing the example shows. One view for both, so the two lines can be compared. */
+/** The part of each drawing the example shows. Both have one view and the two lines can be compared. */
 const STORY_VIEW: [number, number, number, number] = [-170, -372, 770, 764]
 
 /** The two drawings of the first example, the tag over each and the words a screen reader gets. */
@@ -34,18 +36,22 @@ const STORY = [
   { tag: 'CTCF loops alone', data: WITHOUT },
 ]
 
-/** The drawing of the deletion example: GM12878 with the variants of HG00512. A and B are the promoters of GSTM2
- * and GSTM5, the genes either side of the deleted GSTM1. */
+/**
+ * The drawing of the deletion example, GM12878 with the variants of HG00512. A and B are the promoters of GSTM2
+ * and GSTM5, the genes either side of the deleted GSTM1.
+ */
 const DELETION = deletion.deletion as PreviewData
 const DELETION_VIEW: [number, number, number, number] = [-240, -362, 600, 704]
 
-/** The drawings of the expression example: VPS13D in two cell types, each with the enhancer nearest to it in
- * that cell type, 20 kb away in GM12878 and 849 bp away in H1ESC. */
+/**
+ * The drawings of the expression example, VPS13D in two cell types, each with the enhancer nearest to it in
+ * that cell type, 20 kb away in GM12878 and 849 bp away in H1ESC.
+ */
 const CELLS = [
   { tag: 'GM12878', data: expression.gm12878 as PreviewData },
   { tag: 'H1ESC', data: expression.h1esc as PreviewData },
 ]
-/** A view of one size about the middle of each drawing: the two are on one scale and each is centred in its panel. */
+/** A view of one size about the middle of each drawing. The two are on one scale and each is centred in its panel. */
 const CELLS_SIZE = [
   Math.max(...CELLS.map((c) => Math.max(...c.data.points.map((p) => p[0])) - Math.min(...c.data.points.map((p) => p[0])))) + 60,
   Math.max(...CELLS.map((c) => Math.max(...c.data.points.map((p) => p[1])) - Math.min(...c.data.points.map((p) => p[1])))) + 60,
@@ -58,10 +64,10 @@ const centred = (d: PreviewData): [number, number, number, number] => {
 /** The expression of VPS13D in H1ESC over GM12878, from DESeq2 on the ENCODE counts of the site, read on 2026-11-21. */
 const VPS13D_FOLD = 1.7
 
-/** The landing page: what the site computes, the examples and the previous services. */
+/** The front page, with the output of the site, the examples and the previous services. */
 export function Title() {
   const { open, busy, error } = useOpenExample()
-  // The longest region of a job is the server's to say. 20 Mb stands until the server answers.
+  // The server gives the longest region of a job. 20 Mb is shown until the server answers.
   const catalog = useQuery(asked.catalog())
   const maxMb = catalog.data?.max_region_mb ?? 20
   return (

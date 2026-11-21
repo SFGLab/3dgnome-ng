@@ -1,9 +1,9 @@
 import type { Setting, SettingGroup } from '../api'
 
-/** The name a change is keyed by, section.key. */
+/** Returns the key of a change, section.key. */
 export const settingName = (s: Setting) => `${s.section}.${s.key}`
 
-/** The changes that differ from the server's values, keyed section.key. */
+/** Returns the changes that differ from the values of the server, keyed section.key. */
 export function changedSettings(schema: SettingGroup[], values: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const s of schema.flatMap((g) => g.settings)) {
@@ -13,7 +13,7 @@ export function changedSettings(schema: SettingGroup[], values: Record<string, s
   return out
 }
 
-/** The changes as an ini file, one block per section. */
+/** Returns the changes as an ini file, one block per section. */
 export function toIni(changes: Record<string, string>): string {
   const sections = new Map<string, string[]>()
   for (const [name, value] of Object.entries(changes)) {

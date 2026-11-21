@@ -39,7 +39,7 @@ def _nearest(mids: np.ndarray, p: int) -> int | None:
 
 
 def mark_beads(chrom: str, starts: np.ndarray, ends: np.ndarray, genes: pd.DataFrame, enhancers: pd.DataFrame) -> Marks:
-    """The bead of each TSS and enhancer centre on `chrom` within 5 kb of a bead midpoint."""
+    """Returns the bead of each TSS and enhancer centre on `chrom` within 5 kb of a bead midpoint."""
     mids = (starts + ends) // 2
     lo, hi = int(starts.min()), int(ends.max())
     m = Marks()
@@ -55,7 +55,7 @@ def mark_beads(chrom: str, starts: np.ndarray, ends: np.ndarray, genes: pd.DataF
 
 
 def ep_table(models: list[np.ndarray], marks: Marks, genes: pd.DataFrame, starts: np.ndarray, ends: np.ndarray) -> pd.DataFrame:
-    """Per marked gene its nearest enhancer by ensemble mean 3D distance within 1 Mb."""
+    """Returns per marked gene its nearest enhancer by ensemble mean 3D distance within 1 Mb."""
     mids = (starts + ends) // 2
     tss = genes.set_index("gene_id")
     rows = []

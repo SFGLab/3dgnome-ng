@@ -38,7 +38,7 @@ function listedLoops(s: Summary): string {
   return s.request.own?.loops_from ? `${set} of ${s.request.own.loops_from}` : set
 }
 
-/** The job's name, state, facts, structure selector and files. */
+/** The name of the job, its state, facts, structure selector and files. */
 export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props) {
   const remembered = recentJobs().find((j) => j.url === api.url)
   const [name, setName] = useState(remembered?.name ?? '')
@@ -53,8 +53,8 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   // The file of the structure in view is kept in sight in the list of all of them.
   const shown = useRef<HTMLLIElement>(null)
   useEffect(() => {
-    // In braces: a browser may return a promise from the scroll and an effect must return nothing
-    // but its cleanup.
+    // The call is in braces. A browser may return a promise from the scroll and an effect must
+    // return nothing but its cleanup.
     shown.current?.scrollIntoView?.({ block: 'nearest' })
   }, [selected])
   const save = (value: string) => {
@@ -110,8 +110,8 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
       <a className="link-button" href={served(`${ROUTES.model}?from=${encodeURIComponent(api.url)}`)}>
         <CopyPlus size={12} aria-hidden /> New job from this request
       </a>
-      {/* On a narrow screen the panel is above the tabs. Its facts and files fold away there, so
-          the model is not a screen below. */}
+      {/* On a narrow screen the panel is above the tabs. Its facts and files fold away there and
+          the model stays within the first screen. */}
       <button type="button" className={cn('side-fold-toggle')} aria-expanded={unfolded} onClick={() => setUnfolded((u) => !u)}>
         {unfolded ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />} Details and files
       </button>

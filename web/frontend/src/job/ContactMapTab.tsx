@@ -25,10 +25,10 @@ const SHOWS: [Show, string][] = [
   ['oe', 'O/E'],
   ['pearson', 'Pearson'],
 ]
-/** The separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
+/** Returns the separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
 const reach = (bp?: number) => (bp ? `, up to ${bp >= 1e6 ? `${bp / 1e6} Mb` : `${bp / 1000} kb`}` : '')
 
-/** The Contact map tab: the job's Hi-C and its model on one grid, upper and lower half. */
+/** The Contact map tab, with the Hi-C of the job and its model on one grid, upper and lower half. */
 export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary }) {
   const job = parseRegion(summary.region)!
   const [locus, setLocus] = useState<Locus>(job)
@@ -106,7 +106,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     const next = moveTo(want)
     setNote(next.start !== want.start || next.end !== want.end || next.chrom !== want.chrom ? `The job covers ${regionText(job)}. The map shows only that region.` : '')
   }
-  // A native listener, since React's wheel handler is passive and cannot stop the page scrolling.
+  // A native listener. The wheel handler of React is passive and cannot stop the page scrolling.
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
   useEffect(() => {
@@ -130,8 +130,8 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     <div className={cn('contacts-tab')}>
       <div className="contacts-main">
         <div className={cn('map-toolbar')}>
-          {/* No label stands over a control, as on the other tabs. Each control says what it is by
-              its own text and has its name for a screen reader and as a tooltip. */}
+          {/* No control has a label over it, as on the other tabs. Each control states its purpose
+              by its own text and has its name for a screen reader and as a tooltip. */}
           <span className={cn('locus-input')}>
             <input aria-label="Locus" title="Locus" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} />
             <button type="button" onClick={go}>

@@ -5,8 +5,7 @@ const NO_DATA: [number, number, number] = [226, 225, 221]
 
 type Half = { m: number[][]; range: [number, number]; loops: boolean }
 
-/** Each half on its own colour range. A loop half has no empty bins to grey: a row without a loop
- * is a row of zeros, drawn white. */
+/** Draws each half on its own colour range. A loop half has no empty bins to grey. A row without a loop is a row of zeros, drawn white. */
 export function draw(canvas: HTMLCanvasElement, up: Half, low: Half, log: boolean, show: Show) {
   const [upper, lower] = [up.m, low.m]
   const ctx = canvas.getContext('2d')
@@ -14,7 +13,8 @@ export function draw(canvas: HTMLCanvasElement, up: Half, low: Half, log: boolea
   if (!ctx || !n) return
   canvas.width = n
   canvas.height = n
-  // Each half on its own scale: the lower half's values are brought to the upper half's range.
+  // Each half on its own scale. The values of the lower half are brought to
+  // the range of the upper half.
   const span = Math.max(Math.abs(up.range[0]), Math.abs(up.range[1]))
   const none = upper.map(() => false)
   const [emptyUp, emptyLow] = [up.loops ? none : emptyRows(upper), low.loops ? none : emptyRows(lower)]

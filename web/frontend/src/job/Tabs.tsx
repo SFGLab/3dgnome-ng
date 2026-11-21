@@ -24,7 +24,7 @@ type Props = {
   onCompare: () => void
 }
 
-/** The tabs of the explorer and its actions: compare, copy the link, download every file. */
+/** The tabs of the explorer and its actions, which are compare, copy the link and download every file. */
 export function JobTabs({ tab, counts, comparing, zipUrl, onTab, onCompare }: Props) {
   return (
     <div className={cn('job-tabs')}>

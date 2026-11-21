@@ -19,7 +19,7 @@ SEX = {"1": "male", "2": "female"}
 
 
 def read_pedigree(path: Path) -> dict[str, dict[str, str]]:
-    """The pedigree's rows by sample."""
+    """Returns the rows of the pedigree by sample."""
     rows: dict[str, dict[str, str]] = {}
     with path.open() as fh:
         header = fh.readline().split()
@@ -39,7 +39,7 @@ def read_pedigree(path: Path) -> dict[str, dict[str, str]]:
 
 
 def table_rows(samples: list[str], pedigree: dict[str, dict[str, str]]) -> tuple[list[list[str]], dict[str, int]]:
-    """One row per sample of the call set and the counts the script prints."""
+    """Returns one row per sample of the call set and the counts the script prints."""
     known = set(samples)
     counts = {"samples": len(samples), "not in the pedigree": 0, "with a parent in the set": 0, "with both parents in the set": 0, "parents outside the set": 0}
     rows: list[list[str]] = []

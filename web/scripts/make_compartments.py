@@ -20,20 +20,20 @@ import sys
 import cooler
 import numpy as np
 
-#: Diagonals left out of the signal, the bin itself and its neighbour.
+# Diagonals left out of the signal, the bin itself and its neighbour.
 IGNORE_DIAGS = 2
-#: An arm with fewer mapped bins than this is left out.
+# An arm with fewer mapped bins than this is left out.
 MIN_BINS = 30
-#: The least correlation of neighbouring bins for a signal that is not noise.
+# The least correlation of neighbouring bins for a signal that is not noise.
 MIN_LAG1 = 0.3
-#: The least correlation with gene density for a sign that can be trusted.
+# The least correlation with gene density for a sign that can be trusted.
 MIN_GENES = 0.1
 
 
 def signal(m: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """The compartment signal of one arm.
+    """Returns the compartment signal of one arm.
 
-    @param m the arm's balanced map, NaN in the bins the balancing left out
+    @param m the balanced map of the arm, NaN in the bins the balancing left out
     @return the signal over the mapped bins and the indices of those bins
     """
     n = len(m)

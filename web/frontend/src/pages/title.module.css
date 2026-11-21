@@ -40,7 +40,7 @@
   color: var(--muted);
 }
 
-/* The terms of use under the lead: free, no login and the licence. */
+/* The terms of use under the lead, which are free, no login and the licence. */
 .hero-terms {
   margin: -8px 0 0;
   font-size: 13px;
@@ -83,7 +83,7 @@
   color: var(--faint);
 }
 
-/* The rendered structure with its marks, and the key over its lower left corner. */
+/* The rendered structure with its marks and the key over its lower left corner. */
 .hero-image {
   flex: 1;
   height: 440px;
@@ -254,7 +254,7 @@
   object-fit: cover;
 }
 
-/* The first example: two drawings of one locus side by side, on one scale. */
+/* The first example, two drawings of one locus side by side on one scale. */
 .example.story {
   grid-column: span 2;
 }

@@ -51,8 +51,8 @@ class SiteConfig:
 
 
 def parse(text: str, where: str = "config.json") -> SiteConfig:
-    """The configuration a file's text holds. An unknown key or feature and a value that is not
-    true or false are errors. A misspelt flag does not pass for a working one."""
+    """Returns the configuration a file's text holds. An unknown key or feature and a value that is
+    not true or false are errors. A misspelt flag does not pass for a working one."""
     try:
         raw = json.loads(text)
     except json.JSONDecodeError as e:

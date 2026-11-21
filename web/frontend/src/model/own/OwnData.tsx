@@ -23,8 +23,10 @@ const CONTACT_RES = 25_000
 const STEPS: OwnTab[] = ['loops', 'anchors', 'contacts', 'enhancers', 'expression']
 const STEP_TITLE: Record<OwnTab, string> = { loops: 'Loops', anchors: 'Anchors', contacts: 'Contacts', enhancers: 'Enhancers', expression: 'Expression' }
 
-/** The dialog for a job's own data: loops per factor, anchors, contacts, enhancers and an
- * expression table, each checked by the server on arrival. Use this data gives the checked uploads to the form. */
+/**
+ * The dialog for the own data of a job. It takes loops per factor, anchors, contacts, enhancers and an expression
+ * table, each checked by the server on arrival. Use this data gives the checked uploads to the form.
+ */
 export function OwnData({
   cell,
   region,
@@ -61,13 +63,15 @@ export function OwnData({
   const borrowed = start.enhancersFrom && start.enhancersFrom !== 'none' ? start.enhancersFrom : ''
   const [enhSource, setEnhSource] = useState<EnhSource>(start.enhancers || !ownCell ? 'upload' : borrowed ? 'listed' : 'none')
   const [enhFrom, setEnhFrom] = useState(borrowed || cells[0] || '')
-  // The samples the job takes from the expression table and what its values are.
+  // The samples the job takes from the expression table and the kind of its values.
   const [samples, setSamples] = useState<string[]>(start.expression?.columns ?? [])
   const [valueKind, setValueKind] = useState<OwnExpression['kind']>(start.expression?.kind ?? 'counts')
 
 
-  /** Puts a file into the slot of its kind and follows its upload: the entry is there at once and
-   * the outcome is written into it when it arrives, unless another file took the slot meanwhile. */
+  /**
+   * Puts a file into the slot of its kind and follows its upload. The entry is there at once and
+   * the outcome is written into it when it arrives, unless another file took the slot meanwhile.
+   */
   const follow = (kind: Single, name: string, size: number, work: () => Promise<UploadResult>, failed: (e: Error) => Partial<Entry> = (e) => ({ failure: e.message })) => {
     const key = next.current++
     setSingle((s) => ({ ...s, [kind]: { key, factor: '', name, size } }))
@@ -134,7 +138,7 @@ export function OwnData({
       expression: table?.result?.ok ? { upload: table.result, columns: samples, kind: valueKind } : null,
     })
 
-  // The subtitle of each step names what the job will use from it.
+  // The subtitle of each step states what the job will use from it.
   const uses: Record<OwnTab, string> = {
     loops: loops.length ? `${loops.length} file${loops.length === 1 ? '' : 's'}` : 'the listed sets',
     anchors: named(single.anchors) ?? 'the loop ends',

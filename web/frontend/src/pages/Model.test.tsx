@@ -46,7 +46,7 @@ describe('Model a region page', () => {
     const card = await screen.findByRole('radio', { name: /GM12878/ })
     expect(within(card).getByText('lymphoblastoid')).toBeInTheDocument()
     expect(within(card).getByText('enhancers')).toBeInTheDocument()
-    // The own data card has a chip for each kind of data given, and none before.
+    // The own data card has a chip for each kind of data given and none before.
     const own = screen.getByRole('radio', { name: /Your own data/ })
     expect(own).toBeEnabled()
     expect(own.querySelector('.chip')).toBeNull()

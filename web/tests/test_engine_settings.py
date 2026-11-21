@@ -1,7 +1,5 @@
-"""The settings users may change: the schema from SETTINGS.md, validation and the config they
-are written into.
-
-    pytest web/tests/test_engine_settings.py
+"""The settings users may change. The tests cover the schema from SETTINGS.md, the validation and
+the config that takes the changes.
 """
 
 from __future__ import annotations

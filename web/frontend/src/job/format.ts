@@ -1,7 +1,7 @@
 /** Formats shared by the explorer. */
 import type { Summary } from '../api'
 
-/** The variants a job applied and from whom, with the count of those of a type the site does not apply. */
+/** Returns the variants a job applied and their source, with the count of those of a type the site does not apply. */
 export function variants(s: Summary): string {
   const skipped = s.skipped_svs ? `, ${s.skipped_svs} of other types skipped` : ''
   if (!s.n_svs) return `none${skipped}`

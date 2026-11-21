@@ -1,5 +1,5 @@
 #!/bin/bash
-# The site without Docker or Redis: uvicorn with the thread queue on fixed GPU slots and the
+# The site without Docker or Redis. It runs uvicorn with the thread queue on fixed GPU slots and the
 # NVIDIA MPS daemon for the engines when MPS=1. Run from the repository root.
 #
 #   SITE=~/site-data RESULTS=~/results VENV=~/venv PORT=8766 GPUS=0 WORKERS_PER_GPU=2 MPS=1 \

@@ -1,8 +1,8 @@
-/** One way to ask the server: the answer as JSON or text, or an ApiError. */
+/** One way to ask the server. The answer is JSON or text, or an ApiError. */
 import { served } from '../base'
 
 /**
- * An answer of the server that is not 2xx: its message, its status, the form field it concerns
+ * An answer of the server that is not 2xx, with its message, its status, the form field it concerns
  * and the fix. Status 0 is a request the server did not answer.
  */
 export class ApiError extends Error {
@@ -32,13 +32,13 @@ async function answer(path: string, init?: RequestInit): Promise<Response> {
   return r
 }
 
-/** The JSON answer of a path of the API. */
+/** Returns the JSON answer of a path of the API. */
 export const call = async <T>(path: string, init?: RequestInit): Promise<T> => (await (await answer(path, init)).json().catch(() => ({}))) as T
 
-/** The text answer of a path of the API. */
+/** Returns the text answer of a path of the API. */
 export const callText = async (path: string): Promise<string> => (await answer(path)).text()
 
-/** A form of fields as the body of a POST. */
+/** Returns a form of fields as the body of a POST. */
 export function posted(fields: Record<string, string | Blob | undefined>): RequestInit {
   const body = new FormData()
   for (const [k, v] of Object.entries(fields)) if (v !== undefined) body.append(k, v)

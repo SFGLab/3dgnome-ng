@@ -11,7 +11,7 @@ type Props = {
   options: ExpressionOption[]
   /** The id of the chosen source, own for an uploaded table, empty for none. */
   value: string
-  /** The cell type of the form, as its card names it. */
+  /** The cell type of the form, by the name on its card. */
   cell: string
   onChange: (source: string) => void
   /** The uploaded table and the samples the job takes from it. */
@@ -29,9 +29,9 @@ const about = (o: ExpressionOption) =>
 const samples = (n: number) => (n === 1 ? '1 sample' : `${n} samples`)
 
 /**
- * The step of the form for gene expression, off unless a source is chosen. The job then shows
- * the expression of each gene, and the comparison of two jobs shows the change of expression
- * beside the change of the 3D distance. A table of the user comes through the dialog for own data.
+ * The step of the form for gene expression, off unless a source is chosen. The job then shows the
+ * expression of each gene. The comparison of two jobs shows the change of expression beside the
+ * change of the 3D distance. A table of the user comes through the dialog for own data.
  */
 export function Expression({ options, value, cell, onChange, own, onOpen, onRemove }: Props) {
   const chosen = options.find((o) => o.id === value)

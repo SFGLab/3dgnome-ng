@@ -8,16 +8,19 @@ import { nameOf, rememberJob } from '../myjobs/recent'
  * visitor the same job, the first job of the request. */
 export const EXAMPLE_STRUCTURES = 10
 
-/** The request of an example for one loop set and one cell type, without the settings of the form. */
+/** Returns the request of an example for one loop set and one cell type, without the settings of the form. */
 const request = (e: Example, factors: Factors, cell = e.cell) => toFormData({ ...fromExample(e), cell, factors, structures: EXAMPLE_STRUCTURES }, {}, false)
 
-/** Submits an example's request, which the server answers with the shared job, finished or
- * running and returns the page to open: the job on its tab, or with the comparison. */
+/**
+ * Submits the request of an example, which the server answers with the shared job, finished or
+ * running. Returns the page to open, the job on its tab or with the comparison.
+ */
 export async function openExample(e: Example): Promise<string> {
-  // A compare example's two jobs are named by their loop sets, not by the example's title.
+  // The two jobs of a compare example have the names of their loop sets,
+  // not the title of the example.
   const named = (f: Factors) => `${e.cellLabel} ${e.region}, ${f === 'CTCF+RNAPII' ? 'CTCF and RNAPII' : f} loops`
   if (e.compareCell) {
-    // Two cell types on one region: each job is named by its cell type.
+    // Two cell types on one region. Each job has the name of its cell type.
     const of = (cell: string) => `${cell} ${e.region}`
     const first = await api.submit(request(e, e.factors))
     rememberJob({ url: first.url, label: of(e.cell), name: nameOf(first.url), at: Date.now() })

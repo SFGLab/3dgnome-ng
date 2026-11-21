@@ -6,7 +6,7 @@ import type { LoopDrawn, UploadKind, UploadResult } from './types'
 export const uploadFile = (kind: UploadKind, file: File, where: { cell: string; region: string; factor?: string }) =>
   call<UploadResult>('/api/uploads', posted({ kind, file, cell: where.cell, region: where.region, factor: where.factor || undefined }))
 
-/** The loops of a loops upload inside a region, none when the server has no answer. */
+/** Returns the loops of a loops upload inside a region, none when the server has no answer. */
 export const uploadPreview = (id: string, cell: string, region: string) => call<LoopDrawn[]>(`/api/uploads/${id}/preview?${query({ cell, region })}`).catch((): LoopDrawn[] => [])
 
 /** Asks the server to read the region of a remote .hic or .mcool file into a contacts upload. */

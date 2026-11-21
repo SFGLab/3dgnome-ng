@@ -1,7 +1,4 @@
-"""The app's routes with the inline queue and the stand in engine.
-
-    pytest web/tests/test_app.py
-"""
+"""The routes of the app with the inline queue and the stand in engine."""
 
 from __future__ import annotations
 
@@ -111,7 +108,7 @@ def test_a_valid_request_answers_with_its_job(form: Any, site: SimpleNamespace) 
     assert c.get(job + "/files/ep.tsv").status_code == 200, "a listed file downloads"
 
     assert c.get(job + "/files/..%2F..%2Fcatalog.json").status_code == 404, "a path outside the job is refused"
-    # The pages of the site before its React frontend are gone, with the form that posted to /jobs.
+    # The site has no page rendered by the server and no form that posts to /jobs.
     for old in (job + "/classic", job + "/view/x.json"):
         assert c.get(old).status_code in (404, 503), f"{old} is no page of the server"
     assert c.post("/jobs", data=form).status_code in (404, 405), "the old form has no address to post to"

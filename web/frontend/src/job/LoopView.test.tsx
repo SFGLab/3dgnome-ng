@@ -35,7 +35,7 @@ describe('the loop view', () => {
     const { rerender } = render(<LoopView chrom="chr1" region={[900_000, 2_000_000]} loops={LOOPS} onSelect={onSelect} hint="the hint" />)
     expect(screen.getByText('the hint')).toBeInTheDocument()
     // A press and a release on a loop with no drag between them select it. The view takes the
-    // pointer for a drag, so it reads the loop from the press and not from a click.
+    // pointer for a drag and reads the loop from the press, not from a click.
     const press = (name: string) => {
       fireEvent.pointerDown(screen.getByRole('button', { name }))
       fireEvent.pointerUp(screen.getByRole('button', { name }))
@@ -43,7 +43,7 @@ describe('the loop view', () => {
     press(describeLoop(LOOPS[1]))
     expect(onSelect).toHaveBeenLastCalledWith(1)
     rerender(<LoopView chrom="chr1" region={[900_000, 2_000_000]} loops={LOOPS} onSelect={onSelect} selected={1} hint="the hint" />)
-    // The line under the view names the selected loop.
+    // The line under the view states the selected loop.
     expect(screen.getByText(`Selected: ${describeLoop(LOOPS[1])}`)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: describeLoop(LOOPS[1]) })).toHaveAttribute('aria-pressed', 'true')
     press(describeLoop(LOOPS[1]))
@@ -81,7 +81,7 @@ describe('the loop view', () => {
     expect(zoomed([1_000_000, 2_000_000], [1_000_000, 2_000_000], 1_500_000, 0.8)).toEqual([1_100_000, 1_900_000])
     // Out of a part the zoom stops at the whole region.
     expect(zoomed([1_100_000, 1_900_000], [1_000_000, 2_000_000], 1_500_000, 2)).toEqual([1_000_000, 2_000_000])
-    // The position under the pointer keeps its place: a quarter into the part before and after.
+    // The position under the pointer keeps its place, a quarter into the part before and after.
     expect(zoomed([1_000_000, 2_000_000], [0, 5_000_000], 1_250_000, 0.5)).toEqual([1_125_000, 1_625_000])
     const [onWindow, onReset] = [vi.fn(), vi.fn()]
     const { container } = render(<LoopView chrom="chr1" region={[1_200_000, 1_600_000]} bounds={[1_000_000, 2_000_000]} loops={LOOPS} onWindow={onWindow} onReset={onReset} />)
@@ -112,7 +112,7 @@ describe('the loop view', () => {
     expect(box.getAttribute('width')).toBe('250')
     const svg = container.querySelector('.loop-view-arcs')!
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 500, height: 72, right: 500, bottom: 72, x: 0, y: 0, toJSON: () => ({}) })
-    // jsdom's pointer events carry no position, so mouse events of the same names stand in.
+    // The pointer events of jsdom have no position. Mouse events of the same names stand in.
     const at = (type: string, clientX: number) => fireEvent(svg, new MouseEvent(type, { clientX, bubbles: true }))
     at('pointerdown', 100)
     at('pointermove', 300)

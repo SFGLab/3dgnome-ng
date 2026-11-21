@@ -25,15 +25,15 @@ BACKGROUNDS = ("hic", "hicdiffusion", "none")
 
 @lru_cache(maxsize=16)
 def _columns(path: Path) -> frozenset[str]:
-    """The column names of a hosted table, read from its first line."""
+    """Returns the column names of a hosted table, read from its first line."""
     with open(path) as fh:
         return frozenset(re.split(r"[\t,]", fh.readline().rstrip("\n")))
 
 
 @lru_cache(maxsize=None)
 def gene_table(path: Path) -> pd.DataFrame:
-    """The gene table of a cell type, read once for the process. A caller takes rows of it and
-    leaves the table as it is."""
+    """Returns the gene table of a cell type, read once for the process. A caller takes rows of it
+    and leaves the table as it is."""
     return pd.read_csv(path, sep="\t")
 
 
@@ -58,21 +58,21 @@ class CellType:
     data: list[str] = field(default_factory=list)
 
     def path(self, key: str) -> Path:
-        """The absolute path of one of the cell type's single files, by catalog key."""
+        """Returns the absolute path of one of the single files of the cell type, by its key in the catalog."""
         return self.root / self.files[key]
 
     def anchors_for(self, factors: str) -> Path:
-        """The anchors file of a factor choice. RNAPII alone reads the CTCF and RNAPII anchors,
-        which hold the RNAPII loop ends."""
+        """Returns the anchors file of a factor choice. RNAPII alone reads the CTCF and RNAPII
+        anchors, which hold the RNAPII loop ends."""
         return self.root / self.anchors["CTCF+RNAPII" if factors == "RNAPII" else factors]
 
     def clusters_for(self, factors: str) -> list[tuple[str, Path]]:
-        """The loop files a factor choice reads, CTCF first."""
+        """Returns the loop files a factor choice reads, CTCF first."""
         names = {"CTCF": ["CTCF"], "RNAPII": ["RNAPII"]}.get(factors, ["CTCF", "RNAPII"])
         return [(n, self.root / self.clusters[n]) for n in names]
 
     def genes(self) -> pd.DataFrame:
-        """Columns gene_id, name, chrom, tss, strand."""
+        """Returns the gene table with the columns gene_id, name, chrom, tss and strand."""
         return gene_table(self.path("genes"))
 
 
@@ -101,8 +101,8 @@ class SVSet:
     samples_table: Path | None = None
 
     def sample_rows(self) -> list[list[str]]:
-        """The rows of the set's samples in the order of `SAMPLE_COLUMNS`, read once. A sample the
-        table lacks gets empty fields and a parent outside the set is left out.
+        """Returns the rows of the samples of the set in the order of `SAMPLE_COLUMNS`, read once. A
+        sample the table lacks gets empty fields and a parent outside the set is left out.
         """
         return _sample_rows(self.samples_table, tuple(self.samples)) if self.samples_table else []
 
@@ -118,17 +118,17 @@ class Catalog:
     expression: dict[str, Source] = field(default_factory=_no_expression)
 
     def sample_note(self, sv_set: str, sample: str) -> str:
-        """Population, superpopulation and sex of a hosted sample, or an empty string."""
+        """Returns the population, the superpopulation and the sex of a hosted sample, or an empty string."""
         rows = self.sv_sets[sv_set].sample_rows() if sv_set in self.sv_sets else []
         row = next((r for r in rows if r[0] == sample), None)
         return ", ".join(v for v in (row[2], row[3], row[1]) if v) if row else ""
 
     def expression_options(self, cell: str, sample: str = "", hidden: tuple[str, ...] = ()) -> list[dict[str, object]]:
-        """The hosted expression a job of a cell type can take: the replicates of the cell type,
-        and with a hosted sample the libraries of that person. Each option has the id of its
-        source, a label, the kind, the unit, the columns and `other_cell_type`, true for a
-        person's lymphoblastoid line beside a cell type that is not lymphoblastoid. A source of
-        a feature in `hidden` is left out."""
+        """Returns the hosted expression a job of a cell type can take. It is the replicates of the
+        cell type and, with a hosted sample, the libraries of that person. Each option has the id of
+        its source, a label, the kind, the unit, the columns and `other_cell_type`, true for a
+        person's lymphoblastoid line beside a cell type that is not lymphoblastoid. A source of a
+        feature in `hidden` is left out."""
         ct = self.cell_types.get(cell)
         out: list[dict[str, object]] = []
         for src in self.expression.values():

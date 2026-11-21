@@ -1,7 +1,4 @@
-"""The job data endpoints of the explorer.
-
-    pytest web/tests/test_results.py
-"""
+"""The data endpoints of a job page."""
 
 from __future__ import annotations
 

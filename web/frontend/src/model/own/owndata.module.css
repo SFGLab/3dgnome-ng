@@ -87,7 +87,7 @@
   gap: 14px;
 }
 
-/* The dialog's body has three text styles: plain text, a label and a line of code. */
+/* The body of the dialog has three text styles, which are plain text, a label and a line of code. */
 .own-tab .rule {
   display: flex;
   flex-direction: column;

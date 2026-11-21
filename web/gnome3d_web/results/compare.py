@@ -1,4 +1,4 @@
-"""Two jobs compared: the distance of each gene to its enhancer and the expression."""
+"""The comparison of two jobs by the distance of each gene to its enhancer and by the expression."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .views import MAX_GAP, cached, features, genes, nearest, positions
 
 
 def _pair_distances(job: Path) -> dict[str, list[float]]:
-    """The enhancer to promoter distance of every gene of a job in each of its structures."""
+    """Returns the enhancer to promoter distance of every gene of a job in each of its structures."""
 
     def make() -> dict[str, list[float]]:
         pos, _ = positions(job)
@@ -27,7 +27,7 @@ def _pair_distances(job: Path) -> dict[str, list[float]]:
 
 
 def _rank_p(x: list[float], y: list[float]) -> float | None:
-    """The two sided p of the Mann-Whitney U test of two sets of distances, None with fewer
+    """Returns the two sided p of the Mann-Whitney U test of two sets of distances, None with fewer
     than two structures on a side."""
     if len(x) < 2 or len(y) < 2:
         return None
@@ -40,18 +40,18 @@ SAME_ENHANCER_BP = 500
 
 
 def _pairs(a: Path, b: Path, shared: bool) -> tuple[dict[str, dict[str, object]], int | None]:
-    """The enhancer of each gene of both jobs and its distance from the promoter in every
+    """Returns the enhancer of each gene of both jobs and its distance from the promoter in every
     structure of each job.
 
-    By default a job measures a gene to its own nearest enhancer, the one of its gene table.
-    Two cell types have two sets of enhancers and the two enhancers of a gene can differ. With
-    `shared` a gene is measured in both jobs to its nearest enhancer among the enhancers the two
-    jobs share, the ones that overlap in the two sets. Positions are compared as they are, which
-    holds for two jobs without structural variants.
+    By default a job measures a gene to its own nearest enhancer, the one of its gene table. Two
+    cell types have two sets of enhancers and the two enhancers of a gene can differ. With `shared`
+    a gene is measured in both jobs to its nearest enhancer among the enhancers the two jobs share,
+    the ones that overlap in the two sets. Positions are compared as they are, which holds for two
+    jobs without structural variants.
 
-    Returns for each gene `linear`, the separation of the promoter and the enhancer in bp in a
-    and in b, `beads`, the enhancer bead of a and of b, and `values`, the distances in a and in
-    b. The second value is the number of shared enhancers, None by default.
+    A gene has three values. `linear` is the separation of the promoter and the enhancer in bp in a
+    and in b. `beads` is the enhancer bead of a and of b. `values` is the distances in a and in b.
+    The second value of the result is the number of shared enhancers, None by default.
     """
     ga = {r["gene"]: r for r in genes(a)}
     gb = {r["gene"]: r for r in genes(b)}
@@ -84,13 +84,13 @@ def _spread(values: list[float]) -> dict[str, float]:
 
 
 def compare(a: Path, b: Path, shared: bool = False) -> DistanceChanges:
-    """The genes both jobs have, with each job's mean and SD of the enhancer to promoter distance,
-    the ratio b over a and the p of a Mann-Whitney U test of the distances in the structures of
-    the two jobs, the largest changes first.
+    """Returns the genes both jobs have, with the mean and SD of the enhancer to promoter distance
+    of each job, the ratio b over a and the p of a Mann-Whitney U test of the distances in the
+    structures of the two jobs, the largest changes first.
 
-    A row has the separation of the gene and its enhancer in each job and the enhancer bead of
-    each job. `differ` counts the genes with another enhancer in b than in a. `shared` and
-    `shared_enhancers` say which enhancers were measured, see `_pairs`.
+    A row has the separation of the gene and its enhancer in each job and the enhancer bead of each
+    job. `differ` counts the genes with another enhancer in b than in a. `shared` and
+    `shared_enhancers` state the enhancers that were measured, see `_pairs`.
     """
     ra, rb = store.status(a).get("region"), store.status(b).get("region")
     pairs, n_shared = _pairs(a, b, shared)
@@ -111,8 +111,8 @@ def compare(a: Path, b: Path, shared: bool = False) -> DistanceChanges:
 
 
 def compare_gene(a: Path, b: Path, gene: str, shared: bool = False) -> GeneDistances | None:
-    """The enhancer to promoter distance of one gene in each structure of job a and of job b,
-    for a box plot, with the p of `compare`. None for a gene one of the jobs lacks."""
+    """Returns the enhancer to promoter distance of one gene in each structure of job a and of job
+    b, for a box plot, with the p of `compare`. None for a gene one of the jobs lacks."""
     pair = _pairs(a, b, shared)[0].get(gene)
     if pair is None:
         return None
@@ -126,8 +126,8 @@ VOLCANO_FOLD, VOLCANO_P = 12.0, 50.0
 
 
 def _volcano(table: dict[str, tuple[float, float | None, float, float]]) -> Volcano | None:
-    """Every tested gene of a contrast as [log2 fold change, -log10 of the adjusted p], for the
-    background of the volcano plot. The points are on a grid of 0.2 by 0.5 with each cell once.
+    """Returns every tested gene of a contrast as [log2 fold change, -log10 of the adjusted p], for
+    the background of the volcano plot. The points are on a grid of 0.2 by 0.5 with each cell once.
     None for a contrast without p-values."""
     cells: set[tuple[float, float]] = set()
     for fold, padj, *_ in table.values():
@@ -140,15 +140,14 @@ def _volcano(table: dict[str, tuple[float, float | None, float, float]]) -> Volc
 
 
 def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False, names: Callable[[], dict[str, str]] | None = None) -> ExpressionChanges:
-    """The expression of job b against job a for the genes both jobs have, beside the change of
-    their enhancer to promoter distance.
+    """Compares the expression of job b against job a for the genes both jobs have, beside the
+    change of their enhancer to promoter distance.
 
-    Each row has the gene, log2 of the distance of b over a, the log2 fold change of the
-    expression, its adjusted p or None and the two levels. `rho` is the Spearman correlation of
-    the two changes over the rows, None under five rows. `volcano` has every gene of the test for
-    the background of the volcano plot, None without a test. The mode and its reason are those
-    of `expression.contrast`.
-    The distances are those of `compare` with the same `shared`.
+    Each row has the gene, log2 of the distance of b over a, the log2 fold change of the expression,
+    its adjusted p or None and the two levels. `rho` is the Spearman correlation of the two changes
+    over the rows, None under five rows. `volcano` has every gene of the test for the background of
+    the volcano plot, None without a test. The mode and its reason are those of
+    `expression.contrast`. The distances are those of `compare` with the same `shared`.
     """
     c = expression.contrast(a, b, cache, names)
     table = c.get("genes")

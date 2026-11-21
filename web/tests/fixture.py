@@ -1,4 +1,4 @@
-"""A tiny hosted data directory: one cell type on chr1:0-4 Mb and one SV call set."""
+"""A tiny hosted data directory with one cell type on chr1:0-4 Mb and one SV call set."""
 
 from __future__ import annotations
 

@@ -1,8 +1,8 @@
-"""The answers of a job page from a job directory: its summary, structures, annotations, ensemble
-picks, distances, gene statistics, loops and files.
+"""The answers of a job page from a job directory. They are its summary, structures, annotations,
+ensemble picks, distances, gene statistics, loops and files.
 
-Positions are in the job's own coordinates, those of its haplotype when it has variants.
-Results that read every structure are cached as explore_<name>.json in the job directory.
+Positions are in the coordinates of the job, those of its haplotype when it has variants. Results
+that read every structure are kept as explore_<name>.json in the job directory.
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ class ExploreError(ValueError):
 
 
 def cached(job: Path, name: str, make: Callable[[], T]) -> T:
-    """The value kept in the job directory under a name, made and kept on the first call for a
-    finished job."""
+    """Returns the value kept in the job directory under a name. The first call for a finished job
+    makes it and keeps it."""
     path = job / f"explore_{name}.json"
     if path.is_file():
         return json.loads(path.read_text())
@@ -50,8 +50,7 @@ def cached(job: Path, name: str, make: Callable[[], T]) -> T:
 
 
 def _public_expression(job: Path) -> ExpressionStated | None:
-    """The expression of a job as its page states it: the label, the kind, the unit of the gene
-    table and the number of samples. None for a job without expression."""
+    """Returns the expression of a job as its page states it, None for a job without expression."""
     meta = expression.job_meta(job)
     if meta is None:
         return None
@@ -60,7 +59,7 @@ def _public_expression(job: Path) -> ExpressionStated | None:
 
 
 def summary(job: Path, ahead: int | None) -> Summary:
-    """The state, the request, the counts and the files of a job."""
+    """Returns the state, the request, the counts and the files of a job."""
     status = store.status(job)
     error, end = status.get("error"), status.get("log_tail")
     ep = job / "ep.tsv"
@@ -84,7 +83,7 @@ def summary(job: Path, ahead: int | None) -> Summary:
         "models": store.sizes(store.structures(job)),
         "expression": _public_expression(job),
         "stages": status.get("stages", []),
-        # The clock the stages are timed on. A page counts the time of the running stage from it.
+        # The clock that times the stages. A page counts the time of the running stage from it.
         "now": time.time(),
         "structures_done": len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0,
         "structures_asked": store.request(job).get("n_models"),
@@ -100,7 +99,7 @@ def loop_files(job: Path) -> list[tuple[str, Path]]:
 
 
 def loops(job: Path) -> list[Loop]:
-    """The loops the engine read, with factor, ends, span and PET count."""
+    """Returns the loops the engine read, with factor, ends, span and PET count."""
     out: list[Loop] = []
     for factor, path in loop_files(job):
         for ln in path.read_text().splitlines():
@@ -113,7 +112,7 @@ def loops(job: Path) -> list[Loop]:
 
 
 def features(job: Path) -> Annotations:
-    """The genes, enhancers and loops of the job's region."""
+    """Returns the genes, enhancers and loops of the region of the job."""
     elements = store.read_json(job / "marks.json").get("elements", [])
     named: list[NamedGene] = [{"name": e["name"], "tss": (e["start"] + e["end"]) // 2} for e in elements if e["kind"] == "promoter"]
     enh: list[tuple[int, int]] = [(e["start"], e["end"]) for e in elements if e["kind"] == "enhancer"]
@@ -131,8 +130,8 @@ def _chain(pos: np.ndarray, mid: np.ndarray) -> np.ndarray:
 
 
 def structure(job: Path, i: int) -> Structure:
-    """One structure, i from 1: the smoothed chain with a genomic position per point, the beads,
-    the marked beads and the anchors with their loops."""
+    """Returns one structure, i from 1. It has the smoothed chain with a genomic position per point,
+    the beads, the marked beads and the anchors with their loops."""
     files = store.structures(job)
     if not 1 <= i <= len(files):
         raise ExploreError(f"structure {i} of {len(files)} does not exist")
@@ -167,7 +166,7 @@ def structure(job: Path, i: int) -> Structure:
 
 
 def positions(job: Path) -> tuple[list[np.ndarray], np.ndarray]:
-    """The positions of the beads in every structure of a job and the midpoint of each bead.
+    """Returns the positions of the beads in every structure of a job and the midpoint of each bead.
 
     @raises ExploreError for a job without a structure
     """
@@ -189,7 +188,7 @@ def _kabsch_rmsd(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def picks(job: Path) -> Picks:
-    """The medoid by RMSD after superposition, the most compact by radius of gyration and a
+    """Returns the medoid by RMSD after superposition, the most compact by radius of gyration and a
     fixed random pick, as structure numbers from 1."""
 
     def make() -> Picks:
@@ -216,7 +215,7 @@ def nearest(mid: np.ndarray, bp: int) -> tuple[int, int]:
 
 
 def distance(job: Path, a: int, b: int) -> Distance:
-    """The 3D distance between the beads nearest two positions in every structure, with the
+    """Returns the 3D distance between the beads nearest two positions in every structure, with the
     mean and the standard deviation, 0 for one structure."""
     pos, mid = positions(job)
     ends: list[End] = []
@@ -232,8 +231,8 @@ def distance(job: Path, a: int, b: int) -> Distance:
 
 
 def genes(job: Path) -> list[GeneRow]:
-    """The enhancer to promoter table with statistics over the structures and the loop factors
-    whose ends hold the promoter and the enhancer bead."""
+    """Returns the enhancer to promoter table with statistics over the structures and the loop
+    factors whose ends hold the promoter and the enhancer bead."""
 
     def make() -> list[GeneRow]:
         ep = job / "ep.tsv"
@@ -248,7 +247,7 @@ def genes(job: Path) -> list[GeneRow]:
         levels = expression.job_levels(job)
 
         def level(r) -> float | None:  # noqa: ANN001
-            """The expression of the gene of a row. The second copy of a duplicated gene has the id of the gene."""
+            """Returns the expression of the gene of a row. The second copy of a duplicated gene has the id of the gene."""
             if levels is None:
                 return None
             name = str(r.gene_id).removesuffix(".copy2").split(".")[0] if levels[2] == "gene_id" else str(r.name)
@@ -285,7 +284,7 @@ def genes(job: Path) -> list[GeneRow]:
                     "sd": float(d.std(ddof=1)) if len(d) > 1 else 0.0,
                     "n": len(d),
                     "joined_by": " and ".join(factors),
-                    # A promoter can anchor loops that reach elsewhere; the table says so.
+                    # A promoter can anchor loops that reach another place. The table states that.
                     "promoter_loops": sum(1 for lp in loop_rows if holds(lp["a"], pb) or holds(lp["b"], pb)),
                 }
             )

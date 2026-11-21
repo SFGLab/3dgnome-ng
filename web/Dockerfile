@@ -1,5 +1,5 @@
-# The 3D-GNOME site and its worker in one image, the frontend built in a Node stage. Python 3.12,
-# numpy 2.4.4, numba 0.65.1, scipy 1.17.1, jax 0.10.1. Build from the repository root:
+# The site of 3D-GNOMEᴺᴳ and its worker in one image, the frontend built in a Node stage. Python 3.12,
+# numpy 2.4.4, numba 0.65.1, scipy 1.17.1, jax 0.10.1. Build from the repository root.
 #   docker build -f web/Dockerfile -t gnome3d-web .
 #   docker build -f web/Dockerfile --build-arg GPU=1 -t gnome3d-web:gpu .
 FROM node:22-slim AS frontend

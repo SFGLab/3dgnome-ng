@@ -1,4 +1,4 @@
-/** One question of a page to the server: whether it failed and with which message. */
+/** One question of a page to the server, with its failure and the message of the failure. */
 type Asked = { isError: boolean; error: Error | null }
 
 /**

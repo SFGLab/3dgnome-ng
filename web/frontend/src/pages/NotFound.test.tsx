@@ -13,7 +13,7 @@ const renderPage = () =>
     </MemoryRouter>,
   )
 
-/** A fixed sequence in place of the random numbers: the same chain every time. */
+/** Returns a fixed sequence in place of the random numbers, the same chain every time. */
 function fixed() {
   let k = 0
   return () => ((k++ * 37) % 100) / 100

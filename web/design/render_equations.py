@@ -1,4 +1,4 @@
-"""Render the Method page equations of the design mock as images with matplotlib mathtext.
+"""Renders the Method page equations of the design mock as images with matplotlib mathtext.
 
     python web/design/render_equations.py web/design/images/eq
 

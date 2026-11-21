@@ -10,7 +10,7 @@ const cn = scoped(sheet)
 
 const STEPS = 404
 
-/** The page of an address the site does not have: a chain of 404 steps folded at random, and the ways back. */
+/** The page of an address the site does not have, with a chain of 404 steps folded at random and the ways back. */
 export function NotFound() {
   const [fold, setFold] = useState(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
