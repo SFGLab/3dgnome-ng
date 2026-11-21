@@ -191,6 +191,7 @@ describe('Job explorer', () => {
     expect(rows[2].querySelector('.stage-spinner')).not.toBeNull()
     expect(rows[3].querySelector('.status-time')).toBeNull()
     expect(screen.getByText(/structure 2 written/)).toBeInTheDocument()
+    expect(screen.getByLabelText('End of the engine log')).toBeInTheDocument()
     expect(checkCopy(container)).toEqual([])
   })
 
@@ -205,6 +206,8 @@ describe('Job explorer', () => {
     const rows = within(screen.getByRole('list', { name: 'Stages of the job' })).getAllByRole('listitem')
     expect(rows.map((li) => li.textContent)).toEqual(['Queued12 min 34 s', 'Building the inputs', 'Modelling the structures', 'Marking promoters and enhancers'])
     expect(rows.map((li) => li.className)).toEqual(['now', 'next', 'next', 'next'])
+    // No engine runs yet. The box of its log is not shown.
+    expect(screen.queryByLabelText('End of the engine log')).toBeNull()
   })
 
   it('shows a failed job with its error and log', async () => {

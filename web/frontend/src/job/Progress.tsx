@@ -33,7 +33,8 @@ const since = (s: number) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 
  * A queued or running job: the stage with its count, the bar and the stages, then the end of the
  * engine log, which follows its last line unless the reader has scrolled up. The stages are the
  * ones the job goes through, in order. A finished stage has a tick and the time it took, the
- * running one a spinner and its time so far, and a stage to come has neither.
+ * running one a spinner and its time so far, and a stage to come has neither. A waiting job has
+ * no engine yet and no log.
  */
 export function Progress({ summary }: { summary: Summary }) {
   const stage = summary.state === 'queued' ? 'queued' : (summary.stage ?? 'inputs')
@@ -92,7 +93,7 @@ export function Progress({ summary }: { summary: Summary }) {
     return () => cancelAnimationFrame(frame)
   }, [summary.log_recent])
   return (
-    <div className="progress">
+    <div className={stage === 'queued' ? 'progress waiting' : 'progress'}>
       <div className="progress-head">
         <p className="progress-line">{line}</p>
         <span className="progress-pct">{`${pct}%`}</span>
@@ -109,18 +110,20 @@ export function Progress({ summary }: { summary: Summary }) {
           </li>
         ))}
       </ol>
-      <pre
-        className="log-tail live"
-        aria-label="End of the engine log"
-        ref={log}
-        onScroll={(e) => {
-          const el = e.currentTarget
-          // The log follows its end while the reader is at the end.
-          follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
-        }}
-      >
-        {summary.log_recent || 'The engine has not written to its log yet.'}
-      </pre>
+      {stage !== 'queued' && (
+        <pre
+          className="log-tail live"
+          aria-label="End of the engine log"
+          ref={log}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            // The log follows its end while the reader is at the end.
+            follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+          }}
+        >
+          {summary.log_recent || 'The engine has not written to its log yet.'}
+        </pre>
+      )}
     </div>
   )
 }

@@ -1404,6 +1404,11 @@
   padding: 20px 24px;
 }
 
+/* A waiting job has no log to fill the screen. Its box is as tall as its lines. */
+.job-message:has(> .progress.waiting) {
+  height: auto;
+}
+
 .progress {
   display: flex;
   flex: 1;
