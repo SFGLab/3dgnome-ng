@@ -53,7 +53,10 @@ Every row is the maintainer's decision, after the trials of the night.
 | The squeeze in the settings | No setting implies another. There are two canonical configs, `CANONICAL` of the default chain and `CANONICAL_UNIFORM` of the uniform chain, in `gnome3d/production.py`. A value that works better on the uniform chain is stated in the second: `uniform_chain` and `squeeze_constant` 1.0 so far |
 | The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
 | The orientation term | On as it is. `bond_limit` is deleted |
-| The radius of the arcs excluded volume of a node | The radius of the arcs stage, capped for a pair by the chain between its two nodes. Built as `[excluded_volume] arcs_cap` with two limits, measured in `uniform_sweep8.sh` |
+| The radius of the arcs excluded volume of a node | The key `[excluded_volume] radius_arcs` with its value 0, which derives the radius from the loop targets of the run, as the default. Decided on 2026-11-21 after the sweep, where the derived radius scored as 3.0 |
+| The cap of the radius of a pair | The cap by the chain is deleted. The cap by the target is decided after the second round of the sweep |
+| A radius of a node from its chain | Waits for the arm at a radius of 3.85 under the dropout, `uniform_sweep8c.sh` |
+| The subanchor heatmap | Off, as in production |
 | The resolution of the contact cells | Decided again after the radius rule, 5 kb against the ladder |
 | `loop_dropout` | Decided after the radius rule. The rise of the overlap of the ends under it is traced first |
 | `contact_background_z` | Open. 2 gains 0.03 of SCC at a radius of 3.0 and costs 0.035 of Spearman, `uniform_night8.sh` |
@@ -112,20 +115,19 @@ its position is the position of that bead.
 - Excluded volume acts at the radius of the arcs stage, `auto_factor_arcs` times the mean loop target, 2.6 to
   3.1 beads, as on the default chain. A node stands for the chain around it and that chain needs the room. The
   radius of a bead of the first rule, 0.7 of a bond, let the nodes of two megabases pass through each other.
-- The radius of a pair is capped, by the decision of 2026-11-20. The excluded volume does not ask a pair to be
-  further apart than a limit of that pair. Two limits are measured, `[excluded_volume] arcs_cap`:
+- The radius of a pair has an optional cap, `[excluded_volume] arcs_cap = target`. The excluded volume then does
+  not ask a pair to be further apart than the distance its spring holds it at:
 
-  | pair of nodes | limit under `target` | limit under `chain` |
-  |---|---|---|
-  | with a loop | the loop target | the chain between the two beads, in bonds |
-  | without a loop, closer than `background_range_bp` | the background of the law at its separation | the chain between the two beads |
-  | held by its contact cell | the distance of the cell | the chain between the two beads |
-  | any other pair | none, the radius of the stage | the chain between the two beads |
+  | pair of nodes | limit |
+  |---|---|
+  | with a loop | the loop target |
+  | without a loop, closer than `background_range_bp` | the background of the law at its separation |
+  | held by its contact cell | the distance of the cell |
+  | any other pair | none, the radius of the stage |
 
-  The radius of a pair is the smaller of the radius of the stage and its limit. Under `target` a pair is pushed
-  out no further than the distance its spring holds it at. Under `chain` a pair is pushed out no further than
-  the chain can reach, which changes the pairs with fewer bonds between them than the radius, three beads. The
-  nodes next to each other in the order of the chromosome stay out of the excluded volume, as before.
+  The radius of a pair is the smaller of the radius of the stage and its limit. The nodes next to each other in
+  the order of the chromosome stay out of the excluded volume, as before. A second limit, the chain between the
+  two beads, changed no score on the sweep and was deleted on 2026-11-21.
 - The gyration term is unchanged. It reads the genomic midpoints of the beads.
 
 ### Contact data
@@ -1047,6 +1049,10 @@ other arms.
   25 kb. The ends overlap in 19 structures of 144 against 9 at 3.0 and 34 at the radius of a bead.
 - The dropout and the threshold of 2 each gain 0.04 of raw SCC at 25 kb, as on twenty structures.
 - `background_weight` 0.3 gains 0.01 of raw SCC and has the ends overlap in 13 structures against 9.
+
+Step 2 of the sweep, `scores-sweep8b/`, is the subanchor heatmap of the smooth stage at a radius of 3.0, on the
+singletons of production at 25 kb, which are not held out. It scores 0.281 and 0.309 against 0.289 and 0.311, is
+above on 2 rows of 18 in raw SCC, and has 6.4 close pairs per thousand beads against 3.2. It stays off.
 
 The second round, `slurm/ensemble/uniform_sweep8c.sh`, joins the ladder at a radius of 3.0 with the dropout, the
 threshold of 2 and the cap by the target, and tries the ladder up to 50 kb, the ladder at a radius of 2.0 and the

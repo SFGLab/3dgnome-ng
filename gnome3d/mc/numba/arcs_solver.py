@@ -331,32 +331,19 @@ def capped_exclusion_energy_grad(
 
 def capped_pairs(
     exp: F64Array,
-    mids: I64Array | None,
-    s: Settings,
     full: float,
     skip: int,
 ) -> tuple[I32Array, I32Array, F64Array]:
     """Returns the pairs whose excluded volume radius is under the radius `full` of the stage, and
-    the radius of each, under `[excluded_volume] arcs_cap`.
+    the radius of each, for `[excluded_volume] arcs_cap = target`.
 
-    Under `target` the limit of a pair is the distance its spring holds it at, the loop target or
-    the background. A pair without a spring has no limit. Under `chain` the limit is the chain
-    between the two beads, their genomic separation in beads times the bond. Pairs within `skip`
-    of each other in the order of the matrix are left out, as in `arcs_energy_grad`.
+    The limit of a pair is the distance its spring holds it at, the loop target or the
+    background. A pair without a spring has no limit. Pairs within `skip` of each other in the
+    order of the matrix are left out, as in `arcs_energy_grad`.
     """
     n = int(exp.shape[0])
-    if s.exclusion_arcs_cap == "target":
-        held = (exp >= 1e-6) | (exp <= -0.75)
-        limit: F64Array = np.where(held, np.abs(exp), np.inf)
-    else:
-        if mids is None:
-            raise ValueError(
-                "[excluded_volume] arcs_cap = chain needs the genomic midpoints of the anchors"
-            )
-        bp = float(s.target_bp_per_subanchor)
-        bond = float(s.polymer_law().background(int(s.target_bp_per_subanchor)))
-        m = np.asarray(mids, dtype=np.float64)
-        limit = np.abs(m[:, None] - m[None, :]) / bp * bond
+    held = (exp >= 1e-6) | (exp <= -0.75)
+    limit: F64Array = np.where(held, np.abs(exp), np.inf)
     idx = np.arange(n)
     apart = (idx[None, :] - idx[:, None]) > skip
     ci, cj = np.nonzero(apart & (limit < full) & (limit > 0.0))
@@ -382,8 +369,8 @@ def solve_arcs(
     `activity` is the activity of each anchor for the factory term, None for no term. `mids` are
     the genomic midpoints of the anchors, which the gyration term needs. `reach` is the pairs of
     nodes of a uniform chain and the length of chain between each, for the reach term at the
-    weight of a loop spring. Under `[excluded_volume] arcs_cap` the excluded volume of a pair acts
-    at the smaller of the radius of the stage and the limit of the pair.
+    weight of a loop spring. Under `[excluded_volume] arcs_cap = target` the excluded volume of a
+    pair acts at the smaller of the radius of the stage and the distance its spring holds it at.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -505,8 +492,8 @@ def solve_arcs(
 
         fun = with_reach
         fun_args = ()
-    if excl_w > 0.0 and s.exclusion_arcs_cap != "none":
-        cap_i, cap_j, cap_r = capped_pairs(exp64, mids, s, excl_r0, excl_skip)
+    if excl_w > 0.0 and s.exclusion_arcs_cap == "target":
+        cap_i, cap_j, cap_r = capped_pairs(exp64, excl_r0, excl_skip)
         if cap_i.shape[0] > 0:
             base_c, base_c_args = fun, fun_args
 

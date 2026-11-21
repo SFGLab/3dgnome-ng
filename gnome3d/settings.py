@@ -808,9 +808,9 @@ class Settings:
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
         )
         self.exclusion_arcs_cap = gets("excluded_volume", "arcs_cap", self.exclusion_arcs_cap)
-        if self.exclusion_arcs_cap not in ("none", "target", "chain"):
+        if self.exclusion_arcs_cap not in ("none", "target"):
             raise ValueError(
-                "[excluded_volume] arcs_cap must be none, target or chain, got"
+                "[excluded_volume] arcs_cap must be none or target, got"
                 f" {self.exclusion_arcs_cap!r}"
             )
         self.arcs_repulsion_cutoff_factor = getf(

@@ -77,7 +77,7 @@ def test_stage_energy_plus_the_change_is_the_energy_at_the_radius_of_each_pair(
     exp[0, 5] = exp[5, 0] = 1.2
     exp[2, 9] = exp[9, 2] = -2.0
     exp[3, 4] = exp[4, 3] = 1.5
-    pair_i, pair_j, radius = capped_pairs(exp, None, settings(exclusion_arcs_cap="target"), FULL, 1)
+    pair_i, pair_j, radius = capped_pairs(exp, FULL, 1)
     assert sorted(zip(pair_i.tolist(), pair_j.tolist(), radius.tolist(), strict=True)) == [
         (0, 5, 1.2),
         (2, 9, 2.0),
@@ -113,20 +113,6 @@ def test_gradient_of_the_change_matches_a_finite_difference(cloud: F64Array) -> 
         assert grad[k] == pytest.approx((e_up - e_down) / (2 * eps), abs=1e-6), f"coordinate {k}"
 
 
-def test_chain_limit_is_the_bonds_between_two_beads() -> None:
-    mids = np.array([500, 2500, 3500, 60500], dtype=np.int64)
-    s = settings(exclusion_arcs_cap="chain")
-    bond = float(s.polymer_law().background(1000))
-    pair_i, pair_j, radius = capped_pairs(np.zeros((4, 4)), mids, s, FULL, 0)
-    got = sorted(zip(pair_i.tolist(), pair_j.tolist(), radius.tolist(), strict=True))
-    assert [(i, j) for i, j, _ in got] == [(0, 1), (1, 2)], (
-        "the pairs with fewer than three bonds between them"
-    )
-    assert [r for _, _, r in got] == pytest.approx([2 * bond, bond])
-    with pytest.raises(ValueError, match="needs the genomic midpoints"):
-        capped_pairs(np.zeros((4, 4)), None, s, FULL, 0)
-
-
 def test_solver_lets_a_capped_pair_stay_at_its_target() -> None:
     """Three beads in a row. The outer two have a loop at 1.5 and the radius of the stage is 3."""
     exp = np.zeros((3, 3))
@@ -145,5 +131,5 @@ def test_solver_lets_a_capped_pair_stay_at_its_target() -> None:
 
 
 def test_loader_refuses_an_unknown_cap() -> None:
-    with pytest.raises(ValueError, match="none, target or chain"):
+    with pytest.raises(ValueError, match="none or target"):
         Settings.from_dict({"excluded_volume": {"arcs_cap": "law"}})
