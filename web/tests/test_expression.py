@@ -207,3 +207,43 @@ def test_one_library_a_side_gives_a_ratio_and_no_test(site: SimpleNamespace) -> 
     assert same["mode"] == "none" and "same samples" in same["reason"], "a job against itself has no difference: " + str(same)
     none = c.get("/api/compare/expression", params={"a": a, "b": site.job()}).json()
     assert none["mode"] == "none" and "no expression data" in none["reason"], "a job without expression is said to have none"
+
+
+def upload_table(site: SimpleNamespace, table: pd.DataFrame, name: str) -> dict:
+    r = site.c.post("/api/uploads", data={"kind": "expression"}, files={"file": (name, table.to_csv(sep="\t").encode())})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def test_an_uploaded_table_is_checked_and_gives_a_private_job_with_the_chosen_samples(site: SimpleNamespace) -> None:
+    table = counts_table(np.random.default_rng(9), {"s1": 1.0, "s2": 1.0, "s3": 1.0}, {})
+    up = upload_table(site, table, "my counts.tsv")
+    assert up["ok"], "a table of genes by samples passes its check"
+    assert up["samples"] == ["s1", "s2", "s3"], "the check lists the samples and leaves the length column out"
+    assert up["counts"], "a table of whole numbers is read as counts"
+    assert "400 genes by name and 3 samples" in up["summary"], "the summary counts the genes and the samples"
+    url = site.job(expression="own", expression_upload=up["id"], expression_columns=json.dumps(["s1", "s3"]), expression_kind="counts")
+    assert url.startswith("/p/"), "a job with an uploaded table is private"
+    summary = site.c.get(f"/api{url}/summary").json()
+    assert summary["expression"]["samples"] == 2, "the job has the two chosen samples"
+    assert summary["expression"]["unit"] == "TPM", "counts with gene lengths give TPM"
+    assert summary["expression"]["label"] == "Your own table my_counts.tsv, 2 samples", "the label names the file and its samples"
+    assert summary["request"]["expression"] == "upload", "the request states an upload and no path"
+    genes = {g["gene"]: g for g in site.c.get(f"/api{url}/genes").json()}
+    assert genes["ALPHA"]["expression"] > 0, "a gene of the region has a level from the uploaded table"
+
+
+def test_normalised_values_are_refused_as_counts_and_a_request_without_a_table_is_refused(site: SimpleNamespace) -> None:
+    table = counts_table(np.random.default_rng(9), {"s1": 1.0, "s2": 1.0}, {}).drop(columns="length") / 3.7
+    up = upload_table(site, table, "tmm.tsv")
+    assert up["ok"] and not up["counts"], "a table with fractions passes and is not read as counts"
+    form = {"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": "2", "expression": "own"}
+    r = site.c.post("/api/jobs", data={**form, "expression_upload": up["id"], "expression_kind": "counts"})
+    assert r.status_code == 400 and r.json()["field"] == "expression", "fractions stated as counts are refused at the expression step"
+    assert "not whole numbers" in r.json()["error"], "the refusal says what read counts are"
+    r = site.c.post("/api/jobs", data={**form, "expression_upload": up["id"], "expression_kind": "values"})
+    assert r.status_code == 201, "the same table is taken as normalised values"
+    r = site.c.post("/api/jobs", data=form)
+    assert r.status_code == 400 and "needs a table" in r.json()["error"], "your own expression without an upload is refused"
+    bad = site.c.post("/api/uploads", data={"kind": "expression"}, files={"file": ("genes.txt", b"gene\nALPHA\nBETA\n")}).json()
+    assert not bad["ok"] and "one column or more of samples" in bad["error"]["found"], "a table without samples fails its check with the reason"

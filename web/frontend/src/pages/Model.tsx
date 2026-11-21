@@ -49,6 +49,11 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('factors', form.factors)
   d.append('background', form.background)
   if (form.expression) d.append('expression', form.expression)
+  if (form.expression === 'own' && form.ownExpression) {
+    d.append('expression_upload', form.ownExpression.upload.id)
+    d.append('expression_columns', JSON.stringify(form.ownExpression.columns))
+    d.append('expression_kind', form.ownExpression.kind)
+  }
   d.append('sv_set', form.svSet)
   d.append('sample', form.sample)
   d.append('haplotype', String(form.haplotype))
@@ -167,7 +172,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   // A source the cell type or the sample no longer has is taken off the form.
   const offered = expressionOptions.data
   useEffect(() => {
-    if (form.expression && offered && !offered.some((o) => o.id === form.expression)) setForm((f) => ({ ...f, expression: '' }))
+    if (form.expression && form.expression !== 'own' && offered && !offered.some((o) => o.id === form.expression)) setForm((f) => ({ ...f, expression: '' }))
   }, [form.expression, offered])
   const hicdiffusionMb = catalog.data?.hicdiffusion_mb ?? 2
   const hicdiffusionOk = !!catalog.data?.hicdiffusion && !(region.data && region.data.end - region.data.start > hicdiffusionMb * 1e6)
@@ -258,7 +263,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           {stepError(4)}
         </Step>
         <Step n={5} title="Gene expression" note="optional">
-          <Expression options={expressionOptions.data ?? []} value={form.expression} cell={cellType?.label.split(',')[0] ?? form.cell} onChange={(expression) => set({ expression })} />
+          <Expression options={expressionOptions.data ?? []} value={form.expression} cell={cellType?.label.split(',')[0] ?? form.cell} onChange={(expression) => set({ expression })} own={form.ownExpression} onOwn={(ownExpression) => set({ ownExpression })} />
           {stepError(5)}
         </Step>
         <Step n={6} title="Ensemble and simulation settings">

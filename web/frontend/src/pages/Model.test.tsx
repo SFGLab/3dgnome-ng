@@ -171,6 +171,33 @@ describe('Model a region page', () => {
     expect(body.get('expression')).toBe('ENCODE')
   })
 
+  it('takes an uploaded expression table, the chosen samples and what the values are', async () => {
+    const upload = { id: 'upl0expression00', kind: 'expression', name: 'counts.tsv', size: 20480, ok: true, summary: '400 genes by name and 3 samples. Its values are whole numbers, as read counts are.', error: null, samples: ['s1', 's2', 's3'], counts: true }
+    const fetchMock = mockApi([
+      [/^\/api\/uploads$/, () => [201, upload]],
+      [/^\/api\/jobs$/, () => [201, { url: '/p/private0000000000000000' }]],
+    ])
+    const { container } = renderModel('/model?example=TNFRSF8')
+    const group = await screen.findByRole('radiogroup', { name: 'Gene expression' })
+    fireEvent.click(within(group).getByRole('radio', { name: /^Your own table/ }))
+    const input = container.querySelector('.own-expression input[type=file]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File(['gene\ts1\n'], 'counts.tsv')] } })
+    expect(await screen.findByText(upload.summary)).toBeInTheDocument()
+    const samples = screen.getByRole('group', { name: 'Samples of this job' })
+    expect(within(samples).getAllByRole('checkbox').every((c) => (c as HTMLInputElement).checked)).toBe(true)
+    fireEvent.click(within(samples).getByRole('checkbox', { name: 's2' }))
+    // A table of whole numbers starts as read counts.
+    expect(screen.getByRole('combobox', { name: 'The values are' })).toHaveValue('counts')
+    expect(checkCopy(container)).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: /Build \d+ structures/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u, o]) => String(u).endsWith('/api/jobs') && (o as RequestInit)?.method === 'POST')).toBe(true))
+    const body = fetchMock.mock.calls.find(([u, o]) => String(u).endsWith('/api/jobs') && (o as RequestInit)?.method === 'POST')![1]!.body as FormData
+    expect([body.get('expression'), body.get('expression_upload'), body.get('expression_columns'), body.get('expression_kind')]).toEqual(['own', 'upl0expression00', '["s1","s3"]', 'counts'])
+    // The table can be taken away again.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the table' }))
+    expect(screen.queryByRole('group', { name: 'Samples of this job' })).toBeNull()
+  })
+
   it('lists the recent jobs of this browser', async () => {
     rememberJob({ url: '/jobs/abc12345', label: 'GM12878 chr1:11.5-12.6 Mb', name: 'TNFRSF8 run', at: 1 })
     renderModel()

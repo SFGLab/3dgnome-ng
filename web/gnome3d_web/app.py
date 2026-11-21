@@ -25,7 +25,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from . import explore, hicdiffusion, lists, owndata, remote
+from . import explore, expression, hicdiffusion, lists, owndata, remote
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
 from .jobs import JobRequest, _member, request_key, write_json
 from .queue import enqueue, queue_position, resume_after_restart, sweep_private
@@ -183,17 +183,25 @@ def create_app() -> FastAPI:
             background=background, overrides=overrides,
         )  # fmt: skip
         wanted = fields.get("expression", "")
-        if wanted:
+        own_table = None
+        if wanted == "own":
+            own_table = own_expression(fields)
+            req.expression = own_table[2] | {"path": ""}
+        elif wanted:
             # A hosted table, by the id of its source. The columns are the ones of the cell type or of the sample.
             option = next((o for o in catalog.expression_options(base, sample if sv_set else "") if o["id"] == wanted), None)
             if option is None:
                 raise JobError(f"{wanted!r} has no expression for {cell_type}" + (f" and {sample}" if sv_set else ""), "expression")
             src = catalog.expression[wanted]
             req.expression = {"source": src.name, "path": str(src.path), "columns": option["columns"], "kind": src.kind, "unit": src.unit, "label": option["label"]}
-        if own_dirs:
+        if own_dirs or vcf is not None or own_table is not None:
             token = secrets.token_urlsafe(18)
             job = private / token
-            (job / "own").mkdir(parents=True)
+            job.mkdir(parents=True)
+            if own_table is not None:
+                expression.write_job(job, own_table[0], own_table[1], own_table[2])
+        if own_dirs:
+            (job / "own").mkdir()
             own: dict[str, object] = {"loops": []}
             for i, (factor, d) in enumerate(own_dirs.get("loops", [])):
                 own["loops"].append([factor, str(owndata.clean_copy(d, job / "own" / f"loops_{i}.bedpe"))])  # type: ignore[union-attr]
@@ -210,11 +218,9 @@ def create_app() -> FastAPI:
             enqueue(s, req, job)
             return f"/p/{token}"
         if vcf is not None:
-            token = secrets.token_urlsafe(18)
-            job = private / token
-            job.mkdir(parents=True)
             req.upload_vcf = str(put_vcf(vcf, job))
             req.sv_set = ""
+        if vcf is not None or own_table is not None:
             enqueue(s, req, job)
             return f"/p/{token}"
         key = request_key(req, catalog)
@@ -254,6 +260,36 @@ def create_app() -> FastAPI:
         if not m.get("ok"):
             raise JobError(f"{m['name']} did not pass its check. Fix the file and upload it again.", field)
         return d
+
+    def own_expression(fields: dict[str, str]) -> tuple[expression.Table, list[str], dict[str, object]]:
+        """The uploaded expression table of a job request, the columns the request takes and what
+        they are. The field expression_upload names the upload, expression_columns the samples
+        as a JSON list, every sample when empty, and expression_kind counts or values."""
+        if not fields.get("expression_upload"):
+            raise JobError("Your own expression needs a table. Upload one, or choose no expression.", "expression")
+        d = checked_upload(fields["expression_upload"], "expression", "expression")
+        kind = fields.get("expression_kind", "counts")
+        if kind not in expression.KINDS:
+            raise JobError(f"expression_kind is {kind!r}, not one of {', '.join(expression.KINDS)}", "expression")
+        name = str(owndata.meta(d)["name"])
+        try:
+            columns = json.loads(fields.get("expression_columns") or "[]")
+        except json.JSONDecodeError as e:
+            raise JobError(f"expression_columns is not JSON: {e}", "expression") from e
+        if not isinstance(columns, list) or not all(isinstance(c, str) for c in columns):
+            raise JobError("expression_columns must be a list of sample names", "expression")
+        try:
+            table = expression.read_table(owndata.data_file(d))
+            columns = columns or list(table.data.columns)
+            missing = [c for c in columns if c not in table.data.columns]
+            if missing:
+                raise JobError(f"{name} has no sample {', '.join(missing)}", "expression")
+            if kind == "counts":
+                expression.check_counts(table, columns, name)
+        except expression.ExpressionError as e:
+            raise JobError(str(e), "expression") from e
+        samples = "1 sample" if len(columns) == 1 else f"{len(columns)} samples"
+        return table, columns, {"source": "upload", "label": f"Your own table {name}, {samples}", "kind": kind, "unit": ""}
 
     def own_uploads(raw: object) -> dict:
         """The upload directories a job request names, each checked to exist, to be of its kind

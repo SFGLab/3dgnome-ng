@@ -971,3 +971,45 @@ select.value-box {
   display: inline;
   font: inherit;
 }
+
+/* The uploaded expression table: the file, its samples and what its values are. */
+.own-expression {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.own-expression .file-chip {
+  justify-self: start;
+  max-width: 100%;
+}
+
+.own-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  max-height: 132px;
+  margin: 0;
+  padding: 8px 12px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.own-samples legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.own-sample {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.own-kind {
+  max-width: 320px;
+}

@@ -1,6 +1,6 @@
 import type { Region } from '../api'
 import type { Summary } from '../job/api'
-import { NO_OWN, type OwnChoice, type UploadResult } from './upload'
+import { NO_OWN, type OwnChoice, type OwnExpression, type UploadResult } from './upload'
 
 /** The state of the Model a region form. The cell type own means the job reads only uploads. */
 export type Factors = 'CTCF' | 'RNAPII' | 'CTCF+RNAPII'
@@ -15,8 +15,9 @@ export type FormState = {
   haplotype: 0 | 1
   vcfUpload: UploadResult | null
   background: Background
-  /** The id of the hosted expression source of the job, empty for none. */
+  /** The id of the hosted expression source of the job, own for an uploaded table, empty for none. */
   expression: string
+  ownExpression: OwnExpression | null
   structures: number
   name: string
   settings: Record<string, string>
@@ -33,6 +34,7 @@ export const EMPTY_FORM: FormState = {
   vcfUpload: null,
   background: 'hic',
   expression: '',
+  ownExpression: null,
   structures: 100,
   name: '',
   settings: {},
@@ -54,7 +56,7 @@ export function longRegion(text: string, maxSpan: number): Region | undefined {
 /**
  * The form filled with the request of a job, to start another job from it. The files a job read
  * from uploads are not part of its request as the site shows it and are left out: the loops,
- * the contacts and the enhancers of your own data and an uploaded VCF. A job on your own cell
+ * the contacts and the enhancers of your own data, an uploaded VCF and an uploaded expression table. A job on your own cell
  * type gets the listed cell type its loops came from, or the first one.
  */
 export function fromRequest(r: Summary['request'], cells: string[]): FormState {
@@ -71,11 +73,11 @@ export function fromRequest(r: Summary['request'], cells: string[]): FormState {
     sample: r.sv_set ? r.sample : '',
     haplotype: r.sv_set && r.haplotype === 1 ? 1 : 0,
     background,
-    expression: r.expression ?? '',
+    expression: r.expression === 'upload' ? '' : (r.expression ?? ''),
     structures: r.n_models,
     settings: { ...(r.overrides ?? {}) },
   }
 }
 
 /** Whether a job read files from uploads, which a form filled from its request lacks. */
-export const readUploads = (r: Summary['request']) => !!r.own || (!r.sv_set && !!r.sample)
+export const readUploads = (r: Summary['request']) => !!r.own || (!r.sv_set && !!r.sample) || r.expression === 'upload'

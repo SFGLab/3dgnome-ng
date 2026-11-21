@@ -219,7 +219,8 @@ def run_job(
             hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
             hic = cond, region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
-        if req.expression:
+        # The table of an upload is in the job since the request. A hosted table is read here.
+        if req.expression.get("path"):
             e = req.expression
             table = expression.read_table(Path(str(e["path"])))
             columns = [str(c) for c in e["columns"]]  # type: ignore[union-attr]

@@ -16,7 +16,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import BinaryIO
 
-KINDS = ("loops", "anchors", "contacts", "enhancers", "vcf")
+from . import expression
+
+KINDS = ("loops", "anchors", "contacts", "enhancers", "vcf", "expression")
 MAX_PET_LENGTH = 1_000_000
 CHUNK = 1 << 20
 
@@ -38,6 +40,8 @@ class Check:
     summary: str = ""
     error: Problem | None = None
     samples: list[str] = field(default_factory=list)
+    # An expression table with whole numbers alone, which read counts are.
+    counts: bool = False
 
 
 def _n(count: int, one: str, many: str) -> str:
@@ -196,7 +200,21 @@ def check_vcf(path: Path) -> Check:
     return Check(False, error=Problem(0, "The file has no #CHROM header line.", "Give a VCF file compressed with bgzip."))
 
 
+def check_expression(path: Path) -> Check:
+    try:
+        table = expression.read_table(path)
+    except expression.ExpressionError as e:
+        return Check(False, error=Problem(0, str(e), "Give a tab or comma separated table with the genes in the first column and one column for each sample."))
+    samples = list(table.data.columns)
+    whole = bool((table.data >= 0).all().all() and (table.data == table.data.round()).all().all())
+    by = "Ensembl id" if table.key == "gene_id" else "name"
+    values = "Its values are whole numbers, as read counts are." if whole else "Its values are not whole numbers and are read as normalised."
+    return Check(True, f"{_n(len(table.data), 'gene', 'genes')} by {by} and {_n(len(samples), 'sample', 'samples')}. {values}", samples=samples, counts=whole)
+
+
 def check(kind: str, path: Path, region: tuple[str, int, int] | None) -> Check:
+    if kind == "expression":
+        return check_expression(path)
     if kind == "loops":
         return check_loops(path, region)
     if kind == "anchors":
@@ -226,7 +244,7 @@ def result(d: Path, c: Check) -> dict[str, object]:
     m = meta(d)
     # A map read by link is shown by the remote file's name and size, not the window kept.
     name, size = m.get("link_name", m["name"]), int(m.get("link_size", m["size"]))  # type: ignore[arg-type]
-    return {"id": m["id"], "kind": m["kind"], "name": name, "size": size, "ok": c.ok, "summary": c.summary, "error": asdict(c.error) if c.error else None, "samples": c.samples}
+    return {"id": m["id"], "kind": m["kind"], "name": name, "size": size, "ok": c.ok, "summary": c.summary, "error": asdict(c.error) if c.error else None, "samples": c.samples, "counts": c.counts}
 
 
 def preview(d: Path, region: tuple[str, int, int]) -> list[list[int]]:

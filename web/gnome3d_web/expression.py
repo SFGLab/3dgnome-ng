@@ -65,7 +65,9 @@ class Table:
 def read_table(path: Path) -> Table:
     """Reads a table of genes by samples."""
     try:
-        t = pd.read_csv(path, sep=None, engine="python", comment="#")
+        t = pd.read_csv(path, sep="\t", comment="#")
+        if t.shape[1] < 2:
+            t = pd.read_csv(path, sep=",", comment="#")
     except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as e:
         raise ExpressionError(f"{Path(path).name} is not a table of genes by samples: {e}") from e
     if t.shape[1] < 2 or t.empty:
@@ -82,7 +84,7 @@ def read_table(path: Path) -> Table:
             length = pd.to_numeric(rest[c], errors="coerce")
             rest = rest.drop(columns=c)
             break
-    data = rest.select_dtypes(include="number")
+    data = rest.select_dtypes(include="number").dropna(axis=1, how="all")
     if data.shape[1] == 0:
         raise ExpressionError(f"{Path(path).name} has no column of numbers after its gene column")
     data = data.set_axis([str(c) for c in data.columns], axis=1)

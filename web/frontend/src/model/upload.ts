@@ -1,7 +1,7 @@
 import { ApiError } from '../api'
 import { served } from '../base'
 
-export type UploadKind = 'loops' | 'anchors' | 'contacts' | 'enhancers' | 'vcf'
+export type UploadKind = 'loops' | 'anchors' | 'contacts' | 'enhancers' | 'vcf' | 'expression'
 export type CheckError = { line: number | null; found: string; fix: string }
 export type UploadResult = {
   id: string
@@ -12,7 +12,12 @@ export type UploadResult = {
   summary: string
   error: CheckError | null
   samples: string[]
+  /** An expression table of whole numbers, which read counts are. */
+  counts?: boolean
 }
+
+/** An uploaded expression table, the samples of it the job takes and what its values are. */
+export type OwnExpression = { upload: UploadResult; columns: string[]; kind: 'counts' | 'values' }
 
 /**
  * The uploads a job uses in place of the data of a listed cell type. On your own cell type
