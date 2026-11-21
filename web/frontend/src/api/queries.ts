@@ -4,7 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query'
 import type { ApiError } from './http'
-import { compareExpression, compareGene, compareJobs, type JobApi } from './job'
+import { compareExpression, compareGene, compareJobs, type JobApi } from './jobs'
 import { api } from './site'
 import type { Region } from './types'
 import { uploadPreview } from './uploads'

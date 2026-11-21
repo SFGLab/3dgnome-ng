@@ -8,7 +8,7 @@ import { ANNOTATIONS, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../../test/job
 import { jobApi } from '../../api'
 import { Compare } from './Compare'
 import { sideNames } from './names'
-import { csvText } from '../export/saveCsv'
+import { csvText } from '../../lib/csv'
 import { standalone } from '../export/savePng'
 
 vi.mock('../Scene', () => ({ Scene: (p: { markers?: { label: string }[] }) => <div data-testid="scene">{(p.markers ?? []).map((m) => m.label).join('')}</div> }))

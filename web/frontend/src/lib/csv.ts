@@ -1,4 +1,4 @@
-import { saveBlob } from '../../lib/download'
+import { saveBlob } from './download'
 
 /** Saving the rows of a table as a CSV file. */
 
