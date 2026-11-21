@@ -33,7 +33,7 @@ Every row is the maintainer's decision.
 | The order of the build | Three stages with an arms trial after each |
 | The centre of mass that the smooth stage keeps | That of a node, the bead before it and the bead after it |
 | The exceptions of that rule and the reach of the bond limit, both the assistant's | Kept as built |
-| The resolution of the contact cells | Decided on the larger trial. 5 kb is the working base |
+| The resolution of the contact cells | Open between the cells at 5 kb alone and a rewrite of the ladder. The pseudo count and the bound estimate of a cell were measured and are deleted, as more machinery over a ladder that expands the region. The trial `scores-five20/` measures the cells at 5 kb |
 | The draw of the contact bead | Both draws stay as arms |
 | The rule of the smooth stage for a node | Decided after the trial of the rules |
 | Room for the free chain | Gyration windows under 100 kb first, blobs for the free chain when that does not work |
@@ -53,13 +53,15 @@ Every row is the maintainer's decision, after the trials of the night.
 | The squeeze in the settings | No setting implies another. There are two canonical configs, `CANONICAL` of the default chain and `CANONICAL_UNIFORM` of the uniform chain, in `gnome3d/production.py`. A value that works better on the uniform chain is stated in the second: `uniform_chain` and `squeeze_constant` 1.0 so far |
 | The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
 | The orientation term | On as it is. `bond_limit` is deleted |
-| The radius of the arcs excluded volume of a node | The key `[excluded_volume] radius_arcs` with its value 0, which derives the radius from the loop targets of the run, as the default. Decided on 2026-11-21 after the sweep, where the derived radius scored as 3.0 |
-| The cap of the radius of a pair | The cap by the chain is deleted. The cap by the target is decided after the second round of the sweep |
-| A radius of a node from its chain | Waits for the arm at a radius of 3.85 under the dropout, `uniform_sweep8c.sh` |
+| The radius of the arcs excluded volume of a node | The key `[excluded_volume] radius_arcs` at 0, the derived radius. Under `loop_dropout` it is derived from every loop of the chromosome, before the dropout. Decided on 2026-11-21 |
+| The cap of the radius of a pair | The cap by the chain is deleted. The cap by the target is an opt in key, off |
+| A radius of a node from its chain | Built as `[excluded_volume] arcs_chain_radius`, an opt in key, off |
 | The subanchor heatmap | Off, as in production |
+| The expectation of a contact cell | The mean count at the separation times the bias of the two bins, from the balancing weights of the map. It is the one derivation of the expectation and has no key, by the maintainer's word of 2026-11-21 |
+| A map without the resolution of the cells | Read at the finest resolution it holds over the one asked, with a line in the log |
 | The resolution of the contact cells | Decided again after the radius rule, 5 kb against the ladder |
-| `loop_dropout` | Decided after the radius rule. The rise of the overlap of the ends under it is traced first |
-| `contact_background_z` | Open. 2 gains 0.03 of SCC at a radius of 3.0 and costs 0.035 of Spearman, `uniform_night8.sh` |
+| `loop_dropout` | Open, measured again on the cells at 5 kb in `scores-five20/` |
+| `contact_background_z` | Open, 2 against 3 measured again on the cells at 5 kb in `scores-five20/` |
 | The three bead move in the JAX kernel | Not yet |
 
 The draw at the midpoint and `bond_limit` were removed on 2026-11-20, and `uniform_chain` implies the centre of
@@ -1224,9 +1226,10 @@ to 624 at 5 kb on the H1ESC row. The coverage acts at 5 kb as at 25 kb. The ladd
 The coverage of a bin is the same in the two halves of a map. A model that follows the coverage scores on the
 raw counts of the half it did not read. The balanced SCC is the score that the coverage does not reach.
 
-`[springs] contact_bias = weights` puts the inverse balancing weights of the map into the expectation and
-`[springs] contact_pseudo_count` sets the pseudo count, commit 059d374, both off. The arms of `scores-bias20/`
-measure them on the chosen config.
+The trials below ran with two keys of commit 059d374, `[springs] contact_bias = weights` for the inverse
+balancing weights of the map in the expectation and `[springs] contact_pseudo_count` for the pseudo count. The
+weights are the one expectation of a cell since 2026-11-21 and have no key. The pseudo count is 0.5 and its key is
+deleted.
 
 The first run of the trace of the targets read the law before the run fits its exponent and counted pairs at the
 law as held out. The table is from the run with the law of the solve.
@@ -1304,7 +1307,7 @@ heatmap of the coarse stage.
 The equal evidence on the two sides of the test gives unequal distances. A cell of 5 expected counts with none
 observed is 2.2 deviations under and its ratio asks for 2.2 times the law. A cell with 10 observed is 2.2
 deviations over and its ratio asks for 0.80 of the law. A distance from a quantity that is symmetric in the
-evidence is `contact_estimate = bound`, measured in the next trial.
+evidence was built as `contact_estimate = bound`, measured in the next trial and deleted after it.
 
 ### Trial of the estimate of a cell and of the radius from every loop
 

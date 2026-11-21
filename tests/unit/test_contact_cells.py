@@ -8,7 +8,13 @@ import numpy as np
 import pytest
 from scipy import sparse
 
-from gnome3d.pipeline.ib.cells import cell_uri, expected_by_offset, hold_by_cells, read_cells
+from gnome3d.pipeline.ib.cells import (
+    available_resolution,
+    cell_uri,
+    expected_by_offset,
+    hold_by_cells,
+    read_cells,
+)
 from gnome3d.polymer import PolymerLaw
 from gnome3d.settings import Settings
 
@@ -199,12 +205,6 @@ def test_bias_of_the_weights_takes_a_bin_of_low_coverage_out_of_the_test(tmp_pat
     np.fill_diagonal(mat, 0.0)
 
     count, offset, expected, mapped, bias = read_cells(uri, "chr1", mids, res)
-    plain = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
-    assert plain[0, 1] < -0.5 and plain[1, 3] < -0.5, (
-        "by the separation alone the bin of low coverage is held out from the others"
-    )
-
-    count, offset, expected, mapped, bias = read_cells(uri, "chr1", mids, res, "weights")
     assert bias[1] / bias[0] == pytest.approx(0.25), (
         "the bias of a bin is the inverse of its weight"
     )
@@ -216,66 +216,35 @@ def test_bias_of_the_weights_takes_a_bin_of_low_coverage_out_of_the_test(tmp_pat
     out = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s, None, res, bias)
     assert np.array_equal(out, mat), "no cell is off its expectation and no pair is held"
 
-
-def test_a_map_without_weights_is_read_by_the_separation_alone(tmp_path: Path) -> None:
-    uri, _ = biased_mcool(tmp_path, with_weights=False)
-    mids = (np.array([2, 7, 20]) * 5000 + 2500).astype(np.int64)
-    plain = read_cells(uri, "chr1", mids, 5000)
-    fallback = read_cells(uri, "chr1", mids, 5000, "weights")
-    for a, b in zip(plain, fallback, strict=True):
-        assert np.array_equal(a, b), "the reading under weights is the reading under none"
-
-
-def test_a_larger_pseudo_count_draws_a_cell_of_few_counts_to_the_background() -> None:
-    mids, offset, _expected, mapped, mat = cells_case()
-    expected = np.full(100, 5.0)
-    count = np.zeros((3, 3))
-    s = settings()
-    half = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
-    assert half[0, 1] == pytest.approx(-4.0 * (0.5 / 5.5) ** (-1.0 / 3.0)), "no count of 5 expected"
-    s.contact_pseudo_count = 4.0
-    four = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
-    assert four[0, 1] == pytest.approx(-4.0 * (4.0 / 9.0) ** (-1.0 / 3.0))
-    assert -four[0, 1] < -half[0, 1], "the push is smaller"
-
-
-def test_loader_refuses_an_unknown_bias_and_a_pseudo_count_of_zero() -> None:
-    with pytest.raises(ValueError, match="none or weights"):
-        Settings.from_dict({"springs": {"contact_bias": "coverage"}})
-    with pytest.raises(ValueError, match="above zero"):
-        Settings.from_dict({"springs": {"contact_pseudo_count": "0"}})
-
-
-def test_the_bound_gives_a_cell_without_a_count_a_smaller_push_and_no_jump_at_the_threshold() -> (
-    None
-):
-    mids, offset, _expected, mapped, mat = cells_case()
-    expected = np.full(100, 5.0)
-    s = settings()
-    s.contact_estimate = "bound"
-    root_exp = np.sqrt(5.375)
-
-    none = hold_by_cells(mat, mids, np.zeros((3, 3)), offset, expected, mapped, LAW, s)
-    want = 4.0 * ((np.sqrt(0.375) + 1.0) / root_exp) ** (-2.0 / 3.0)
-    assert none[0, 1] == pytest.approx(-want), "no count of 5 expected, the bound one root over"
-    assert want / 4.0 == pytest.approx(1.274, abs=0.001), "1.27 backgrounds, 2.2 under ratio"
-
-    many = np.array([[0.0, 20.0, 0.0], [20.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-    out = hold_by_cells(mat, mids, many, offset, expected, mapped, LAW, s)
-    want = 4.0 * ((np.sqrt(20.375) - 1.0) / root_exp) ** (-2.0 / 3.0)
-    assert out[0, 1] == pytest.approx(-want), "20 counts of 5 expected, the bound one root under"
-
-    ten = np.array([[0.0, 10.0, 5.0], [10.0, 0.0, 5.0], [5.0, 5.0, 0.0]])
-    out = hold_by_cells(mat, mids, ten, offset, expected, mapped, LAW, s)
-    assert out[0, 1] == mat[0, 1], "10 counts of 5 expected are 1.8 roots over and are not held"
-
-    just = np.array([[0.0, 11.0, 5.0], [11.0, 0.0, 5.0], [5.0, 5.0, 0.0]])
-    out = hold_by_cells(mat, mids, just, offset, expected, mapped, LAW, s)
-    assert -4.0 < out[0, 1] / 1.0 and out[0, 1] == pytest.approx(-4.0, rel=0.03), (
-        "a cell just over the threshold is held near the background"
+    plain = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
+    assert plain[0, 1] < -0.5 and plain[1, 3] < -0.5, (
+        "without the bias the bin of low coverage is held out from the others"
     )
 
 
-def test_loader_refuses_an_unknown_estimate() -> None:
-    with pytest.raises(ValueError, match="ratio or bound"):
-        Settings.from_dict({"springs": {"contact_estimate": "median"}})
+def test_a_map_without_weights_has_a_bias_of_one(tmp_path: Path) -> None:
+    uri, _ = biased_mcool(tmp_path, with_weights=False)
+    mids = (np.array([2, 7, 20]) * 5000 + 2500).astype(np.int64)
+    _count, _offset, _expected, mapped, bias = read_cells(uri, "chr1", mids, 5000)
+    assert bias.tolist() == [1.0, 1.0, 1.0] and mapped.all()
+
+
+def test_a_run_reads_the_finest_resolution_of_the_map_at_or_over_the_one_it_asks(
+    tmp_path: Path,
+) -> None:
+    cooler = pytest.importorskip("cooler")
+    import pandas as pd
+
+    path = tmp_path / "two.mcool"
+    for res in (10_000, 25_000):
+        n = 8
+        bins = pd.DataFrame(
+            {"chrom": "chr1", "start": np.arange(n) * res, "end": (np.arange(n) + 1) * res}
+        )
+        pix = pd.DataFrame({"bin1_id": [0], "bin2_id": [1], "count": [3]})
+        cooler.create_cooler(f"{path}::/resolutions/{res}", bins, pix, ordered=True, mode="a")
+    assert available_resolution(str(path), 10_000) == 10_000, "the map holds the resolution"
+    assert available_resolution(str(path), 5000) == 10_000, "the finest one over 5 kb"
+    assert available_resolution(f"{path}::/resolutions/10000", 5000) == 10_000
+    with pytest.raises(ValueError, match="holds no resolution"):
+        available_resolution(str(path), 50_000)

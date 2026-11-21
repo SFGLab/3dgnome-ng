@@ -2,10 +2,9 @@
 
 A pair of nodes reads the cell of `[data] contact_map` that holds its two beads, at
 `[springs] contact_resolution`. The counts are raw. The expectation of a cell is the mean count at
-its separation over the stretch of the chromosome that holds the nodes. Under
-`[springs] contact_bias = weights` it is that mean times the bias of its two bins, the inverse of
-the balancing weight of the map. A pair without a loop is held at the distance of the law for its
-cell when the cell passes the Poisson test of `contact_background_z`.
+its separation over the stretch of the chromosome that holds the nodes, times the bias of its two
+bins, the inverse of the balancing weight of the map. A pair without a loop is held at the distance
+of the law for its cell when the cell passes the Poisson test of `contact_background_z`.
 """
 
 from __future__ import annotations
@@ -35,6 +34,27 @@ def cell_uri(uri: str, resolution: int) -> str:
     return uri
 
 
+def available_resolution(uri: str, resolution: int) -> int:
+    """Returns the resolution that a run reads from `uri` when it asks for `resolution`: that one
+    when a multi resolution file holds it, else the finest one the file holds over it.
+    """
+    path, _, _group = uri.partition("::")
+    if not path.endswith(".mcool"):
+        return int(resolution)
+    import cooler  # noqa: PLC0415
+
+    groups: list[str] = cooler.fileops.list_coolers(path)  # pyright: ignore[reportUnknownMemberType]
+    have = sorted(int(g.rsplit("/", 1)[1]) for g in groups if g.startswith("/resolutions/"))
+    at_or_over = [r for r in have if r >= int(resolution)]
+    if not at_or_over:
+        raise ValueError(
+            f"[data] contact_map {uri!r} holds no resolution at or over [springs]"
+            f" contact_resolution {int(resolution)}, it holds {have}. Give an mcool with that"
+            " resolution or a coarser one."
+        )
+    return at_or_over[0]
+
+
 def expected_by_offset(counts: Any, valid: BoolArray) -> F64Array:
     """Returns the mean count of a cell at each offset from the diagonal, in bins.
 
@@ -61,7 +81,7 @@ def expected_by_offset(counts: Any, valid: BoolArray) -> F64Array:
 
 
 def read_cells(
-    uri: str, chrom: str, mids: I64Array, resolution: int, bias: str = "none"
+    uri: str, chrom: str, mids: I64Array, resolution: int
 ) -> tuple[F64Array, I64Array, F64Array, BoolArray, F64Array]:
     """Reads the cells of the pairs of nodes from a cooler.
 
@@ -71,10 +91,9 @@ def read_cells(
     node. The expectation of the cell of nodes i and j is
     `expected[offset] * node_bias[i] * node_bias[j]`.
 
-    Under `bias = none` the bias is one. Under `weights` it is the inverse of the balancing weight
-    of the bin over its mean, the mean by offset is taken of the counts over the two biases, and a
-    bin without a weight is not mapped. A map without weights is read as under `none`, with a
-    line in the log.
+    The bias of a bin is the inverse of its balancing weight over the mean of the stretch. The mean
+    by offset is taken of the counts over the two biases, and a bin without a weight is not
+    mapped. A map without weights has a bias of one in every bin, with a line in the log.
     """
     from scipy import sparse  # noqa: PLC0415
 
@@ -101,23 +120,21 @@ def read_cells(
     weight: Any = None
     with COOLER_LOCK:
         matrix = clr.matrix(balance=False, sparse=True).fetch(stretch)
-        if bias == "weights":
-            table: Any = clr.bins().fetch(stretch)
-            if "weight" in table.columns:
-                weight = table["weight"].to_numpy(dtype=np.float64)
+        table: Any = clr.bins().fetch(stretch)
+        if "weight" in table.columns:
+            weight = table["weight"].to_numpy(dtype=np.float64)
     upper: Any = sparse.triu(matrix, 1)  # pyright: ignore[reportUnknownMemberType]
     counts: Any = (upper + upper.T).tocsr()
     valid: BoolArray = np.asarray(counts.sum(axis=1)).ravel() > 0
     bins = (mids // res - first).astype(np.int64)
     count: F64Array = np.asarray(counts[bins][:, bins].todense(), dtype=np.float64)
     offset: I64Array = np.abs(bins[:, None] - bins[None, :])
-    if bias != "weights":
-        return count, offset, expected_by_offset(counts, valid), valid[bins], np.ones(len(bins))
     if weight is None:
         log.status(
             LOG,
             "contact cells at %d bp: [data] contact_map has no balancing weights, the"
-            " expectation of a cell is by its separation alone",
+            " expectation of a cell is by its separation alone. Balance the map to have the"
+            " coverage of a bin in it",
             res,
         )
         return count, offset, expected_by_offset(counts, valid), valid[bins], np.ones(len(bins))
@@ -149,27 +166,19 @@ def hold_by_cells(
 
     A pair without a loop whose cell has an expectation above z squared and a count more than z
     Poisson deviations from it is held at the background times
-    `((count + k) / (expected + k)) ^ (-1/3)`, with k of `contact_pseudo_count`, clipped to one
-    bead and to `distance_heatmap_stretching` backgrounds. It is entered as minus its distance,
-    which the kernels score with the background spring. Two nodes in one cell and a node in a bin
-    without a count are left as they are.
+    `((count + 0.5) / (expected + 0.5)) ^ (-1/3)`, clipped to one bead and to
+    `distance_heatmap_stretching` backgrounds. It is entered as minus its distance, which the
+    kernels score with the background spring. Two nodes in one cell and a node in a bin without
+    a count are left as they are.
 
     The expectation of a cell is `expected` at its offset, times `node_bias` of its two nodes when
     that is given.
-
-    Under `[springs] contact_estimate = bound` the test and the distance read the square roots of
-    the count and of the expectation, each with 3/8 added, whose difference has the same spread on
-    both sides. A cell is held when twice that difference is beyond z, and its distance is the
-    background times `(bound / root of the expectation) ^ (-2/3)`, with the bound the root of
-    the count moved z / 2 towards the expectation. A cell at the threshold is at the background.
 
     `tested` marks the pairs whose cell had an expectation above z squared at a finer resolution.
     Such a pair is left as it is and the pairs that this resolution can test are added to the
     marks. A pair is then read at the finest resolution that can test it.
     """
     z_cut = float(s.contact_background_z)
-    pseudo = float(s.contact_pseudo_count)
-    by_bound = s.contact_estimate == "bound"
     s0 = max(int(law.s0_bp), 1)
     stretch = float(s.heatmap_distance_stretching)
     pos = mids.astype(np.float64)
@@ -185,14 +194,7 @@ def hold_by_cells(
         if node_bias is not None:
             exp = exp * node_bias[ii] * node_bias[jj]
         obs = count[ii, jj]
-        root_obs: F64Array = obs
-        root_exp: F64Array = exp
-        if by_bound:
-            root_obs = np.sqrt(obs + 0.375)
-            root_exp = np.sqrt(exp + 0.375)
-            z = 2.0 * (root_obs - root_exp)
-        else:
-            z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
+        z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
         testable = (
             (mat[ii, jj] < 0.0) & (off >= 1) & mapped[ii] & mapped[jj] & (exp > z_cut * z_cut)
         )
@@ -204,10 +206,7 @@ def hold_by_cells(
             continue
         sep = np.abs(pos[jj[sel]] - pos[ii[sel]])
         bg = np.maximum(1.0, (np.maximum(sep, 1.0) / s0) ** law.nu)
-        ratio: F64Array = (obs[sel] + pseudo) / (exp[sel] + pseudo)
-        if by_bound:
-            bound: F64Array = root_obs[sel] - np.sign(z[sel]) * 0.5 * z_cut
-            ratio = (bound / root_exp[sel]) ** 2
+        ratio = (obs[sel] + 0.5) / (exp[sel] + 0.5)
         target = np.clip(bg * ratio ** (-1.0 / 3.0), 1.0, stretch * bg)
         out[ii[sel], jj[sel]] = -target
         out[jj[sel], ii[sel]] = -target

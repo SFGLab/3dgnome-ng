@@ -103,9 +103,6 @@ class Settings:
     contact_background_z: float
     contact_resolution: int
     contact_resolution_max: int
-    contact_bias: str
-    contact_pseudo_count: float
-    contact_estimate: str
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -350,9 +347,6 @@ class Settings:
         self.contact_background_z = 0.0
         self.contact_resolution = 5000
         self.contact_resolution_max = 0
-        self.contact_bias = "none"
-        self.contact_pseudo_count = 0.5
-        self.contact_estimate = "ratio"
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -668,24 +662,6 @@ class Settings:
         self.contact_resolution_max = geti(
             "springs", "contact_resolution_max", self.contact_resolution_max
         )
-        self.contact_bias = gets("springs", "contact_bias", self.contact_bias)
-        if self.contact_bias not in ("none", "weights"):
-            raise ValueError(
-                f"[springs] contact_bias must be none or weights, got {self.contact_bias!r}"
-            )
-        self.contact_pseudo_count = getf(
-            "springs", "contact_pseudo_count", self.contact_pseudo_count
-        )
-        if self.contact_pseudo_count <= 0.0:
-            raise ValueError(
-                "[springs] contact_pseudo_count must be above zero, got"
-                f" {self.contact_pseudo_count}"
-            )
-        self.contact_estimate = gets("springs", "contact_estimate", self.contact_estimate)
-        if self.contact_estimate not in ("ratio", "bound"):
-            raise ValueError(
-                f"[springs] contact_estimate must be ratio or bound, got {self.contact_estimate!r}"
-            )
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
 

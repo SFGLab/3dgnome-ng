@@ -22,7 +22,7 @@ from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
-from gnome3d.pipeline.ib.cells import hold_by_cells, read_cells
+from gnome3d.pipeline.ib.cells import available_resolution, hold_by_cells, read_cells
 from gnome3d.pipeline.ib.maxent import anchor_draw
 from gnome3d.pipeline.ib.nodes import (
     ContactNodes,
@@ -245,12 +245,21 @@ def solve_nodes(
                 " zero, or use_contact_background to no."
             )
         else:
-            finest = int(s.contact_resolution)
+            finest = available_resolution(str(s.data_contact_map), int(s.contact_resolution))
+            if finest != int(s.contact_resolution):
+                log.status(
+                    LOG,
+                    "joint arcs solve %s: [data] contact_map holds no map at %d bp, the cells are"
+                    " read at %d bp",
+                    chr_,
+                    int(s.contact_resolution),
+                    finest,
+                )
             ladder = [r for r in _CELL_LADDER if finest < r <= int(s.contact_resolution_max)]
             tested: BoolArray | None = np.zeros((m, m), dtype=np.bool_) if ladder else None
             for resolution in [finest, *ladder]:
                 count, offset, expected, mapped, node_bias = read_cells(
-                    str(s.data_contact_map), chr_, nodes.mid, resolution, s.contact_bias
+                    str(s.data_contact_map), chr_, nodes.mid, resolution
                 )
                 exp_dist = hold_by_cells(
                     exp_dist,
@@ -263,7 +272,7 @@ def solve_nodes(
                     s,
                     tested,
                     resolution,
-                    node_bias if s.contact_bias != "none" else None,
+                    node_bias,
                 )
     exp_dist = cb.repulsion_range(exp_dist, [int(x) for x in nodes.mid], s)
     pos0: F32Array = np.ascontiguousarray(centre, dtype=np.float32)
