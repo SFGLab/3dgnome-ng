@@ -199,7 +199,7 @@ export function SettingsTree({ schema, values, onChange }: { schema: SettingGrou
   )
 }
 
-/** The structures and the job name of step 5. */
+/** The structures and the job name of step 6. */
 export function EnsembleFields({ structures, name, max, onChange }: { structures: number; name: string; max: number; onChange: (p: Partial<FormState>) => void }) {
   const [draft, setDraft] = useState(String(structures))
   useEffect(() => setDraft(String(structures)), [structures])

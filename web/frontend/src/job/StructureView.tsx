@@ -5,7 +5,7 @@ import { stretch } from './chain'
 import { readPalette, type Mode } from './colors'
 import { bp as fmt } from '../lib/format'
 import { Scene, type Marker, type SceneHandle } from './Scene'
-import { saveDataUrl } from './savePng'
+import { saveDataUrl } from './export/savePng'
 import { chainColors, beadAt, chainAt, FOCUS_REACH, focusRanges } from './structure'
 
 export type HoverInfo = { lines: string[]; x: number; y: number; index: number }

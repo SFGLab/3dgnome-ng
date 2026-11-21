@@ -1,17 +1,17 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { rememberJob } from '../myjobs/recent'
-import { mockApi } from '../test/api'
-import { checkCopy } from '../test/copy'
-import { ANNOTATIONS, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../test/job'
-import { jobApi } from '../api'
+import { rememberJob } from '../../myjobs/recent'
+import { mockApi } from '../../test/api'
+import { checkCopy } from '../../test/copy'
+import { ANNOTATIONS, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../../test/job'
+import { jobApi } from '../../api'
 import { Compare } from './Compare'
-import { sideNames } from './CompareResults'
-import { csvText } from './saveCsv'
-import { standalone } from './savePng'
+import { sideNames } from './names'
+import { csvText } from '../export/saveCsv'
+import { standalone } from '../export/savePng'
 
-vi.mock('./Scene', () => ({ Scene: (p: { markers?: { label: string }[] }) => <div data-testid="scene">{(p.markers ?? []).map((m) => m.label).join('')}</div> }))
+vi.mock('../Scene', () => ({ Scene: (p: { markers?: { label: string }[] }) => <div data-testid="scene">{(p.markers ?? []).map((m) => m.label).join('')}</div> }))
 
 const OTHER = 'fedcba9876543210'
 const CTCF_SUMMARY = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, factors: 'CTCF' } }

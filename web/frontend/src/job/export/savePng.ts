@@ -1,4 +1,4 @@
-import { saveBlob, saveUrl } from '../lib/download'
+import { saveBlob, saveUrl } from '../../lib/download'
 
 /** Saving a figure of the page as a PNG file. */
 

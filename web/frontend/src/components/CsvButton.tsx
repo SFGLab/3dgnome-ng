@@ -1,5 +1,5 @@
 import { Download } from 'lucide-react'
-import { type Cell, saveCsv } from '../job/saveCsv'
+import { type Cell, saveCsv } from '../job/export/saveCsv'
 
 /** A button that saves every row of a table as a CSV file, also the rows of its other pages. */
 export function CsvButton({ file, head, rows }: { file: string; head: string[]; rows: () => Cell[][] }) {

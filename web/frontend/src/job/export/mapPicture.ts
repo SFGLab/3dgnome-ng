@@ -1,4 +1,4 @@
-import { regionText } from '../lib/region'
+import { regionText } from '../../lib/region'
 
 /** The picture of a contact map that the page saves: the map with its region, its two halves and its axes. */
 
