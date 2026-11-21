@@ -1,6 +1,6 @@
 import { RefreshCw, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Loop } from './api'
+import type { Loop } from '../api'
 import './loop-view.css'
 import { wheelFactor } from './wheel'
 import { zoomed, describeLoop, ticks } from './loops'

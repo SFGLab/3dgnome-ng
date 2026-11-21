@@ -6,12 +6,12 @@
  * private jobs of a browser then stay in that browser.
  */
 import { useSyncExternalStore } from 'react'
-import { BASE, served } from '../base'
-import { JOBS_EDITED, mergeJobs, recentJobs, replaceJobs, type RecentJob } from '../model/recent'
+import { type ApiError, makeList, readList, sendJobs, type SharedList } from '../api'
+import { BASE } from '../base'
+import { JOBS_EDITED, mergeJobs, recentJobs, replaceJobs } from '../model/recent'
 import { ROUTES } from '../routes'
 
 export type Sync = { code: string; private: boolean }
-export type SharedList = Sync & { jobs: RecentJob[] }
 /** `gone` says the server has no list for the code any more. */
 export type SyncStatus = { state: 'off' | 'syncing' | 'ok' | 'error'; at?: number; error?: string; gone?: boolean }
 
@@ -20,16 +20,6 @@ const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 const LENGTH = 16
 const EVERY_MS = 30_000
 const FRESH_MS = 5_000
-
-/** An answer of the list API that is not 2xx. */
-export class SyncError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message)
-  }
-}
 
 /** The characters of a typed code that can be part of one, with O, I and L read as digits. */
 function bare(text: string): string {
@@ -70,25 +60,6 @@ function setStatus(next: SyncStatus) {
   watchers.forEach((w) => w())
 }
 
-async function call(path: string, init?: RequestInit): Promise<SharedList> {
-  let r: Response
-  try {
-    r = await fetch(served(path), init)
-  } catch {
-    throw new SyncError('The server did not answer.', 0)
-  }
-  const body = await r.json().catch(() => ({}))
-  if (!r.ok) throw new SyncError(body.error ?? `The server answered ${r.status}.`, r.status)
-  return body as SharedList
-}
-
-const json = (method: string, body: unknown, keepalive = false): RequestInit => ({
-  method,
-  keepalive,
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(body),
-})
-
 function adopt(list: SharedList): SharedList {
   localStorage.setItem(KEY, JSON.stringify({ code: list.code, private: list.private }))
   replaceJobs(mergeJobs(recentJobs(), list.jobs))
@@ -96,18 +67,15 @@ function adopt(list: SharedList): SharedList {
   return list
 }
 
-/** The list of a code, read without joining it. */
-export const readList = (code: string) => call(`/api/lists/${encodeURIComponent(code)}`)
-
 /** Makes a list from the jobs of this browser and joins it. */
 export async function createList(includePrivate: boolean): Promise<SharedList> {
-  return adopt(await call('/api/lists', json('POST', { jobs: sendable({ private: includePrivate }), private: includePrivate })))
+  return adopt(await makeList(sendable({ private: includePrivate }), includePrivate))
 }
 
 /** Joins the list of a code: the jobs of this browser go to it and its jobs come here. */
 export async function joinList(code: string): Promise<SharedList> {
   const list = await readList(fullCode(code) ?? code)
-  return adopt(await call(`/api/lists/${encodeURIComponent(list.code)}`, json('PUT', { jobs: sendable(list) })))
+  return adopt(await sendJobs(list.code, sendable(list)))
 }
 
 /** Leaves the list. The jobs stay in this browser and the code keeps working elsewhere. */
@@ -131,11 +99,11 @@ export async function syncNow(keepalive = false): Promise<void> {
   // An answer that arrives after the browser left the list is dropped.
   const current = () => syncState()?.code === s.code
   try {
-    const list = await call(`/api/lists/${encodeURIComponent(s.code)}`, json('PUT', { jobs: sendable(s) }, keepalive))
+    const list = await sendJobs(s.code, sendable(s), keepalive)
     if (current()) adopt(list)
   } catch (e) {
     if (!current()) return
-    const err = e as SyncError
+    const err = e as ApiError
     setStatus({ state: 'error', at: status.at, error: err.message, gone: err.status === 404 })
   }
 }

@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { CsvButton } from '../components/CsvButton'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
-import type { JobApi, Loop } from './api'
+import type { JobApi, Loop } from '../api'
 import { bp, kb } from './format'
 
 /** The Loops tab: every loop the engine read, with its factor, ends, span and PET count. A row

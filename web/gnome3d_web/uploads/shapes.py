@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from typing_extensions import NotRequired, TypedDict
+
+Kind = Literal["loops", "anchors", "contacts", "enhancers", "vcf", "expression"]
 
 
 class Meta(TypedDict):
@@ -10,7 +14,7 @@ class Meta(TypedDict):
     name and the size of the remote file. Loops have their factor."""
 
     id: str
-    kind: str
+    kind: Kind
     name: str
     size: int
     created: float
@@ -29,7 +33,7 @@ class ProblemFound(TypedDict):
 
 class UploadResult(TypedDict):
     id: str
-    kind: str
+    kind: Kind
     name: str
     size: int
     ok: bool

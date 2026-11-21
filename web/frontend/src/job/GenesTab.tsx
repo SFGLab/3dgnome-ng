@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CsvButton } from '../components/CsvButton'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
-import type { GeneRow } from './api'
+import type { GeneRow } from '../api'
 import { bp, kb } from './format'
 
 type Key = 'gene' | 'enhancer' | 'linear_bp' | 'distance' | 'expression'

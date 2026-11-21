@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import type { Loop } from './api'
+import type { Loop } from '../api'
 import { LoopView } from './LoopView'
 import { describeLoop, sameLoop, ticks, zoomed } from './loops'
 import { wheelFactor } from './wheel'

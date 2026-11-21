@@ -1,5 +1,5 @@
 /** The loops of a job as the loop views show them: the zoom, the ticks, the text of a loop and whether two are one. */
-import type { Loop } from './api'
+import type { Loop } from '../api'
 import { bp, kb } from './format'
 
 /** The shortest part a zoom leaves, in bp. */

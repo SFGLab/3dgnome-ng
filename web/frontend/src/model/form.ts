@@ -1,6 +1,6 @@
-import type { Region } from '../api'
-import type { Summary } from '../job/api'
-import { NO_OWN, type OwnChoice, type UploadResult } from './upload'
+import type { Region, Summary } from '../api'
+import { NO_OWN, type OwnChoice } from './upload'
+import { type UploadResult } from '../api'
 
 /** The state of the Model a region form. The cell type own means the job reads only uploads. */
 export type Factors = 'CTCF' | 'RNAPII' | 'CTCF+RNAPII'

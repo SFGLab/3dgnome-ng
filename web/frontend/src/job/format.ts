@@ -1,5 +1,5 @@
 /** Formats shared by the explorer. */
-import type { Summary } from './api'
+import type { Summary } from '../api'
 
 export const bp = (n: number) => n.toLocaleString('en-US')
 

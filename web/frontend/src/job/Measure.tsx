@@ -1,4 +1,4 @@
-import type { Distance } from './api'
+import type { Distance } from '../api'
 
 /** The Distance A to B card: the mean and SD over the ensemble, the value in this structure,
  * a dot per structure and the two positions. */

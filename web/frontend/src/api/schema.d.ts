@@ -1485,8 +1485,11 @@ export interface components {
             error: components["schemas"]["ProblemFound"] | null;
             /** Id */
             id: string;
-            /** Kind */
-            kind: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "loops" | "anchors" | "contacts" | "enhancers" | "vcf" | "expression";
             /** Name */
             name: string;
             /** Ok */

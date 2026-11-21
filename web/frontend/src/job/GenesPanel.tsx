@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { JobApi, Summary } from './api'
+import type { JobApi, Summary } from '../api'
 import { GenesTab } from './GenesTab'
 import { parseRegion } from './structure'
 

@@ -2,10 +2,9 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowRight, Info } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, ApiError, type Region } from '../api'
+import { api, ApiError, type Region, jobApi } from '../api'
 import { served } from '../base'
 import { Background } from '../model/Background'
-import { jobApi } from '../job/api'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
 import { Expression } from '../model/Expression'
@@ -155,7 +154,8 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
       onSubmitted(url)
     },
   })
-  const error = submit.error instanceof ApiError ? submit.error : null
+  // A refusal of the server is shown at the step of its field. A request without an answer is shown under the button.
+  const error = submit.error instanceof ApiError && submit.error.status > 0 ? submit.error : null
   const errorStep = error ? (FIELD_STEP[error.field ?? ''] ?? 6) : 0
   const stepError = (n: number) =>
     errorStep === n && error ? (
@@ -285,7 +285,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           </button>
           <span className="timing">The job page shows the progress of the job and its place in the queue.</span>
         </div>
-        {submit.error && !(submit.error instanceof ApiError) && (
+        {submit.error && !error && (
           <p className="field-error" role="alert">
             The server did not answer. Check the connection and build again.
           </p>

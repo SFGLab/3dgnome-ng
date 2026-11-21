@@ -5,7 +5,7 @@ export const CATALOG = {
     GM12878: { label: 'GM12878, lymphoblastoid', description: 'lymphoblastoid', data: ['CTCF', 'RNAPII', 'Hi-C', 'enhancers'], lymphoblastoid: true, note: '' },
     H1ESC: { label: 'H1ESC, embryonic stem cell', description: 'embryonic stem cell', data: ['CTCF', 'RNAPII', 'Hi-C', 'Micro-C'], lymphoblastoid: false, note: '' },
   },
-  sv_sets: { HGSVC: { label: 'HGSVC freeze 4', samples: ['HG00512', 'HG00733'] } },
+  sv_sets: { HGSVC: { label: 'HGSVC freeze 4', samples: ['HG00512', 'HG00733'], sample_table: false } },
   factors: ['CTCF', 'RNAPII', 'CTCF+RNAPII'],
   max_region_mb: 20,
   hicdiffusion_mb: 2,

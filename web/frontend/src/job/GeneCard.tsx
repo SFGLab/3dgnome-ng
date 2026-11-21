@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react'
-import type { GeneRow } from './api'
+import type { GeneRow } from '../api'
 import { bp, kb } from './format'
 
 /** The Selected gene card: the gene's nearest enhancer by mean 3D distance over the ensemble. */

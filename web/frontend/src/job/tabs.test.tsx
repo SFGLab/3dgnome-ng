@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { KEY } from '../test/job'
-import { jobApi } from './api'
+import { jobApi } from '../api'
 import { LogTab } from './LogTab'
 import { LoopsTab } from './LoopsTab'
 

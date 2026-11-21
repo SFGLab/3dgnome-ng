@@ -1,6 +1,6 @@
 import { Expand, Camera, RotateCcw } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { Annotations, Structure } from './api'
+import type { Annotations, Structure } from '../api'
 import { stretch } from './chain'
 import { readPalette, type Mode } from './colors'
 import { bp as fmt } from './format'

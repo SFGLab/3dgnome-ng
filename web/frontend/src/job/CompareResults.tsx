@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { CsvButton } from '../components/CsvButton'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
-import { compareGene, type Compare, type ExpressionCompare, type Summary } from './api'
+import { compareGene, type Compare, type ExpressionCompare, type Summary } from '../api'
 import { FACTORS, kb } from './format'
 import { savePng } from './savePng'
 

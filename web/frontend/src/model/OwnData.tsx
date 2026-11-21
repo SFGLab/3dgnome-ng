@@ -1,9 +1,9 @@
 import { useQueries } from '@tanstack/react-query'
 import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, SquareTerminal, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { Region } from '../api'
 import { readHicWindow } from './hicLocal'
-import { guessFactor, LinkRefused, megabytes, NO_OWN, type OwnChoice, type OwnExpression, type UploadKind, type UploadResult, uploadFile, uploadLink, uploadPreview } from './upload'
+import { ApiError, type Region, type UploadKind, type UploadResult, uploadFile, uploadLink, uploadPreview } from '../api'
+import { guessFactor, megabytes, NO_OWN, type OwnChoice, type OwnExpression } from './upload'
 import '../styles/dialog.css'
 import './owndata.css'
 
@@ -349,7 +349,7 @@ export function OwnData({
     const put = putContacts(key)
     uploadLink(url, where)
       .then((result) => put({ result }))
-      .catch((e: Error) => put({ failure: e.message, fix: e instanceof LinkRefused ? e.fix : '' }))
+      .catch((e: Error) => put({ failure: e.message, fix: e instanceof ApiError ? (e.fix ?? '') : '' }))
   }
   const addLocal = (file: File) => {
     const key = next.current++

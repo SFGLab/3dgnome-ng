@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, KEY, SUMMARY_DONE } from '../test/job'
-import { jobApi, square } from './api'
+import { jobApi, square } from '../api'
 import { ContactMapTab } from './ContactMapTab'
 
 const MAP = {

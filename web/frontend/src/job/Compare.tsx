@@ -2,15 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { Camera, ChevronDown } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { recentJobs } from '../model/recent'
-import { compareExpression, compareJobs, jobApi, type JobApi, type Summary } from './api'
+import { compareExpression, compareJobs, jobApi, type JobApi, type Summary } from '../api'
 import { CompareResults, sideNames } from './CompareResults'
 import { readPalette } from './colors'
 import { FACTORS } from './format'
 import { makeCameraLink, type CameraLink } from './cameraLink'
 import { Scene, type SceneHandle } from './Scene'
 import { saveDataUrl } from './savePng'
-import { chainColors, focusRanges } from './structure'
-import { parseRegion } from './structure'
+import { chainColors, focusRanges, parseRegion } from './structure'
 
 const factorColor = (f: string) => (f === 'CTCF' ? 'var(--ctcf)' : 'var(--rnapii)')
 

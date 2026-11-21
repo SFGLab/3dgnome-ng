@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, Dna, Upload, X } from 'lucide-react'
-import type { Catalog, SampleRow } from '../api'
+import type { Catalog, SampleRow, UploadResult } from '../api'
 import type { FormState } from './form'
-import type { UploadResult } from './upload'
 
 type Props = {
   catalog: Catalog

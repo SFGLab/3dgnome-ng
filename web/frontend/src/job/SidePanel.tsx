@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { served } from '../base'
 import { recentJobs, rememberJob } from '../model/recent'
 import { ROUTES } from '../routes'
-import type { JobApi, Summary } from './api'
+import type { JobApi, Summary } from '../api'
 import { bp, duration, FACTORS, size, shortRegion, variants } from './format'
 
 type Props = {

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { checkCopy } from '../test/copy'
 import { GENES } from '../test/job'
-import type { GeneRow } from './api'
+import type { GeneRow } from '../api'
 import { GenesTab } from './GenesTab'
 
 const ROWS: GeneRow[] = [

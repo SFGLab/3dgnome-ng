@@ -1,5 +1,5 @@
 /** The beads and the chain of a structure: the region of a job, the colours, the bead at a position and the ranges of a focus. */
-import type { Loop, Annotations, Structure } from './api'
+import type { Loop, Annotations, Structure } from '../api'
 import { stretch } from './chain'
 import { colorAt, readPalette, type Mode } from './colors'
 

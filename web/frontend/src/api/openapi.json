@@ -2071,6 +2071,14 @@
       "type": "string"
      },
      "kind": {
+      "enum": [
+       "loops",
+       "anchors",
+       "contacts",
+       "enhancers",
+       "vcf",
+       "expression"
+      ],
       "title": "Kind",
       "type": "string"
      },

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { JobApi } from './api'
+import type { JobApi } from '../api'
 
 /** The Log tab: the engine's log of the job. */
 export function LogTab({ api }: { api: JobApi }) {

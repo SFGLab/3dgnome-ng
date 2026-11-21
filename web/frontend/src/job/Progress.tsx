@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Summary } from './api'
+import type { Summary } from '../api'
 
 const WORDS: Record<string, string> = {
   queued: 'Queued',

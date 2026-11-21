@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Camera, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { Contacts, JobApi, Summary } from './api'
+import type { Contacts, JobApi, Summary } from '../api'
 import { bp } from './format'
 import { LoopView } from './LoopView'
 import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
