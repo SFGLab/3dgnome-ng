@@ -21,7 +21,7 @@ import pandas as pd
 from gnome3d.geometry import smooth_chain
 
 from . import contacts as cm
-from . import hicdiffusion
+from . import expression, hicdiffusion
 from .marks import read_cif
 
 MAX_GAP = 5_000
@@ -55,7 +55,10 @@ def models(job: Path) -> list[Path]:
 
 def _public_request(req: dict) -> dict:
     """The request without the server's paths of uploaded files."""
-    out = {k: v for k, v in req.items() if k not in ("upload_vcf", "own")}
+    out = {k: v for k, v in req.items() if k not in ("upload_vcf", "own", "expression")}
+    # The source of the expression by its id. The table of an upload has a path on the server.
+    if req.get("expression"):
+        out["expression"] = str(req["expression"].get("source", ""))
     own = req.get("own") or {}
     if own:
         out["own"] = {
@@ -64,6 +67,16 @@ def _public_request(req: dict) -> dict:
             **{k: own[k] for k in ("loops_from", "enhancers_from") if own.get(k)},
         }
     return out
+
+
+def _public_expression(job: Path) -> dict[str, object] | None:
+    """The expression of a job as its page states it: the label, the kind, the unit of the gene
+    table and the number of samples. None for a job without expression."""
+    meta = expression.job_meta(job)
+    if meta is None:
+        return None
+    levels = expression.job_levels(job)
+    return {"label": meta.get("label", ""), "kind": meta["kind"], "unit": levels[1] if levels else "", "samples": len(meta["columns"]), "source": meta.get("source", "")}  # type: ignore[arg-type]
 
 
 def summary(job: Path, ahead: int | None) -> dict[str, object]:
@@ -88,6 +101,7 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "loop_count": sum(status.get("loops", {}).values()),
         "files": files,
         "models": [{"name": m.name, "size": m.stat().st_size} for m in models(job) if m.is_file()],
+        "expression": _public_expression(job),
         "stages": status.get("stages", []),
         # The clock the stages are timed on. A page counts the time of the running stage from it.
         "now": time.time(),
@@ -254,6 +268,15 @@ def genes(job: Path) -> list[dict[str, object]]:
         pos, mid = _positions(job)
         _, start, end, _ = read_cif(models(job)[0])
         loop_rows = loops(job)
+        levels = expression.job_levels(job)
+
+        def level(r) -> float | None:  # noqa: ANN001
+            """The expression of the gene of a row. The second copy of a duplicated gene has the id of the gene."""
+            if levels is None:
+                return None
+            name = str(r.gene_id).removesuffix(".copy2").split(".")[0] if levels[2] == "gene_id" else str(r.name)
+            v = levels[0].get(name)
+            return None if v is None else round(v, 3)
 
         def holds(end_: list[int], bead: int) -> bool:
             return end_[0] < int(end[bead]) and end_[1] > int(start[bead])
@@ -269,6 +292,8 @@ def genes(job: Path) -> list[dict[str, object]]:
             rows.append(
                 {
                     "gene": str(r.name),
+                    "gene_id": str(r.gene_id),
+                    "expression": level(r),
                     "tss": int(r.tss),
                     "enhancer": int(r.enhancer_centre),
                     "linear_bp": int(r.linear_bp),
@@ -289,7 +314,7 @@ def genes(job: Path) -> list[dict[str, object]]:
             )
         return rows
 
-    return _cached(job, "genes_v2", make)
+    return _cached(job, "genes_v3", make)
 
 
 def _public_log(text: str, job: Path) -> str:
@@ -499,3 +524,35 @@ def compare(a: Path, b: Path) -> dict[str, object]:
         )
     rows.sort(key=lambda r: max(r["ratio"], 1 / r["ratio"]), reverse=True)
     return {"same_region": ra is not None and ra == rb, "rows": rows[:20]}
+
+
+def compare_expression(a: Path, b: Path, cache: Path) -> dict[str, object]:
+    """The expression of job b against job a for the genes both jobs have, beside the change of
+    their enhancer to promoter distance.
+
+    Each row has the gene, log2 of the distance of b over a, the log2 fold change of the
+    expression, its adjusted p or None and the two levels. `rho` is the Spearman correlation of
+    the two changes over the rows, None under five rows. The mode and its reason are those of
+    `expression.contrast`.
+    """
+    c = expression.contrast(a, b, cache)
+    table = c.pop("genes", None)
+    if not table:
+        return {**c, "rows": [], "rho": None}
+    by_id = c.get("key") == "gene_id"
+    ga = {r["gene"]: r for r in genes(a)}
+    gb = {r["gene"]: r for r in genes(b)}
+    rows = []
+    for name in ga.keys() & gb.keys():
+        x, y = ga[name], gb[name]
+        e = table.get(str(x["gene_id"]).removesuffix(".copy2").split(".")[0] if by_id else name)
+        if e is None or x["distance"] <= 0 or y["distance"] <= 0:
+            continue
+        rows.append({"gene": name, "distance": round(float(np.log2(y["distance"] / x["distance"])), 4), "log2fc": e[0], "padj": e[1], "a": e[2], "b": e[3]})
+    rows.sort(key=lambda r: abs(r["log2fc"]), reverse=True)
+    rho = None
+    if len(rows) >= 5:
+        d = pd.DataFrame(rows)
+        rho = float(d["distance"].corr(d["log2fc"], method="spearman"))
+        rho = None if not np.isfinite(rho) else round(rho, 3)
+    return {**c, "rows": rows, "rho": rho}

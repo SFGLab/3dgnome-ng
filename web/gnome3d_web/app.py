@@ -34,7 +34,7 @@ from .settings import Settings
 from .settings_schema import SettingError, parse_ini, schema, validate_overrides
 from .siteconfig import ConfigFile
 
-FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|[A-Za-z0-9_.:-]+\.cif)$")
+FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|expression\.tsv|[A-Za-z0-9_.:-]+\.cif)$")
 
 
 def packed_json(request: Request, value: object) -> Response:
@@ -182,6 +182,14 @@ def create_app() -> FastAPI:
             haplotype=1 if str(fields.get("haplotype", "0")) == "1" else 0, n_models=n_models,
             background=background, overrides=overrides,
         )  # fmt: skip
+        wanted = fields.get("expression", "")
+        if wanted:
+            # A hosted table, by the id of its source. The columns are the ones of the cell type or of the sample.
+            option = next((o for o in catalog.expression_options(base, sample if sv_set else "") if o["id"] == wanted), None)
+            if option is None:
+                raise JobError(f"{wanted!r} has no expression for {cell_type}" + (f" and {sample}" if sv_set else ""), "expression")
+            src = catalog.expression[wanted]
+            req.expression = {"source": src.name, "path": str(src.path), "columns": option["columns"], "kind": src.kind, "unit": src.unit, "label": option["label"]}
         if own_dirs:
             token = secrets.token_urlsafe(18)
             job = private / token
@@ -520,6 +528,14 @@ def create_app() -> FastAPI:
             "hicdiffusion": not hicdiffusion.missing(),
         }
 
+    @app.get("/api/expression")
+    def api_expression(cell: str, sv_set: str = "", sample: str = "") -> JSONResponse:
+        """The hosted expression a job of this cell type, and of this sample of a call set, can take."""
+        if cell not in catalog.cell_types:
+            return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
+        known = sv_set in catalog.sv_sets and sample in catalog.sv_sets[sv_set].samples
+        return JSONResponse({"options": catalog.expression_options(cell, sample if known else "")})
+
     @app.get("/api/settings")
     def api_settings(cell: str) -> JSONResponse:
         if cell not in catalog.cell_types:
@@ -611,6 +627,16 @@ def create_app() -> FastAPI:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
         return JSONResponse(explore.compare(dirs[0], dirs[1]))
+
+    @app.get("/api/compare/expression")
+    def api_compare_expression(a: str, b: str) -> JSONResponse:
+        dirs = []
+        for url in (a, b):
+            m = re.fullmatch(r"/(jobs|p)/([A-Za-z0-9_-]{8,64})", url)
+            if not m:
+                raise HTTPException(404)
+            dirs.append(job_dir(m[1], m[2]))
+        return JSONResponse(explore.compare_expression(dirs[0], dirs[1], s.results_dir / "expression"))
 
     shared_lists = lists.Lists(s.results_dir / "lists")
     BAD_CODE = "A sync code has 16 letters and digits, like K7M2-9QXD-4THP-W3RZ."

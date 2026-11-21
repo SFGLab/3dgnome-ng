@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 from personal3d.lift import Lift
 
-from . import hicdiffusion
+from . import expression, hicdiffusion
 from .catalog import Catalog
 from .inputs import Own, build_inputs
 from .marks import ep_table, mark_beads, read_cif
@@ -57,6 +57,9 @@ class JobRequest:
     overrides: dict[str, str] = field(default_factory=_no_overrides)
     background: str = "hic"
     own: dict[str, object] = field(default_factory=_no_own)
+    # The expression of the job: the path of its table, its columns, the kind, the unit, the label
+    # and the source. Empty for a job without expression.
+    expression: dict[str, object] = field(default_factory=_no_own)
 
     def __post_init__(self) -> None:
         # The old form sent HiCDiffusion as a flag; request.json files of that form still read.
@@ -76,6 +79,9 @@ def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
     d["hicdiffusion"] = d["background"] == "hicdiffusion"
     if d["background"] in ("hic", "hicdiffusion"):
         del d["background"]
+    # The key of a request without expression is the one it had before expression existed.
+    if not d["expression"]:
+        del d["expression"]
     if not (req.sv_set or req.upload_vcf):
         d["sample"], d["haplotype"] = "", 0
     return d
@@ -213,6 +219,13 @@ def run_job(
             hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
             hic = cond, region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
+        if req.expression:
+            e = req.expression
+            table = expression.read_table(Path(str(e["path"])))
+            columns = [str(c) for c in e["columns"]]  # type: ignore[union-attr]
+            if e["kind"] == "counts":
+                expression.check_counts(table, columns, str(e["label"]))
+            expression.write_job(job, table, columns, {k: e.get(k, "") for k in ("source", "label", "kind", "unit")})
         apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
 

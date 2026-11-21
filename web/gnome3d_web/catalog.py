@@ -9,13 +9,25 @@ without loops. An SV set is one bgzipped VCF and its samples, with an optional
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
 
+from .expression import KINDS as EXPRESSION_KINDS
+from .expression import Source
+
 FACTOR_CHOICES = ("CTCF", "RNAPII", "CTCF+RNAPII")
 BACKGROUNDS = ("hic", "hicdiffusion", "none")
+
+
+@lru_cache(maxsize=16)
+def _columns(path: Path) -> frozenset[str]:
+    """The column names of a hosted table, read from its first line."""
+    with open(path) as fh:
+        return frozenset(re.split(r"[\t,]", fh.readline().rstrip("\n")))
 
 
 def _no_strings() -> dict[str, str]:
@@ -85,11 +97,44 @@ class SVSet:
         return rows
 
 
+def _no_expression() -> dict[str, Source]:
+    return {}
+
+
 @dataclass
 class Catalog:
     root: Path
     cell_types: dict[str, CellType]
     sv_sets: dict[str, SVSet]
+    expression: dict[str, Source] = field(default_factory=_no_expression)
+
+    def expression_options(self, cell: str, sample: str = "") -> list[dict[str, object]]:
+        """The hosted expression a job of a cell type can take: the replicates of the cell type,
+        and with a hosted sample the libraries of that person. Each option has the id of its
+        source, a label, the kind, the unit, the columns and `other_cell_type`, true for a
+        person's lymphoblastoid line beside a cell type that is not lymphoblastoid."""
+        ct = self.cell_types.get(cell)
+        out: list[dict[str, object]] = []
+        for src in self.expression.values():
+            columns = src.cell_types.get(cell, [])
+            who = cell
+            if not columns and src.people and sample and sample in _columns(src.path):
+                columns, who = [sample], sample
+            if not columns:
+                continue
+            n = len(columns)
+            count = f"{n} replicates" if n > 1 and who == cell else f"{n} librar{'y' if n == 1 else 'ies'}"
+            out.append(
+                {
+                    "id": src.name,
+                    "label": f"{src.label} of {who}, {count}",
+                    "kind": src.kind,
+                    "unit": src.unit,
+                    "columns": columns,
+                    "other_cell_type": bool(src.lymphoblastoid and who != cell and ct is not None and not ct.lymphoblastoid),
+                }
+            )
+        return out
 
     @classmethod
     def load(cls, root: Path) -> Catalog:
@@ -123,4 +168,13 @@ class Catalog:
             )
             for name, s in raw.get("sv_sets", {}).items()
         }
-        return cls(root=root, cell_types=cts, sv_sets=svs)
+        tables: dict[str, Source] = {}
+        for name, e in raw.get("expression", {}).items():
+            if e.get("kind") not in EXPRESSION_KINDS:
+                raise ValueError(f"catalog.json: the expression source {name} needs a kind, counts or values")
+            tables[name] = Source(
+                name=name, label=e.get("label", name), path=root / e["file"], kind=e["kind"], unit=e.get("unit", ""),
+                cell_types={k: list(v) for k, v in e.get("cell_types", {}).items()},
+                people=bool(e.get("people", False)), lymphoblastoid=bool(e.get("lymphoblastoid", False)),
+            )  # fmt: skip
+        return cls(root=root, cell_types=cts, sv_sets=svs, expression=tables)

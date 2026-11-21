@@ -6,6 +6,8 @@ rq==2.1.0
 redis==5.2.1
 pandas==3.0.3
 sortedcontainers==2.4.0
+# differential expression of two jobs, gnome3d_web/expression.py
+pydeseq2==0.5.4
 scipy==1.17.1
 threadpoolctl==3.6.0
 h5py==3.16.0
