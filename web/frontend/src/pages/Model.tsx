@@ -9,7 +9,6 @@ import { jobApi } from '../job/api'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
 import { Expression } from '../model/Expression'
-import { ExpressionDialog } from '../model/ExpressionDialog'
 import { EMPTY_FORM, fromRequest, longRegion, readUploads, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
@@ -50,10 +49,11 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('factors', form.factors)
   d.append('background', form.background)
   if (form.expression) d.append('expression', form.expression)
-  if (form.expression === 'own' && form.ownExpression) {
-    d.append('expression_upload', form.ownExpression.upload.id)
-    d.append('expression_columns', JSON.stringify(form.ownExpression.columns))
-    d.append('expression_kind', form.ownExpression.kind)
+  const table = form.own.expression
+  if (form.expression === 'own' && table) {
+    d.append('expression_upload', table.upload.id)
+    d.append('expression_columns', JSON.stringify(table.columns))
+    d.append('expression_kind', table.kind)
   }
   d.append('sv_set', form.svSet)
   d.append('sample', form.sample)
@@ -91,7 +91,6 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
   const [dialog, setDialog] = useState<{ tab: OwnTab; cell: boolean } | null>(null)
-  const [expressionDialog, setExpressionDialog] = useState(false)
   const [svDialog, setSvDialog] = useState<{
     mode: VariantsMode
     file: File | null
@@ -265,7 +264,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           {stepError(4)}
         </Step>
         <Step n={5} title="Gene expression" note="optional">
-          <Expression options={expressionOptions.data ?? []} value={form.expression} cell={form.cell} onChange={(expression) => set({ expression })} own={form.ownExpression} onOpen={() => setExpressionDialog(true)} onRemove={() => set({ expression: '', ownExpression: null })} />
+          <Expression options={expressionOptions.data ?? []} value={form.expression} cell={form.cell} onChange={(expression) => set({ expression })} own={form.own.expression ?? null} onOpen={() => setDialog({ tab: 'expression', cell: ownCell })} onRemove={() => set({ expression: '', own: { ...form.own, expression: null } })} />
           {stepError(5)}
         </Step>
         <Step n={6} title="Ensemble and simulation settings">
@@ -305,16 +304,6 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           }}
         />
       )}
-      {expressionDialog && (
-        <ExpressionDialog
-          initial={form.ownExpression}
-          onClose={() => setExpressionDialog(false)}
-          onUse={(ownExpression) => {
-            set({ expression: 'own', ownExpression })
-            setExpressionDialog(false)
-          }}
-        />
-      )}
       {dialog && (
         <OwnData
           cell={lookup}
@@ -328,7 +317,10 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           onUse={(own) => {
             const asOwn = dialog.cell || ownCell
             const chosen = asOwn ? { ...own, loopsFrom: own.loops.length ? undefined : own.loopsFrom || cells[0], enhancersFrom: own.enhancersFrom ?? 'none' } : own
-            set(dialog.cell ? { own: chosen, cell: 'own' } : { own: chosen })
+            // A table added in the dialog becomes the expression of the job. A table taken away leaves the job without.
+            const added = !!chosen.expression && (dialog.tab === 'expression' || !form.own.expression)
+            const expression = added ? 'own' : !chosen.expression && form.expression === 'own' ? '' : form.expression
+            set(dialog.cell ? { own: chosen, cell: 'own', expression } : { own: chosen, expression })
             setDialog(null)
           }}
         />

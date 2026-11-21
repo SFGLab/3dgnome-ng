@@ -141,6 +141,7 @@ def test_a_cell_type_is_offered_its_replicates_and_a_sample_its_libraries(site: 
     other = {o["id"]: o for o in cat.expression_options("FBX", "P1")}
     assert other["PEOPLE"]["other_cell_type"] and not other["OTHER"]["other_cell_type"], "a person's lymphoblastoid line beside another cell type is marked: " + str(other)
     assert "TMM" not in {o["id"] for o in cat.expression_options("GMX", "P2")}, "a sample a table lacks is not offered that table"
+    assert "RNA-seq" in cat.cell_types["GMX"].data and "RNA-seq" in cat.cell_types["FBX"].data, "a cell type with replicates lists RNA-seq among its data"
     r = site.c.get("/api/expression", params={"cell": "GMX", "sv_set": "DEMO", "sample": "P1"})
     assert r.status_code == 200 and {o["id"] for o in r.json()["options"]} == {"LINES", "OTHER", "PEOPLE", "TMM"}, "the API lists the same options: " + r.text[:200]
     assert {o["id"] for o in site.c.get("/api/expression", params={"cell": "GMX", "sv_set": "DEMO", "sample": "nobody"}).json()["options"]} == {"LINES", "OTHER"}, "a sample the call set lacks gets the cell type alone"

@@ -180,4 +180,9 @@ class Catalog:
                 cell_types={k: list(v) for k, v in e.get("cell_types", {}).items()},
                 people=bool(e.get("people", False)), lymphoblastoid=bool(e.get("lymphoblastoid", False)), feature=str(e.get("feature", "")),
             )  # fmt: skip
+        # A cell type with replicates in a table that no feature hides lists RNA-seq among its data.
+        for src in tables.values():
+            for cell in src.cell_types if not src.feature else ():
+                if cell in cts and "RNA-seq" not in cts[cell].data:
+                    cts[cell].data.append("RNA-seq")
         return cls(root=root, cell_types=cts, sv_sets=svs, expression=tables)

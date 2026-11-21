@@ -145,7 +145,7 @@ export function Help() {
             than the loops do.
           </p>
           <p>
-            You can upload a table of your own in place of a hosted set. The table is tab or comma separated. Its first column holds the gene as an Ensembl id or a gene name. Every other column of numbers is a sample. A column named
+            You can upload a table of your own in place of a hosted set, in the Expression step of the Your own data dialog. The table is tab or comma separated. Its first column holds the gene as an Ensembl id or a gene name. Every other column of numbers is a sample. A column named
             length gives the length of the gene in bp. The output of featureCounts is read as it is. After the upload choose the samples of the job and state that the values are read counts or normalised values.
           </p>
           <pre className="code">{EXPRESSION}</pre>

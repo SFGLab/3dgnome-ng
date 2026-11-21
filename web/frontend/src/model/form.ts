@@ -1,6 +1,6 @@
 import type { Region } from '../api'
 import type { Summary } from '../job/api'
-import { NO_OWN, type OwnChoice, type OwnExpression, type UploadResult } from './upload'
+import { NO_OWN, type OwnChoice, type UploadResult } from './upload'
 
 /** The state of the Model a region form. The cell type own means the job reads only uploads. */
 export type Factors = 'CTCF' | 'RNAPII' | 'CTCF+RNAPII'
@@ -15,9 +15,8 @@ export type FormState = {
   haplotype: 0 | 1
   vcfUpload: UploadResult | null
   background: Background
-  /** The id of the hosted expression source of the job, own for an uploaded table, empty for none. */
+  /** The id of the hosted expression source of the job, own for the table of the own data, empty for none. */
   expression: string
-  ownExpression: OwnExpression | null
   structures: number
   name: string
   settings: Record<string, string>
@@ -34,7 +33,6 @@ export const EMPTY_FORM: FormState = {
   vcfUpload: null,
   background: 'hic',
   expression: '',
-  ownExpression: null,
   structures: 100,
   name: '',
   settings: {},

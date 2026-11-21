@@ -39,12 +39,14 @@ list.
 ## Uploads
 
 The Your own data dialog takes loops, one seven column BEDPE per factor, anchors in BED with an
-optional orientation column, contacts and enhancers in BED. The structural variants dialog takes
+optional orientation column, contacts, enhancers in BED and an expression table. The structural variants dialog takes
 a VCF compressed with bgzip. `POST /api/uploads` stores each file in chunks under the
 `UPLOAD_MAX_MB` cap and checks it on arrival; the dialog shows the check and holds the job until
 every file passes. A job copies the files it uses into its own directory.
 
-The Gene expression step takes a table of genes by samples, uploaded with the kind `expression`.
+The Expression step of the dialog takes a table of genes by samples, uploaded with the kind
+`expression`. The Your own table card of the Gene expression step of the form opens the dialog
+on that step.
 The check lists the samples and states that the values are whole numbers or not. The request
 names the upload in `expression_upload`, the chosen samples in `expression_columns` and counts
 or values in `expression_kind`. The job is private, as a job with any other upload is.

@@ -972,7 +972,7 @@ select.value-box {
   font: inherit;
 }
 
-/* The uploaded expression table under the cards, and its samples in the dialog. */
+/* The uploaded expression table under the cards. */
 .upload.own-table {
   font-size: 13px;
 }
@@ -989,34 +989,4 @@ select.value-box {
 
 .own-table .icon-button {
   margin-left: 6px;
-}
-
-.own-samples {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  max-height: 132px;
-  margin: 0;
-  padding: 8px 12px;
-  overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-.own-samples legend {
-  padding: 0 4px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.own-sample {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
-.expression-dialog {
-  width: min(720px, 100%);
 }

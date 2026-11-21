@@ -20,7 +20,7 @@ export type UploadResult = {
 export type OwnExpression = { upload: UploadResult; columns: string[]; kind: 'counts' | 'values' }
 
 /**
- * The uploads a job uses in place of the data of a listed cell type. On your own cell type
+ * The uploads a job uses in place of the data of a listed cell type, and its expression table. On your own cell type
  * loopsFrom and enhancersFrom give a listed cell type whose loops or enhancers it takes,
  * enhancersFrom none for no enhancers.
  */
@@ -31,6 +31,8 @@ export type OwnChoice = {
   enhancers: UploadResult | null
   loopsFrom?: string
   enhancersFrom?: string
+  /** An expression table with the samples the job takes from it. */
+  expression?: OwnExpression | null
 }
 
 export const NO_OWN: OwnChoice = { loops: [], anchors: null, contacts: null, enhancers: null }
@@ -43,6 +45,7 @@ export function ownData(own: OwnChoice): string[] {
     ...(own.loopsFrom ? [`${own.loopsFrom} loops`] : []),
     ...(own.contacts ? ['contacts'] : []),
     ...(own.enhancers ? ['enhancers'] : own.enhancersFrom && own.enhancersFrom !== 'none' ? [`${own.enhancersFrom} enhancers`] : []),
+    ...(own.expression ? ['RNA-seq'] : []),
   ]
 }
 

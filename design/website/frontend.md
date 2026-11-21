@@ -47,7 +47,7 @@ directory as `explore_<name>.json`.
 
 Step 5 of the form, Gene expression, is optional. It lists the hosted tables that
 `GET /api/expression?cell=&sv_set=&sample=` returns for the cell type and the sample, and a card
-for a table of the user. A job with expression has an Expression column in the Genes tab. The
+for a table of the user, which opens the Your own data dialog on its Expression step. A job with expression has an Expression column in the Genes tab. The
 compare view of two such jobs reads `GET /api/compare/expression?a=&b=` and shows the change of
 expression of each gene against the change of its distance to the nearest enhancer, as a plot and
 a table. `design/website/data.md` has the tables and the comparison.

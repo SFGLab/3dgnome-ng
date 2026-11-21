@@ -119,8 +119,8 @@ describe('Your own data dialog', () => {
   it('lists four steps in a side panel, each naming what the job will use', () => {
     renderDialog()
     const steps = screen.getAllByRole('tab')
-    expect(steps.map((t) => t.querySelector('.step-title')?.textContent)).toEqual(['Loops', 'Anchors', 'Contacts', 'Enhancers'])
-    expect(steps.map((t) => t.querySelector('.step-uses')?.textContent)).toEqual(['the listed sets', 'the loop ends', "the cell type's Hi-C", "the cell type's"])
+    expect(steps.map((t) => t.querySelector('.step-title')?.textContent)).toEqual(['Loops', 'Anchors', 'Contacts', 'Enhancers', 'Expression'])
+    expect(steps.map((t) => t.querySelector('.step-uses')?.textContent)).toEqual(['the listed sets', 'the loop ends', "the cell type's Hi-C", "the cell type's", 'none'])
     expect(screen.getByRole('tablist')).toHaveAttribute('aria-orientation', 'vertical')
   })
 
@@ -144,7 +144,10 @@ describe('Your own data dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.getByRole('tab', { name: /Enhancers/ })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByRole('tab', { name: /Expression/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     expect(screen.getByRole('tab', { name: /Contacts/ })).toHaveAttribute('aria-selected', 'true')
   })

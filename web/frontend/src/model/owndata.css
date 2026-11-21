@@ -398,6 +398,33 @@
   font: 13px var(--font);
 }
 
+/* The samples of an expression table, to tick the ones a job takes. */
+.own-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  max-height: 132px;
+  margin: 0;
+  padding: 8px 12px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.own-samples legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.own-sample {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
 .routes {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

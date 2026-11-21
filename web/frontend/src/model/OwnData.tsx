@@ -3,14 +3,14 @@ import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, Squ
 import { useEffect, useRef, useState } from 'react'
 import type { Region } from '../api'
 import { readHicWindow } from './hicLocal'
-import { guessFactor, LinkRefused, megabytes, NO_OWN, type OwnChoice, type UploadKind, type UploadResult, uploadFile, uploadLink, uploadPreview } from './upload'
+import { guessFactor, LinkRefused, megabytes, NO_OWN, type OwnChoice, type OwnExpression, type UploadKind, type UploadResult, uploadFile, uploadLink, uploadPreview } from './upload'
 import '../styles/dialog.css'
 import './owndata.css'
 
-export type OwnTab = 'loops' | 'anchors' | 'contacts' | 'enhancers'
+export type OwnTab = 'loops' | 'anchors' | 'contacts' | 'enhancers' | 'expression'
 
 /** One uploaded file in the dialog: checking, checked, or refused by the server. */
-export type Entry = { key: number; factor: string; name: string; size: number; result?: UploadResult; failure?: string; fix?: string }
+type Entry = { key: number; factor: string; name: string; size: number; result?: UploadResult; failure?: string; fix?: string }
 
 const fromResult = (key: number, factor: string, r: UploadResult): Entry => ({ key, factor, name: r.name, size: r.size, result: r })
 const passed = (e: Entry | null) => !e || !!e.result?.ok
@@ -20,7 +20,7 @@ const W = 780
 const H = 120
 const AXIS = 60
 
-export function CheckLine({ entry }: { entry: Entry }) {
+function CheckLine({ entry }: { entry: Entry }) {
   if (entry.failure) {
     return (
       <p className="check bad">
@@ -47,7 +47,7 @@ export function CheckLine({ entry }: { entry: Entry }) {
   )
 }
 
-export function FileChip({ entry }: { entry: Entry }) {
+function FileChip({ entry }: { entry: Entry }) {
   return (
     <span className="file-chip">
       <FileText size={14} aria-hidden />
@@ -89,7 +89,7 @@ function OwnPreview({ cell, region, loops }: { cell: string; region: Region; loo
 }
 
 /** What a step takes: a sentence or two and the columns of the file on a line of their own. */
-export function Rule({ text, columns }: { text: string; columns?: string }) {
+function Rule({ text, columns }: { text: string; columns?: string }) {
   return (
     <div className="rule">
       <p>{text}</p>
@@ -136,8 +136,8 @@ const ENH_SOURCES: [EnhSource, string, string][] = [
 ]
 
 const CONTACT_RES = 25_000
-const STEPS: OwnTab[] = ['loops', 'anchors', 'contacts', 'enhancers']
-const STEP_TITLE: Record<OwnTab, string> = { loops: 'Loops', anchors: 'Anchors', contacts: 'Contacts', enhancers: 'Enhancers' }
+const STEPS: OwnTab[] = ['loops', 'anchors', 'contacts', 'enhancers', 'expression']
+const STEP_TITLE: Record<OwnTab, string> = { loops: 'Loops', anchors: 'Anchors', contacts: 'Contacts', enhancers: 'Enhancers', expression: 'Expression' }
 type Route = 'link' | 'local' | 'bedpe'
 const ROUTES: [Route, string, string, typeof Link2][] = [
   ['link', 'Link to a file', '.hic or .mcool', Link2],
@@ -261,8 +261,8 @@ function ContactsTab({
   )
 }
 
-/** The dialog for a job's own data: loops per factor, anchors, contacts and enhancers, each
- * checked by the server on arrival. "Use these loops" hands the checked uploads to the form. */
+/** The dialog for a job's own data: loops per factor, anchors, contacts, enhancers and an
+ * expression table, each checked by the server on arrival. "Use these loops" hands the checked uploads to the form. */
 export function OwnData({
   cell,
   region,
@@ -297,6 +297,10 @@ export function OwnData({
   const borrowed = start.enhancersFrom && start.enhancersFrom !== 'none' ? start.enhancersFrom : ''
   const [enhSource, setEnhSource] = useState<EnhSource>(start.enhancers || !ownCell ? 'upload' : borrowed ? 'listed' : 'none')
   const [enhFrom, setEnhFrom] = useState(borrowed || cells[0] || '')
+  // The expression table, the samples the job takes from it and what its values are.
+  const [table, setTable] = useState<Entry | null>(start.expression ? fromResult(93, '', start.expression.upload) : null)
+  const [samples, setSamples] = useState<string[]>(start.expression?.columns ?? [])
+  const [valueKind, setValueKind] = useState<OwnExpression['kind']>(start.expression?.kind ?? 'counts')
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -322,6 +326,20 @@ export function OwnData({
     setSingle((s) => ({ ...s, [kind]: { key, factor: '', name: file.name, size: file.size } }))
     void send(kind, file, '', (patch) => setSingle((s) => (s[kind]?.key === key ? { ...s, [kind]: { ...s[kind]!, ...patch } } : s)))
   }
+
+  const addTable = (file: File) => {
+    const key = next.current++
+    setTable({ key, factor: '', name: file.name, size: file.size })
+    const put = (patch: Partial<Entry>) => setTable((t) => (t?.key === key ? { ...t, ...patch } : t))
+    uploadFile('expression', file, where)
+      .then((result) => {
+        put({ result })
+        setSamples(result.ok ? result.samples : [])
+        setValueKind(result.counts ? 'counts' : 'values')
+      })
+      .catch((e: Error) => put({ failure: e.message }))
+  }
+  const toggleSample = (sample: string) => setSamples((now) => (table?.result?.samples ?? []).filter((s) => (s === sample ? !now.includes(s) : now.includes(s))))
 
   const putContacts = (key: number) => (patch: Partial<Entry>) => setSingle((s) => (s.contacts?.key === key ? { ...s, contacts: { ...s.contacts, ...patch } } : s))
   const addLink = (url: string) => {
@@ -349,9 +367,10 @@ export function OwnData({
   }
 
   const kinds = enhSource === 'upload' ? (['anchors', 'contacts', 'enhancers'] as const) : (['anchors', 'contacts'] as const)
-  const blocking = [...loops.map((l) => [l, `${l.factor} file`] as const), ...kinds.map((k) => [single[k], `${k} file`] as const)].find(([e]) => !passed(e) && !pending(e))
-  const checking = loops.some(pending) || Object.values(single).some(pending)
-  const anything = loops.length > 0 || Object.values(single).some(Boolean) || (ownCell && enhSource === 'listed')
+  const blocking = [...loops.map((l) => [l, `${l.factor} file`] as const), ...kinds.map((k) => [single[k], `${k} file`] as const), [table, 'expression table'] as const].find(([e]) => !passed(e) && !pending(e))
+  const checking = loops.some(pending) || Object.values(single).some(pending) || pending(table)
+  const anything = loops.length > 0 || Object.values(single).some(Boolean) || !!table || (ownCell && enhSource === 'listed')
+  const noSample = !!table?.result?.ok && samples.length === 0
   const use = () =>
     onUse({
       loops: loops.map((l) => ({ factor: l.factor.trim() || 'loops', upload: l.result! })),
@@ -360,6 +379,7 @@ export function OwnData({
       enhancers: enhSource === 'upload' ? (single.enhancers?.result ?? null) : null,
       loopsFrom: start.loopsFrom,
       enhancersFrom: ownCell ? (enhSource === 'listed' ? enhFrom : enhSource === 'none' ? 'none' : undefined) : undefined,
+      expression: table?.result?.ok ? { upload: table.result, columns: samples, kind: valueKind } : null,
     })
 
   // Each step's subtitle names what the job will use from it, in one form for all four.
@@ -369,6 +389,7 @@ export function OwnData({
     anchors: named(single.anchors) ?? 'the loop ends',
     contacts: named(single.contacts) ?? (ownCell ? 'needed' : "the cell type's Hi-C"),
     enhancers: !ownCell ? (named(single.enhancers) ?? "the cell type's") : enhSource === 'upload' ? (named(single.enhancers) ?? 'none') : enhSource === 'listed' ? enhFrom : 'none',
+    expression: named(table) ?? 'none',
   }
   const at = STEPS.indexOf(active)
 
@@ -489,17 +510,76 @@ export function OwnData({
                 onRemove={() => setSingle((s) => ({ ...s, enhancers: null }))}
               />
             )}
+            {active === 'expression' && (
+              <div className="own-tab">
+                <Rule
+                  text="One table of genes by samples, separated by tabs or commas, for the Genes tab and the comparison of two jobs. The first column holds the gene as an Ensembl id or a gene name. Every other column of numbers is a sample. A column named length is optional and gives the gene length in bp. The output of featureCounts is read as it is. Without a table the job has the expression chosen in the form."
+                  columns="gene length sample_1 sample_2"
+                />
+                {table ? (
+                  <div className={`factor-row${table.failure || table.result?.ok === false ? ' bad' : ''}`} role="group" aria-label="expression file">
+                    <div className="row-head">
+                      <FileChip entry={table} />
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`Remove ${table.name}`}
+                        onClick={() => {
+                          setTable(null)
+                          setSamples([])
+                        }}
+                      >
+                        <Trash2 size={15} aria-hidden />
+                      </button>
+                    </div>
+                    <CheckLine entry={table} />
+                  </div>
+                ) : (
+                  <label className="add-file">
+                    <Upload size={14} aria-hidden /> Choose an expression file
+                    <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && addTable(e.target.files[0])} />
+                  </label>
+                )}
+                {table?.result?.ok && (
+                  <>
+                    <fieldset className="own-samples">
+                      <legend>Samples of this job</legend>
+                      {table.result.samples.map((s) => (
+                        <label key={s} className="own-sample">
+                          <input type="checkbox" checked={samples.includes(s)} onChange={() => toggleSample(s)} />
+                          {s}
+                        </label>
+                      ))}
+                    </fieldset>
+                    <label className="own-select">
+                      <span>The values are</span>
+                      <select value={valueKind} onChange={(e) => setValueKind(e.target.value === 'values' ? 'values' : 'counts')}>
+                        <option value="counts">read counts</option>
+                        <option value="values">normalised, such as TPM or TMM</option>
+                      </select>
+                    </label>
+                    <p className="hint">
+                      {valueKind === 'counts'
+                        ? 'Two jobs with two samples or more each are compared with DESeq2. With one sample on a side the comparison is a ratio with no test.'
+                        : 'Two jobs with normalised values are compared by the ratio of their values, with no test.'}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <footer className="dialog-foot">
-          <p className={`foot-note${blocking ? ' bad' : ''}`}>
+          <p className={`foot-note${blocking || noSample ? ' bad' : ''}`}>
             {blocking
               ? `Fix or remove the ${blocking[1]} to continue.`
-              : checking
-                ? 'Checking the files.'
-                : active === 'contacts' && !ownCell
-                  ? "The map replaces the cell type's map for this job."
-                  : ''}
+              : noSample
+                ? 'Choose one sample or more of the expression table.'
+                : checking
+                  ? 'Checking the files.'
+                  : active === 'contacts' && !ownCell
+                    ? "The map replaces the cell type's map for this job."
+                    : ''}
           </p>
           <button type="button" className="secondary" onClick={onClose}>
             Cancel
@@ -510,7 +590,7 @@ export function OwnData({
           <button type="button" className="secondary" disabled={at === STEPS.length - 1} onClick={() => setActive(STEPS[at + 1])}>
             Next
           </button>
-          <button type="button" className="primary" disabled={!!blocking || checking || !anything} onClick={use}>
+          <button type="button" className="primary" disabled={!!blocking || checking || noSample || !anything} onClick={use}>
             Use this data
           </button>
         </footer>

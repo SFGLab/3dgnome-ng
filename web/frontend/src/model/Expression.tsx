@@ -27,7 +27,7 @@ const samples = (n: number) => (n === 1 ? '1 sample' : `${n} samples`)
 /**
  * The step of the form for gene expression, off unless a source is chosen. The job then shows
  * the expression of each gene, and the comparison of two jobs shows the change of expression
- * beside the change of the 3D distance. A table of the user comes through its dialog.
+ * beside the change of the 3D distance. A table of the user comes through the dialog for own data.
  */
 export function Expression({ options, value, cell, onChange, own, onOpen, onRemove }: Props) {
   const chosen = options.find((o) => o.id === value)
