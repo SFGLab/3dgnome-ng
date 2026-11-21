@@ -10,63 +10,11 @@
   padding: 48px 96px 40px;
 }
 
-/* The sign: 404 folded from one chain, on the page itself. Its digits have the colour of the site. */
-.not-found-sign {
-  display: block;
-  width: min(100%, 420px);
-  height: auto;
-  margin: 0 0 4px -14px;
-  animation: fold-in 0.5s ease-out;
-}
-
-.not-found-sign path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.not-found-sign .edge {
-  stroke: var(--bg);
-  stroke-width: 22;
-}
-
-.not-found-sign .strand {
-  stroke-width: 12;
-}
-
-.not-found-sign .strand.far {
-  stroke: var(--muted);
-}
-
-.not-found-sign .strand.near {
-  stroke: var(--accent);
-}
-
-/* A farther strand is fainter, as in the drawings of the structures. */
-.not-found-sign .strand.far.step0 { opacity: 0.22; }
-.not-found-sign .strand.far.step1 { opacity: 0.32; }
-.not-found-sign .strand.far.step2 { opacity: 0.42; }
-.not-found-sign .strand.near.step3 { opacity: 0.72; }
-.not-found-sign .strand.near.step4 { opacity: 0.86; }
-.not-found-sign .strand.near.step5 { opacity: 1; }
-
-.not-found-sign .strand.end {
-  stroke-width: 20;
-}
-
-.not-found-sign .strand.end.promoter {
-  stroke: var(--promoter);
-}
-
-.not-found-sign .strand.end.enhancer {
-  stroke: var(--enhancer);
-}
-
-@keyframes fold-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
+.not-found-code {
+  margin: 0;
+  color: var(--accent);
+  font: 700 76px/1 var(--mono);
+  letter-spacing: -2px;
 }
 
 .not-found h1 {
@@ -159,10 +107,6 @@
 @media (prefers-reduced-motion: reduce) {
   .not-found-figure .chain {
     stroke-dashoffset: 0;
-    animation: none;
-  }
-
-  .not-found-sign {
     animation: none;
   }
 }

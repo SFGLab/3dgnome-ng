@@ -8,7 +8,7 @@ export function CiteStrip() {
   return (
     <footer className="cite-strip">
       <Quote size={14} aria-hidden />
-      <p>If you use these models, please cite 3D-GNOMEᴺᴳ and the method and data papers on the Cite page.</p>
+      <p>If you use any structures, figures or data produced on this website, please cite 3D-GNOMEᴺᴳ and the method and data papers on the Cite page.</p>
       <a className="cite-button" href="https://github.com/SFGLab/3dgnome-ng">
         <Code size={13} aria-hidden /> Source code
       </a>
