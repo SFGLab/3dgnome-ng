@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
@@ -157,12 +158,31 @@ def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, ce
     return genes, pd.concat([enh[(enh[1] >= 0) & (enh[2] > 0)], second], ignore_index=True)
 
 
+# Starts a command on a set of cores: the cores as the first argument, the command after it. The
+# process takes the cores and becomes the command, and every thread of the command has them.
+_ON_CORES = "import os, sys; os.sched_setaffinity(0, {int(c) for c in sys.argv[1].split(',')}); os.execvp(sys.argv[2], sys.argv[2:])"
+
+
+def on_cores(cmd: list[str], cores: list[int] | None) -> list[str]:
+    """Returns the command that runs `cmd` on `cores` alone, `cmd` itself for no cores or on a
+    system that cannot pin a process."""
+    if not cores or not hasattr(os, "sched_setaffinity"):
+        return cmd
+    return [sys.executable, "-c", _ON_CORES, ",".join(str(c) for c in cores), *cmd]
+
+
 def run_job(
-    req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | None = None, env_extra: dict[str, str] | None = None
+    req: JobRequest,
+    catalog: Catalog,
+    job: Path,
+    engine: list[str] | None = None,
+    env_extra: dict[str, str] | None = None,
+    cores: list[int] | None = None,
 ) -> Path:
     """Run one job in `job` and return that directory. `engine` is the command that starts
     the engine, `python -m gnome3d.cli` from `ENGINE_PYTHON` by default. `env_extra` is added to
-    the engine's environment, the GPU of a queue slot for example."""
+    the engine's environment, the GPU of a queue slot for example. `cores` are the cores the
+    engine runs on, every core of this process when None."""
     job.mkdir(parents=True, exist_ok=True)
     write_json(job / "request.json", asdict(req))
     _status(job, state="running", stage="inputs", started=time.time())
@@ -208,7 +228,7 @@ def run_job(
             if kept:
                 fh.write(f"\nThe job was started again and goes on after {kept} of {req.n_models} structures.\n")
                 fh.flush()
-            rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, cwd=env.get("ENGINE_ROOT"), env=env).returncode
+            rc = subprocess.run(on_cores(cmd, cores), stdout=fh, stderr=subprocess.STDOUT, cwd=env.get("ENGINE_ROOT"), env=env).returncode
         if rc != 0:
             raise RuntimeError(f"the engine exited with {rc}")
 

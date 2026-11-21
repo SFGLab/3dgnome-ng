@@ -1,6 +1,6 @@
 """Stands in for `python -m gnome3d.cli` in tests: writes N straight chain cifs over the region,
 or fails when the region starts with chr9. FAKE_ENGINE_SLEEP holds it for that many seconds and
-FAKE_ENGINE_TRACE receives its start, end and CUDA_VISIBLE_DEVICES."""
+FAKE_ENGINE_TRACE receives its start, end, CUDA_VISIBLE_DEVICES and the cores it may use."""
 
 from __future__ import annotations
 
@@ -33,5 +33,6 @@ for k in range(n):
     write_cif(str(out / f"{chrom}_{a}_{b}_s{k + 1}.cif"), beads)
 if trace:
     with open(trace, "a") as fh:
-        fh.write(f"{start} {time.time()} {os.environ.get('CUDA_VISIBLE_DEVICES', '')}\n")
+        cores = ",".join(str(c) for c in sorted(os.sched_getaffinity(0))) if hasattr(os, "sched_getaffinity") else "-"
+        fh.write(f"{start} {time.time()} {os.environ.get('CUDA_VISIBLE_DEVICES', '')} {cores}\n")
 print(f"wrote {n} structures")

@@ -1,8 +1,15 @@
-"""Running jobs: rq workers, or a local pool of slots in the web process, one GPU per slot."""
+"""Running jobs: rq workers, or a local pool of slots in the web process, one GPU per slot.
+
+The engine of a job of the local pool runs on a set of cores of its slot, `slot_cores`: the
+cores of the server divided by the slots, or `limits.cores_per_job` of config.json. Two jobs at
+once then do not share cores. An engine takes as many threads as it has cores.
+"""
 
 from __future__ import annotations
 
 import json
+import logging
+import os
 import queue
 import shutil
 import threading
@@ -14,15 +21,63 @@ from pathlib import Path
 from .catalog import Catalog
 from .jobs import JobRequest, run_job, write_json
 from .settings import Settings
+from .siteconfig import ConfigError, ConfigFile
+
+log = logging.getLogger(__name__)
 
 
-def work(req_dict: dict[str, object], job_dir: str, gpu: str | None = None, engine: list[str] | None = None) -> str:
+def server_cores() -> list[int]:
+    """The cores this process may use, in order. Empty on a system that cannot pin a process."""
+    return sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else []
+
+
+def slot_cores(cores: list[int], slot: int, slots: int, per_job: int | None = None) -> list[int]:
+    """The cores of the job that runs on one slot.
+
+    Each slot has the next `per_job` cores of the server. With more cores asked for than the
+    server has for every slot, the sets of the slots overlap. A `per_job` of all the cores gives
+    every job the whole server.
+
+    Parameters
+    ----------
+    cores
+        The cores of the server.
+    slot
+        The index of the slot, from 0.
+    slots
+        The number of slots of the queue.
+    per_job
+        The cores of one job. None divides the cores by the slots.
+    """
+    n = len(cores)
+    if n == 0:
+        return []
+    count = min(n, per_job) if per_job else max(1, n // max(slots, 1))
+    first = (slot * count) % n
+    return sorted(cores[(first + k) % n] for k in range(count))
+
+
+def _cores_per_job(s: Settings) -> int | None:
+    """`limits.cores_per_job` of the site's config.json as it is now, None when it is not set."""
+    try:
+        return ConfigFile(s.site_config or s.data_dir / "config.json").get().cores_per_job
+    except ConfigError as e:
+        log.error("%s The job gets the cores of the server divided by the slots.", e)
+        return None
+
+
+def work(
+    req_dict: dict[str, object], job_dir: str, gpu: str | None = None, engine: list[str] | None = None, slot: tuple[int, int] | None = None
+) -> str:
     """The function a worker runs, with everything it needs read from the environment. `gpu`
-    is the only GPU the engine sees, all of the worker's GPUs when None."""
+    is the only GPU the engine sees, all of the worker's GPUs when None. `slot` is the index of
+    the slot of the local pool and the number of its slots, and gives the engine the cores of
+    that slot. Without it the engine has every core of the worker."""
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
     extra = {"CUDA_VISIBLE_DEVICES": gpu} if gpu is not None else None
-    run_job(JobRequest(**req_dict), catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=extra)  # type: ignore[arg-type]
+    cores = slot_cores(server_cores(), slot[0], slot[1], _cores_per_job(s)) if slot else []
+    run_job(JobRequest(**req_dict), catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=extra, cores=cores or None)  # type: ignore[arg-type]
     return job_dir
 
 
@@ -34,14 +89,14 @@ class LocalPool:
     def __init__(self, slots: list[str], engine: list[str] | None = None) -> None:
         self._jobs: queue.Queue[tuple[dict[str, object], str]] = queue.Queue()
         self._engine = engine
-        for gpu in slots:
-            threading.Thread(target=self._serve, args=(gpu,), daemon=True).start()
+        for i, gpu in enumerate(slots):
+            threading.Thread(target=self._serve, args=(gpu, (i, len(slots))), daemon=True).start()
 
-    def _serve(self, gpu: str) -> None:
+    def _serve(self, gpu: str, slot: tuple[int, int]) -> None:
         while True:
             req_dict, job_dir = self._jobs.get()
             try:
-                work(req_dict, job_dir, gpu, self._engine)
+                work(req_dict, job_dir, gpu, self._engine, slot)
             except Exception:  # noqa: BLE001
                 # A job that raises before run_job records it must not end the slot.
                 traceback.print_exc()

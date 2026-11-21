@@ -25,7 +25,7 @@ the limits of a job. The server reads the file again when it changes. An edit ne
 and no build.
 
     {"features": {"results": true, "method": true, "trios": false},
-     "limits": {"region_mb": 20, "hicdiffusion_mb": 2}}
+     "limits": {"region_mb": 20, "hicdiffusion_mb": 2, "cores_per_job": 18}}
 
 | key | default | meaning |
 |---|---|---|
@@ -33,11 +33,19 @@ and no build.
 | `features.trios` | on | the nine people on the Results page |
 | `limits.region_mb` | `MAX_REGION_MB`, 20 | the longest region of a job, in Mb |
 | `limits.hicdiffusion_mb` | 2 | the longest region of a job with a HiCDiffusion background, in Mb, 2.097152 at most |
+| `limits.cores_per_job` | the cores of the server divided by the slots of `GPU_SLOTS` | the cores the engine of one job runs on, with the `thread` queue |
 
 HiCDiffusion predicts one window of 2,097,152 bp of the haplotype. A longer region would get the
 prediction on its first part alone, and the file is refused with a higher limit. The default
 of 2 Mb leaves room for insertions. The form, the title page and the refusals of the server
 state the limits of the file.
+
+The `thread` queue runs one job per slot of `GPU_SLOTS` at once and an engine takes as many threads
+as it has cores. Each slot has a set of cores of its own, the next `cores_per_job` cores of the
+server, and the engine of its job is started on that set. With two slots on a server of 36 cores a
+job has 18 and two jobs at once share none. A count above that share makes the sets overlap, and
+the number of cores of the server gives every job all of them. The value is read when a job starts.
+A job that runs keeps the cores it started on. The `rq` queue does not set the cores of a job.
 
 A site does not start on a file with an unknown key, feature or limit. A broken edit of a
 running site is logged and the configuration it had stays.
