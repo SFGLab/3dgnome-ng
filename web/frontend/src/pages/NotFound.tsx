@@ -2,12 +2,46 @@ import { ArrowRight, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../routes'
-import { SIZE, walk } from './chainWalk'
+import { fold404, HEIGHT, LAYERS, piece, SIZE, walk, WIDTH } from './chainWalk'
 import './notfound.css'
 
 const STEPS = 404
 
-/** The page of an address the site does not have: a chain of 404 steps folded at random, and the ways back. */
+/** Beads either side of an end of the digits drawn in its colour, as a promoter and an enhancer are. */
+const REACH = 5
+
+/** The sign of the page: the number 404 folded from one chain, the digits as the nearer strands. */
+function Sign({ fold }: { fold: number }) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const beads = useMemo(() => fold404(), [fold])
+  const far: string[] = Array.from({ length: LAYERS }, () => '')
+  const near: string[] = Array.from({ length: LAYERS }, () => '')
+  for (let i = 0; i + 1 < beads.length; i++) (beads[i].digit && beads[i + 1].digit ? near : far)[Math.max(beads[i].layer, beads[i + 1].layer)] += piece(beads, i)
+  const first = beads.findIndex((b) => b.digit)
+  const last = beads.length - 1 - [...beads].reverse().findIndex((b) => b.digit)
+  const mark = (at: number) =>
+    Array.from({ length: 2 * REACH }, (_, k) => at - REACH + k)
+      .filter((i) => i >= 0 && i + 1 < beads.length)
+      .map((i) => piece(beads, i))
+      .join('')
+  return (
+    <svg key={fold} className="not-found-sign" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="404, folded from one chain of beads">
+      {far.map((d, k) => (
+        <g key={k}>
+          <path className="edge" d={d + near[k]} />
+          <path className={`strand far step${k}`} d={d} />
+          <path className={`strand near step${k}`} d={near[k]} />
+        </g>
+      ))}
+      <path className="edge" d={mark(first) + mark(last)} />
+      <path className="strand end promoter" d={mark(first)} />
+      <path className="strand end enhancer" d={mark(last)} />
+    </svg>
+  )
+}
+
+/** The page of an address the site does not have: the sign 404 folded from one chain, a chain of
+ * 404 steps folded at random, and the ways back. */
 export function NotFound() {
   const [fold, setFold] = useState(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -16,12 +50,12 @@ export function NotFound() {
   return (
     <div className="not-found">
       <div className="not-found-text">
-        <p className="not-found-code">404</p>
+        <Sign fold={fold} />
         <h1>No structure at this address</h1>
         <p className="lead">
-          The site has no page here. The link may be mistyped, or it was the link of a private job, which is deleted after 14 days. In its place the page has folded a chain of 404 steps for you, with no loops and no Hi-C
-          to guide it.
+          The link may be mistyped, or it was the link for a private job, that was deleted after 14 days. In its place the page has folded a chain of 404 steps for you using random data. Enjoy.
         </p>
+        <p className="signed">- Nik</p>
         <div className="buttons">
           <Link className="button primary" to={ROUTES.model}>
             Model a real region <ArrowRight size={16} aria-hidden />

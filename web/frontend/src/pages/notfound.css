@@ -1,18 +1,72 @@
+/* The frame of the title page: the content starts at the left edge of that frame. */
 .not-found {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
-  gap: 40px;
+  grid-template-columns: minmax(0, 560px) minmax(0, 440px);
+  justify-content: start;
+  gap: 72px;
   align-items: center;
-  max-width: 1100px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 56px 24px;
+  padding: 48px 96px 40px;
 }
 
-.not-found-code {
-  margin: 0;
-  color: var(--accent);
-  font: 700 76px/1 var(--mono);
-  letter-spacing: -2px;
+/* The sign: 404 folded from one chain, on the page itself. Its digits have the colour of the site. */
+.not-found-sign {
+  display: block;
+  width: min(100%, 420px);
+  height: auto;
+  margin: 0 0 4px -14px;
+  animation: fold-in 0.5s ease-out;
+}
+
+.not-found-sign path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.not-found-sign .edge {
+  stroke: var(--bg);
+  stroke-width: 22;
+}
+
+.not-found-sign .strand {
+  stroke-width: 12;
+}
+
+.not-found-sign .strand.far {
+  stroke: var(--muted);
+}
+
+.not-found-sign .strand.near {
+  stroke: var(--accent);
+}
+
+/* A farther strand is fainter, as in the drawings of the structures. */
+.not-found-sign .strand.far.step0 { opacity: 0.22; }
+.not-found-sign .strand.far.step1 { opacity: 0.32; }
+.not-found-sign .strand.far.step2 { opacity: 0.42; }
+.not-found-sign .strand.near.step3 { opacity: 0.72; }
+.not-found-sign .strand.near.step4 { opacity: 0.86; }
+.not-found-sign .strand.near.step5 { opacity: 1; }
+
+.not-found-sign .strand.end {
+  stroke-width: 20;
+}
+
+.not-found-sign .strand.end.promoter {
+  stroke: var(--promoter);
+}
+
+.not-found-sign .strand.end.enhancer {
+  stroke: var(--enhancer);
+}
+
+@keyframes fold-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
 }
 
 .not-found h1 {
@@ -22,10 +76,16 @@
 }
 
 .not-found .lead {
-  margin: 0 0 22px;
+  margin: 0 0 6px;
   color: var(--muted);
   font-size: 16px;
   line-height: 1.55;
+}
+
+.not-found .signed {
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 16px;
 }
 
 .not-found .buttons {
@@ -101,6 +161,10 @@
     stroke-dashoffset: 0;
     animation: none;
   }
+
+  .not-found-sign {
+    animation: none;
+  }
 }
 
 .not-found-figure figcaption {
@@ -127,9 +191,10 @@
   cursor: pointer;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1000px) {
   .not-found {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 560px);
+    gap: 32px;
     padding: 32px 16px;
   }
 }
