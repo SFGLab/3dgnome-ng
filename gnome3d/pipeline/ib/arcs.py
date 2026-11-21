@@ -77,6 +77,7 @@ def _run_one(problem: Problem, backend: str) -> Result:
                 activity=activity,
                 mids=g[:, 2] if g.ndim == 2 else g,
                 reach=problem.get("reach"),
+                share=problem.get("share"),
             )
         else:
             if problem.get("reach") is not None:

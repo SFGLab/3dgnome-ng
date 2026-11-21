@@ -26,6 +26,7 @@ from gnome3d.pipeline.ib.cells import hold_by_cells, read_cells
 from gnome3d.pipeline.ib.maxent import anchor_draw
 from gnome3d.pipeline.ib.nodes import (
     ContactNodes,
+    chain_share,
     contact_nodes,
     draw_ends,
     node_targets,
@@ -279,6 +280,42 @@ def solve_nodes(
         )
         for b, k, mid in zip(nodes.block, nodes.bead, nodes.mid, strict=True)
     ]
+    share: F64Array | None = None
+    if s.exclusion_arcs_chain_radius != "none":
+        every = m
+        if s.loop_dropout:
+            # The count of nodes of a conformation that keeps every loop, from a draw of its own.
+            _, arcs_all = cb.active_arcs(state, active_all, chr_, None)
+            ends_all: I32Array = np.array([(a[0], a[1]) for a in arcs_all], dtype=np.int32).reshape(
+                -1, 2
+            )
+            beads_all = draw_ends(
+                np.concatenate(lo_parts),
+                np.concatenate(hi_parts),
+                ends_all,
+                np.random.default_rng([seed, 12]),
+            )
+            every = int(
+                contact_nodes(
+                    edges, anchor_block, ends_all, beads_all, np.ones(len(arcs_all))
+                ).mid.shape[0]
+            )
+        share = chain_share(
+            nodes.mid, min(int(e[0]) for e in edges), max(int(e[-1]) for e in edges), every
+        )
+        f = np.cbrt(share)
+        log.status(
+            LOG,
+            "joint arcs solve %s: radius from the chain under %s, %d nodes of %d with every loop,"
+            " factor of a node %.2f to %.2f, median %.2f",
+            chr_,
+            s.exclusion_arcs_chain_radius,
+            m,
+            every,
+            float(f.min()),
+            float(f.max()),
+            float(np.median(f)),
+        )
     energy, pos = run_arcs_problem(
         {
             "anchor_pos": pos0,
@@ -290,6 +327,7 @@ def solve_nodes(
             "seed": seed,
             "anchor_genomic": node_genomic,
             "reach": reach_pairs(nodes, bond),
+            "share": share,
         }  # type: ignore[arg-type]
     )
     log.status(

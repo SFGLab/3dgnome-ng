@@ -94,6 +94,21 @@ def contact_nodes(
     )
 
 
+def chain_share(mid: I64Array, start: int, end: int, count: int) -> F64Array:
+    """Returns the chain each node stands for over the mean chain of a node.
+
+    A node stands for the chain from the midpoint to its neighbour before it to the midpoint to
+    its neighbour after it. The first node starts at `start` and the last one ends at `end`, the
+    two ends of the chain of the chromosome. The mean chain of a node is the whole chain over
+    `count`, the number of nodes of a conformation that keeps every loop. The shares sum to
+    `count`.
+    """
+    m = np.asarray(mid, dtype=np.float64)
+    bounds = np.concatenate([[float(start)], 0.5 * (m[:-1] + m[1:]), [float(end)]])
+    share: F64Array = np.diff(bounds) * (max(count, 1) / max(float(end - start), 1.0))
+    return share
+
+
 def node_weights(nodes: ContactNodes, s: Settings) -> F32Array | None:
     """Returns the spring weight of each pair of nodes, the summed strength of its loops to
     `arc_weight_exponent` and one elsewhere. Returns None at exponent zero.

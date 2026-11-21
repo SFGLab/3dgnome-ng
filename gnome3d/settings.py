@@ -165,6 +165,7 @@ class Settings:
     mc_neighbour_grid: bool
     exclusion_radius_arcs: float
     exclusion_arcs_cap: str
+    exclusion_arcs_chain_radius: str
     arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
     exclusion_radius_heatmap: float
@@ -407,6 +408,7 @@ class Settings:
         self.mc_neighbour_grid = True
         self.exclusion_radius_arcs = 0.0
         self.exclusion_arcs_cap = "none"
+        self.exclusion_arcs_chain_radius = "none"
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
@@ -813,6 +815,14 @@ class Settings:
                 "[excluded_volume] arcs_cap must be none or target, got"
                 f" {self.exclusion_arcs_cap!r}"
             )
+        self.exclusion_arcs_chain_radius = gets(
+            "excluded_volume", "arcs_chain_radius", self.exclusion_arcs_chain_radius
+        )
+        if self.exclusion_arcs_chain_radius not in ("none", "product", "sum"):
+            raise ValueError(
+                "[excluded_volume] arcs_chain_radius must be none, product or sum, got"
+                f" {self.exclusion_arcs_chain_radius!r}"
+            )
         self.arcs_repulsion_cutoff_factor = getf(
             "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
         )
@@ -985,6 +995,12 @@ class Settings:
                 " A node of the uniform chain moves with its two neighbours, which is one rule"
                 " for the fixed beads of the smooth stage, and anchor_cap is another. Set"
                 " anchor_cap to 0."
+            )
+        if self.exclusion_arcs_chain_radius != "none" and not self.uniform_chain:
+            raise ValueError(
+                "[excluded_volume] arcs_chain_radius is set and [main] uniform_chain is off. The"
+                " radius from the chain is stated on the nodes of the uniform chain. Set"
+                " arcs_chain_radius to none or uniform_chain to yes."
             )
         self.smooth_start = gets("simulation_arcs_smooth", "start", self.smooth_start)
         self.smooth_prefetch = geti("simulation_arcs_smooth", "prefetch", self.smooth_prefetch)
