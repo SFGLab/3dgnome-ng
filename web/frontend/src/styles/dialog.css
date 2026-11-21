@@ -1,0 +1,92 @@
+/* The frame of a dialog, shared by the dialogs of the model page and of the sync panel. A
+   component imports this file before its own stylesheet, and a rule of that stylesheet with one
+   class then overrides the frame. */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(20 20 19 / 45%);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, 100%);
+  max-height: calc(100vh - 32px);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+}
+
+.dialog-head {
+  display: flex;
+  align-items: flex-start;
+  padding: 20px 22px 12px;
+}
+
+.dialog-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dialog-sub {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px;
+  overflow-y: auto;
+}
+
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 0 0 14px 14px;
+}
+
+.dialog-foot button {
+  padding: 9px 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dialog-foot .secondary {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.dialog-foot .primary {
+  border: 0;
+  background: var(--accent);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.dialog-foot .primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .dialog-foot {
+    flex-wrap: wrap;
+  }
+}

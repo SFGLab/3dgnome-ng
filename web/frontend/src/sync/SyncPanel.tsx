@@ -1,7 +1,9 @@
 import { Check, Copy, Link2, RefreshCw, Unlink } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRecentJobs } from '../model/useRecentJobs'
 import { createList, formatCode, fullCode, joinLink, joinList, readList, startSync, stopSync, syncNow, syncState, useSyncStatus, type SharedList } from './sync'
+import '../styles/dialog.css'
 import './sync.css'
 
 const clock = new Intl.DateTimeFormat('en-GB', { timeStyle: 'short' })
@@ -19,6 +21,43 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       {copied ? <Check size={14} aria-hidden /> : label === 'Copy link' ? <Link2 size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
       {copied ? 'Copied' : label}
     </button>
+  )
+}
+
+/** Asks before this computer leaves the shared list. Escape and Keep syncing close it. */
+function StopDialog({ code, onStop, onClose }: { code: string; onStop: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onClose])
+  return createPortal(
+    <div className="dialog-backdrop">
+      <div className="dialog sync-dialog" role="dialog" aria-modal="true" aria-labelledby="sync-stop-title">
+        <header className="dialog-head">
+          <div>
+            <h2 id="sync-stop-title">Stop syncing on this computer</h2>
+            <p className="dialog-sub">The jobs stay on this computer and the code keeps working on the others.</p>
+          </div>
+        </header>
+        <div className="dialog-body">
+          <p>Keep a copy of the code if no other computer has it.</p>
+          <div className="sync-code-row">
+            <code className="sync-code">{code}</code>
+            <CopyButton text={code} label="Copy code" />
+          </div>
+        </div>
+        <footer className="dialog-foot">
+          <button type="button" className="secondary" onClick={onStop}>
+            Stop syncing
+          </button>
+          <button type="button" className="primary" autoFocus onClick={onClose}>
+            Keep syncing
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -217,6 +256,9 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
         </code>
         <CopyButton text={sync.code} label="Copy code" />
         <CopyButton text={joinLink(sync.code)} label="Copy link" />
+        <button type="button" className="sync-button" aria-haspopup="dialog" onClick={() => setMode('stop')}>
+          <Unlink size={14} aria-hidden /> Stop syncing on this computer
+        </button>
       </div>
       <p>On another computer, open My jobs, choose Enter a code and type this code. Opening the link there does the same.</p>
       <p>{sync.private ? 'Private jobs are on the shared list. Anyone who has the code can open them.' : 'Private jobs stay on this computer. They are not on the shared list.'}</p>
@@ -228,31 +270,15 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
           </button>
         </p>
       )}
-      {mode === 'stop' ? (
-        <div className="sync-stop">
-          <p>The jobs stay on this computer and the code keeps working on the others. Keep a copy of the code if no other computer has it.</p>
-          <div className="sync-actions">
-            <button
-              type="button"
-              className="sync-button"
-              onClick={() => {
-                stopSync()
-                setMode('closed')
-              }}
-            >
-              Stop syncing
-            </button>
-            <button type="button" className="sync-button" onClick={() => setMode('closed')}>
-              Keep syncing
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="sync-actions">
-          <button type="button" className="sync-button" onClick={() => setMode('stop')}>
-            <Unlink size={14} aria-hidden /> Stop syncing on this computer
-          </button>
-        </div>
+      {mode === 'stop' && (
+        <StopDialog
+          code={sync.code}
+          onStop={() => {
+            stopSync()
+            setMode('closed')
+          }}
+          onClose={() => setMode('closed')}
+        />
       )}
     </section>
   )
