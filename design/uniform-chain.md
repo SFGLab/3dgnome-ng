@@ -1007,6 +1007,51 @@ No structure of 360 per arm has a stretched piece.
 The threshold of 2 with the radius of 3.0 has the SCC of the threshold of 3 at the radius of a bead, with the
 close pairs and the ends of the radius of 3.0. It is a comparison of the sweep of `uniform_sweep8.sh`.
 
+### Sweep at eight structures per arm
+
+`design/figures/uniform-2026-11-19/sweep8a/` and `scores-sweep8a/`, with `scores-sweep8a_10k/` and
+`scores-sweep8a_5k/`, step 1 of `slurm/ensemble/uniform_sweep8.sh`, commit 5636a87. The eighteen rows of the larger
+trial with eight structures per arm, the cells at 5 kb on counts the run does not read. The first five arms are
+the first eight structures of the arms of the larger trial, built at commit f5ec43a. A pooled map of eight
+structures scores lower than one of twenty, and the arms compare within this table alone. Raw and balanced SCC
+per bead pair, with the rows of 18 above the cells at 5 kb with a radius of 3.0 in raw SCC at 25 kb:
+
+| arm | SCC at 25 kb | rows above | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.191, 0.247 | 0 | 0.161, 0.169 | 0.112, 0.105 | 0.502, 0.407, 0.335 | 0.723 | 11.2 | 3.5 | 6 of 144 |
+| radius of a bead | 0.318, 0.324 | 15 | 0.269, 0.235 | 0.205, 0.157 | 0.501, 0.436, 0.374 | 0.671 | 10.1 | 5.5 | 34 of 144 |
+| radius 3.0 | 0.289, 0.311 | | 0.247, 0.225 | 0.190, 0.151 | 0.517, 0.433, 0.366 | 0.715 | 3.2 | 0.6 | 9 of 144 |
+| radius 3.0, `loop_dropout` | 0.326, 0.336 | 16 | 0.263, 0.235 | 0.191, 0.151 | 0.518, 0.447, 0.381 | 0.714 | 2.2 | 0.5 | 13 of 144 |
+| radius 3.0, z 2 | 0.325, 0.341 | 16 | 0.270, 0.243 | 0.203, 0.157 | 0.502, 0.421, 0.359 | 0.717 | 3.4 | 0.5 | 4 of 144 |
+| radius 3.0, cap by the target | 0.298, 0.315 | 12 | 0.257, 0.228 | 0.198, 0.151 | 0.516, 0.433, 0.367 | 0.715 | 4.5 | 0.6 | 9 of 144 |
+| radius 3.0, cap by the chain | 0.292, 0.311 | 10 | 0.248, 0.227 | 0.190, 0.151 | 0.516, 0.433, 0.367 | 0.714 | 3.3 | 0.6 | 9 of 144 |
+| derived radius | 0.295, 0.312 | 13 | 0.249, 0.226 | 0.191, 0.149 | 0.518, 0.436, 0.368 | 0.713 | 3.7 | 0.8 | 9 of 144 |
+| derived radius, cap by the target | 0.303, 0.319 | 14 | 0.259, 0.229 | 0.200, 0.150 | 0.524, 0.438, 0.370 | 0.713 | 4.8 | 0.8 | 7 of 144 |
+| radius 3.0, cap by the target, `loop_dropout` | 0.333, 0.344 | 18 | 0.272, 0.239 | 0.199, 0.155 | 0.517, 0.448, 0.383 | 0.716 | 2.6 | 0.6 | 14 of 144 |
+| radius 2.0 | 0.316, 0.324 | 16 | 0.264, 0.232 | 0.201, 0.154 | 0.525, 0.447, 0.378 | 0.692 | 5.2 | 1.2 | 19 of 144 |
+| radius 3.0, ladder to 25 kb | 0.326, 0.330 | 16 | 0.270, 0.232 | 0.203, 0.151 | 0.515, 0.442, 0.380 | 0.749 | 4.3 | 0.5 | 2 of 144 |
+| radius 3.0, `background_weight` 0.3 | 0.298, 0.317 | 13 | 0.256, 0.228 | 0.198, 0.151 | 0.523, 0.439, 0.370 | 0.709 | 3.8 | 0.9 | 13 of 144 |
+
+No structure has a stretched piece. The radius of gyration is 9.9 bonds with the ladder and 9.1 to 9.4 on the
+other arms.
+
+- The ladder at a radius of 3.0 gains 0.04 of raw and 0.02 of balanced SCC at 25 kb, 0.02 and 0.01 at 10 kb, with
+  the same Spearman at 25 kb and 0.01 more at 10 and 5 kb. It has the highest balanced Pearson of the table, 0.749,
+  and the ends overlap in 2 structures of 144. It has the SCC of the radius of a bead without its close pairs and
+  its overlap of the ends.
+- The cap by the chain does not change a score. The cap by the target gains 0.01 of raw SCC at each resolution, on
+  12 rows of 18 at a radius of 3.0, 12 with the derived radius and 14 under the dropout, and adds 1.3 close pairs
+  per thousand beads next to each other.
+- The derived radius of the default chain scores as the radius of 3.0.
+- The radius of 2.0 has the SCC of the radius of a bead, half of its close pairs and the highest Spearman at
+  25 kb. The ends overlap in 19 structures of 144 against 9 at 3.0 and 34 at the radius of a bead.
+- The dropout and the threshold of 2 each gain 0.04 of raw SCC at 25 kb, as on twenty structures.
+- `background_weight` 0.3 gains 0.01 of raw SCC and has the ends overlap in 13 structures against 9.
+
+The second round, `slurm/ensemble/uniform_sweep8c.sh`, joins the ladder at a radius of 3.0 with the dropout, the
+threshold of 2 and the cap by the target, and tries the ladder up to 50 kb, the ladder at a radius of 2.0 and the
+dropout at a radius of 3.85.
+
 ## Settings
 
 A setting is added when a run reads it.

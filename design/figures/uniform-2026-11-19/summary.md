@@ -70,6 +70,60 @@
 | s_c5k_r3 | ev20q_10k | 18 | 0.279 | 0.256 | 0.270 | 0.243 | 0.278 | 0.255 | 0.485 | 0.682 |  |  |  |
 | default chain | ev20q_10k | 18 | 0.250 | 0.196 | 0.238 | 0.177 | 0.181 | 0.195 | 0.463 | 0.670 |  |  |  |
 
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, eight structures per arm, score at 5k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_c5k | sweep8a_5k | 18 | 0.206 | 0.157 | 0.198 | 0.144 | 0.205 | 0.157 | 0.374 | 0.606 |  |  |  |
+| s_c5k_z2_r3 | sweep8a_5k | 18 | 0.204 | 0.158 | 0.196 | 0.144 | 0.203 | 0.157 | 0.359 | 0.643 |  |  |  |
+| w_r2 | sweep8a_5k | 18 | 0.201 | 0.154 | 0.194 | 0.141 | 0.201 | 0.154 | 0.378 | 0.621 |  |  |  |
+| w_r3_lad | sweep8a_5k | 18 | 0.203 | 0.151 | 0.195 | 0.137 | 0.203 | 0.151 | 0.380 | 0.652 |  |  |  |
+| w_r3_target_drop | sweep8a_5k | 18 | 0.199 | 0.155 | 0.191 | 0.141 | 0.199 | 0.155 | 0.383 | 0.633 |  |  |  |
+| w_auto_target | sweep8a_5k | 18 | 0.201 | 0.151 | 0.193 | 0.137 | 0.200 | 0.150 | 0.370 | 0.637 |  |  |  |
+| w_r3_target | sweep8a_5k | 18 | 0.198 | 0.151 | 0.190 | 0.137 | 0.198 | 0.151 | 0.366 | 0.639 |  |  |  |
+| w_r3_bg03 | sweep8a_5k | 18 | 0.198 | 0.151 | 0.190 | 0.137 | 0.198 | 0.151 | 0.370 | 0.634 |  |  |  |
+| s_c5k_drop_r3 | sweep8a_5k | 18 | 0.191 | 0.152 | 0.183 | 0.138 | 0.191 | 0.151 | 0.381 | 0.631 |  |  |  |
+| s_c5k_r3 | sweep8a_5k | 18 | 0.191 | 0.151 | 0.183 | 0.137 | 0.190 | 0.151 | 0.366 | 0.638 |  |  |  |
+| w_r3_chain | sweep8a_5k | 18 | 0.190 | 0.151 | 0.182 | 0.138 | 0.190 | 0.151 | 0.367 | 0.637 |  |  |  |
+| w_auto | sweep8a_5k | 18 | 0.191 | 0.150 | 0.182 | 0.136 | 0.191 | 0.149 | 0.368 | 0.637 |  |  |  |
+| default chain | sweep8a_5k | 18 | 0.168 | 0.112 | 0.158 | 0.095 | 0.112 | 0.105 | 0.335 | 0.600 |  |  |  |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, eight structures per arm, score at 10k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_c5k_z2_r3 | sweep8a_10k | 18 | 0.272 | 0.244 | 0.263 | 0.233 | 0.270 | 0.243 | 0.421 | 0.691 |  |  |  |
+| w_r3_target_drop | sweep8a_10k | 18 | 0.273 | 0.240 | 0.264 | 0.227 | 0.272 | 0.239 | 0.448 | 0.686 |  |  |  |
+| s_c5k | sweep8a_10k | 18 | 0.270 | 0.236 | 0.262 | 0.225 | 0.269 | 0.235 | 0.436 | 0.648 |  |  |  |
+| w_r3_lad | sweep8a_10k | 18 | 0.271 | 0.233 | 0.262 | 0.220 | 0.270 | 0.232 | 0.442 | 0.707 |  |  |  |
+| s_c5k_drop_r3 | sweep8a_10k | 18 | 0.265 | 0.236 | 0.256 | 0.224 | 0.263 | 0.235 | 0.447 | 0.684 |  |  |  |
+| w_r2 | sweep8a_10k | 18 | 0.265 | 0.233 | 0.256 | 0.222 | 0.264 | 0.232 | 0.447 | 0.666 |  |  |  |
+| w_auto_target | sweep8a_10k | 18 | 0.260 | 0.229 | 0.251 | 0.217 | 0.259 | 0.229 | 0.438 | 0.684 |  |  |  |
+| w_r3_target | sweep8a_10k | 18 | 0.259 | 0.229 | 0.250 | 0.216 | 0.257 | 0.228 | 0.434 | 0.687 |  |  |  |
+| w_r3_bg03 | sweep8a_10k | 18 | 0.257 | 0.228 | 0.248 | 0.216 | 0.256 | 0.228 | 0.439 | 0.681 |  |  |  |
+| w_auto | sweep8a_10k | 18 | 0.251 | 0.227 | 0.241 | 0.214 | 0.249 | 0.226 | 0.436 | 0.684 |  |  |  |
+| w_r3_chain | sweep8a_10k | 18 | 0.250 | 0.227 | 0.241 | 0.215 | 0.248 | 0.227 | 0.433 | 0.685 |  |  |  |
+| s_c5k_r3 | sweep8a_10k | 18 | 0.248 | 0.226 | 0.239 | 0.213 | 0.247 | 0.225 | 0.433 | 0.686 |  |  |  |
+| default chain | sweep8a_10k | 18 | 0.231 | 0.179 | 0.219 | 0.161 | 0.161 | 0.169 | 0.407 | 0.667 |  |  |  |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, eight structures per arm
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| w_r3_target_drop | sweep8a | 18 | 0.338 | 0.349 | 0.331 | 0.340 | 0.333 | 0.344 | 0.517 | 0.716 |  | 2.6 | 0.6 |
+| s_c5k_z2_r3 | sweep8a | 18 | 0.329 | 0.345 | 0.323 | 0.339 | 0.325 | 0.341 | 0.502 | 0.717 |  | 3.4 | 0.5 |
+| s_c5k_drop_r3 | sweep8a | 18 | 0.331 | 0.341 | 0.324 | 0.333 | 0.326 | 0.336 | 0.518 | 0.714 |  | 2.2 | 0.5 |
+| w_r3_lad | sweep8a | 18 | 0.331 | 0.335 | 0.323 | 0.327 | 0.326 | 0.330 | 0.515 | 0.749 |  | 4.3 | 0.5 |
+| s_c5k | sweep8a | 18 | 0.323 | 0.328 | 0.315 | 0.320 | 0.318 | 0.324 | 0.501 | 0.671 |  | 10.1 | 5.5 |
+| w_r2 | sweep8a | 18 | 0.321 | 0.328 | 0.313 | 0.320 | 0.316 | 0.324 | 0.525 | 0.692 |  | 5.2 | 1.2 |
+| w_auto_target | sweep8a | 18 | 0.308 | 0.323 | 0.299 | 0.314 | 0.303 | 0.319 | 0.524 | 0.713 |  | 4.8 | 0.8 |
+| w_r3_bg03 | sweep8a | 18 | 0.303 | 0.321 | 0.294 | 0.312 | 0.298 | 0.317 | 0.523 | 0.709 |  | 3.8 | 0.9 |
+| w_r3_target | sweep8a | 18 | 0.304 | 0.320 | 0.295 | 0.311 | 0.298 | 0.315 | 0.516 | 0.715 |  | 4.5 | 0.6 |
+| w_auto | sweep8a | 18 | 0.300 | 0.317 | 0.292 | 0.309 | 0.295 | 0.312 | 0.518 | 0.713 |  | 3.7 | 0.8 |
+| w_r3_chain | sweep8a | 18 | 0.297 | 0.317 | 0.289 | 0.308 | 0.292 | 0.312 | 0.516 | 0.714 |  | 3.3 | 0.6 |
+| s_c5k_r3 | sweep8a | 18 | 0.294 | 0.316 | 0.286 | 0.308 | 0.289 | 0.311 | 0.517 | 0.715 |  | 3.2 | 0.6 |
+| default chain | sweep8a | 18 | 0.300 | 0.261 | 0.289 | 0.245 | 0.191 | 0.247 | 0.502 | 0.723 |  | 11.2 | 3.5 |
+
 ## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
