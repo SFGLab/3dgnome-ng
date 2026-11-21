@@ -1,6 +1,6 @@
-import { X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ApiError, type Region, type UploadResult, uploadFile, uploadLink } from '../../api'
+import { Dialog } from '../../components/Dialog'
 import { readHicWindow } from '../hicLocal'
 import { guessFactor, NO_OWN, type OwnChoice, type OwnExpression } from '../upload'
 import { ContactsStep } from './ContactsStep'
@@ -9,7 +9,6 @@ import { type Entry, fromResult, named, passed, pending } from './entry'
 import { ExpressionStep } from './ExpressionStep'
 import { LoopsStep } from './LoopsStep'
 import { OneFile } from './parts'
-import '../../styles/dialog.css'
 import './owndata.css'
 
 export type OwnTab = 'loops' | 'anchors' | 'contacts' | 'enhancers' | 'expression'
@@ -62,11 +61,6 @@ export function OwnData({
   const [samples, setSamples] = useState<string[]>(start.expression?.columns ?? [])
   const [valueKind, setValueKind] = useState<OwnExpression['kind']>(start.expression?.kind ?? 'counts')
 
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', esc)
-    return () => window.removeEventListener('keydown', esc)
-  }, [onClose])
 
   /** Puts a file into the slot of its kind and follows its upload: the entry is there at once and
    * the outcome is written into it when it arrives, unless another file took the slot meanwhile. */
@@ -147,101 +141,90 @@ export function OwnData({
   const at = STEPS.indexOf(active)
 
   return (
-    <div className="dialog-backdrop">
-      <div className="dialog own-data" role="dialog" aria-modal="true" aria-labelledby="own-title">
-        <header className="dialog-head">
-          <div>
-            <h2 id="own-title">Your own data</h2>
-            <p className="dialog-sub">Files stay private to this job and are deleted after 14 days.</p>
-          </div>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
-            <X size={18} aria-hidden />
-          </button>
-        </header>
-        <div className="wizard">
-          <div className="wizard-steps" role="tablist" aria-orientation="vertical" aria-label="Steps">
-            {STEPS.map((id, i) => (
-              <button key={id} type="button" role="tab" aria-selected={active === id} onClick={() => setActive(id)}>
-                <span className="step-number" aria-hidden>
-                  {i + 1}
-                </span>
-                <span className="step-text">
-                  <span className="step-title">{STEP_TITLE[id]}</span>
-                  <span className="step-uses">{uses[id]}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="dialog-body" role="tabpanel">
-            {active === 'loops' && <LoopsStep cell={cell} region={region} loops={loops} setLoops={setLoops} addLoops={addLoops} />}
-            {active === 'anchors' && (
-              <OneFile
-                kind="anchors"
-                rule="One BED file. The fourth column is optional and gives the motif orientation, L, R or N. Without a file the anchors are the loop ends, merged where they overlap."
-                columns="chr start end orientation"
-                entry={single.anchors}
-                onFile={(f) => void addSingle('anchors', f)}
-                onRemove={() => remove('anchors')}
-              />
-            )}
-            {active === 'contacts' && (
-              <ContactsStep region={region} maxMb={maxMb} entry={single.contacts} onLink={addLink} onLocal={addLocal} onFile={(f) => void addSingle('contacts', f)} onRemove={() => remove('contacts')} />
-            )}
-            {active === 'enhancers' && (
-              <EnhancersStep
-                ownCell={ownCell}
-                cells={cells}
-                enhSource={enhSource}
-                setEnhSource={setEnhSource}
-                enhFrom={enhFrom}
-                setEnhFrom={setEnhFrom}
-                entry={single.enhancers}
-                onFile={(f) => void addSingle('enhancers', f)}
-                onRemove={() => remove('enhancers')}
-              />
-            )}
-            {active === 'expression' && (
-              <ExpressionStep
-                table={table}
-                samples={samples}
-                valueKind={valueKind}
-                setValueKind={setValueKind}
-                toggleSample={toggleSample}
-                onFile={addTable}
-                onRemove={() => {
-                  remove('expression')
-                  setSamples([])
-                }}
-              />
-            )}
-          </div>
+    <Dialog id="own-title" name="own-data" title="Your own data" sub="Files stay private to this job and are deleted after 14 days." onClose={onClose}>
+      <div className="wizard">
+        <div className="wizard-steps" role="tablist" aria-orientation="vertical" aria-label="Steps">
+          {STEPS.map((id, i) => (
+            <button key={id} type="button" role="tab" aria-selected={active === id} onClick={() => setActive(id)}>
+              <span className="step-number" aria-hidden>
+                {i + 1}
+              </span>
+              <span className="step-text">
+                <span className="step-title">{STEP_TITLE[id]}</span>
+                <span className="step-uses">{uses[id]}</span>
+              </span>
+            </button>
+          ))}
         </div>
-        <footer className="dialog-foot">
-          <p className={`foot-note${blocking || noSample ? ' bad' : ''}`}>
-            {blocking
-              ? `Fix or remove the ${blocking[1]} to continue.`
-              : noSample
-                ? 'Choose one sample or more of the expression table.'
-                : checking
-                  ? 'Checking the files.'
-                  : active === 'contacts' && !ownCell
-                    ? "The map replaces the cell type's map for this job."
-                    : ''}
-          </p>
-          <button type="button" className="secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="secondary" disabled={at === 0} onClick={() => setActive(STEPS[at - 1])}>
-            Back
-          </button>
-          <button type="button" className="secondary" disabled={at === STEPS.length - 1} onClick={() => setActive(STEPS[at + 1])}>
-            Next
-          </button>
-          <button type="button" className="primary" disabled={!!blocking || checking || noSample || !anything} onClick={use}>
-            Use this data
-          </button>
-        </footer>
+        <div className="dialog-body" role="tabpanel">
+          {active === 'loops' && <LoopsStep cell={cell} region={region} loops={loops} setLoops={setLoops} addLoops={addLoops} />}
+          {active === 'anchors' && (
+            <OneFile
+              kind="anchors"
+              rule="One BED file. The fourth column is optional and gives the motif orientation, L, R or N. Without a file the anchors are the loop ends, merged where they overlap."
+              columns="chr start end orientation"
+              entry={single.anchors}
+              onFile={(f) => void addSingle('anchors', f)}
+              onRemove={() => remove('anchors')}
+            />
+          )}
+          {active === 'contacts' && (
+            <ContactsStep region={region} maxMb={maxMb} entry={single.contacts} onLink={addLink} onLocal={addLocal} onFile={(f) => void addSingle('contacts', f)} onRemove={() => remove('contacts')} />
+          )}
+          {active === 'enhancers' && (
+            <EnhancersStep
+              ownCell={ownCell}
+              cells={cells}
+              enhSource={enhSource}
+              setEnhSource={setEnhSource}
+              enhFrom={enhFrom}
+              setEnhFrom={setEnhFrom}
+              entry={single.enhancers}
+              onFile={(f) => void addSingle('enhancers', f)}
+              onRemove={() => remove('enhancers')}
+            />
+          )}
+          {active === 'expression' && (
+            <ExpressionStep
+              table={table}
+              samples={samples}
+              valueKind={valueKind}
+              setValueKind={setValueKind}
+              toggleSample={toggleSample}
+              onFile={addTable}
+              onRemove={() => {
+                remove('expression')
+                setSamples([])
+              }}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      <footer className="dialog-foot">
+        <p className={`foot-note${blocking || noSample ? ' bad' : ''}`}>
+          {blocking
+            ? `Fix or remove the ${blocking[1]} to continue.`
+            : noSample
+              ? 'Choose one sample or more of the expression table.'
+              : checking
+                ? 'Checking the files.'
+                : active === 'contacts' && !ownCell
+                  ? "The map replaces the cell type's map for this job."
+                  : ''}
+        </p>
+        <button type="button" className="secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="secondary" disabled={at === 0} onClick={() => setActive(STEPS[at - 1])}>
+          Back
+        </button>
+        <button type="button" className="secondary" disabled={at === STEPS.length - 1} onClick={() => setActive(STEPS[at + 1])}>
+          Next
+        </button>
+        <button type="button" className="primary" disabled={!!blocking || checking || noSample || !anything} onClick={use}>
+          Use this data
+        </button>
+      </footer>
+    </Dialog>
   )
 }

@@ -1,13 +1,13 @@
 import { asked, type Catalog, type Region, type VariantRow, type UploadResult, uploadFile } from '../api'
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, Upload, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Dialog } from '../components/Dialog'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
 import type { FormState } from './form'
 import { type OwnChoice, ownField } from './upload'
 import { megabytes } from '../lib/format'
-import '../styles/dialog.css'
 import './own/owndata.css'
 import './variants.css'
 
@@ -125,11 +125,6 @@ export function VariantsDialog(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file])
 
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', esc)
-    return () => window.removeEventListener('keydown', esc)
-  }, [onClose])
 
   const source = mode === 'upload' ? (upload?.ok ? upload.id : '') : svSet
   const own = props.own?.loops.length ? props.own : null
@@ -180,144 +175,133 @@ export function VariantsDialog(props: {
   )
 
   return (
-    <div className="dialog-backdrop">
-      <div className="dialog sv-dialog" role="dialog" aria-modal="true" aria-labelledby="sv-title">
-        <header className="dialog-head">
-          <div>
-            <h2 id="sv-title">Structural variants</h2>
-            <p className="dialog-sub">The variants change the loops before modelling. An uploaded VCF stays private to this job.</p>
-          </div>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
-            <X size={18} aria-hidden />
-          </button>
-        </header>
-        <div className="dialog-body sv-body">
-          <div className="segmented" role="tablist">
-            {(
-              [
-                ['hosted', 'Hosted call set'],
-                ['upload', 'Upload a VCF'],
-              ] as const
-            ).map(([id, title]) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={mode === id}
-                disabled={id === 'hosted' && !Object.keys(catalog.sv_sets).length}
-                onClick={() => setMode(id)}
-              >
-                {title}
-              </button>
-            ))}
-          </div>
-          <div className="sv-fields" role="tabpanel">
-            {mode === 'upload' ? (
-              file || upload ? (
-                <span className="file-chip">
-                  <FileArchive size={14} aria-hidden />
-                  <span className="file-name">{file?.name ?? upload?.name}</span>
-                  <span className="file-size">{megabytes(file?.size ?? upload?.size ?? 0)}</span>
-                </span>
-              ) : (
-                <label className="add-file">
-                  <Upload size={14} aria-hidden /> Choose a VCF compressed with bgzip
-                  <input type="file" accept=".gz,.bgz" className="visually-hidden" onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} />
-                </label>
-              )
-            ) : (
-              <label className="field">
-                <span>Call set</span>
-                <select
-                  value={svSet}
-                  onChange={(e) => {
-                    setSvSet(e.target.value)
-                    setSample('')
-                  }}
-                >
-                  {Object.entries(catalog.sv_sets).map(([name, s]) => (
-                    <option key={name} value={name}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {sampleField(mode === 'upload' ? 'Sample, from the VCF header' : 'Sample')}
-            {haplotypeField}
-          </div>
-          {mode === 'upload' && file && !upload && !failure && (
-            <p className="check">
-              <LoaderCircle size={14} aria-hidden className="spin" /> Reading the samples of the VCF.
-            </p>
-          )}
-          {(failure || upload?.ok === false) && (
-            <p className="sv-box bad" role="alert">
-              <CircleAlert size={15} aria-hidden /> {failure || `${upload?.error?.found} ${upload?.error?.fix}`}
-            </p>
-          )}
-          {!span && <p className="hint">Enter the region in step 1 to see the variants inside it.</p>}
-          {check.isError && (
-            <p className="sv-box bad" role="alert">
-              <CircleAlert size={15} aria-hidden /> {check.error.message}
-            </p>
-          )}
-          {check.isFetching && (
-            <p className="check">
-              <LoaderCircle size={14} aria-hidden className="spin" /> Applying the variants to the loops of the region.
-            </p>
-          )}
-          {check.data && region && (
-            <>
-              <p className="sv-box good">
-                <CircleCheck size={15} aria-hidden /> {check.data.summary}
-              </p>
-              <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />
-              {check.data.variants.length > 0 && (
-                <>
-                  <Pager page={variantPage} noun="variants" />
-                  <div className="sv-table-wrap">
-                    <table className="sv-table">
-                      <thead>
-                        <tr>
-                          <th>Type</th>
-                          <th>Position</th>
-                          <th>Length</th>
-                          <th>Genotype</th>
-                          <th>Change to the loops</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {variantPage.rows.map((v, i) => (
-                          <tr key={i}>
-                            <td>
-                              <span className={`sv-dot sv-${v.type.toLowerCase()}`} aria-hidden />
-                              {NAMES[v.type] ?? v.type}
-                            </td>
-                            <td className="mono">{`${region.chrom}:${v.pos.toLocaleString('en-US')}`}</td>
-                            <td>{basePairs(v.length)}</td>
-                            <td className="mono">{v.genotype}</td>
-                            <td>{v.change}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </>
-          )}
+    <Dialog id="sv-title" name="sv-dialog" title="Structural variants" sub="The variants change the loops before modelling. An uploaded VCF stays private to this job." onClose={onClose}>
+      <div className="dialog-body sv-body">
+        <div className="segmented" role="tablist">
+          {(
+            [
+              ['hosted', 'Hosted call set'],
+              ['upload', 'Upload a VCF'],
+            ] as const
+          ).map(([id, title]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={mode === id}
+              disabled={id === 'hosted' && !Object.keys(catalog.sv_sets).length}
+              onClick={() => setMode(id)}
+            >
+              {title}
+            </button>
+          ))}
         </div>
-        <footer className="dialog-foot">
-          <p className="foot-note">The haplotype of a phased genotype decides which variants apply. An unphased variant goes to the first haplotype.</p>
-          <button type="button" className="secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="primary" disabled={!ready} onClick={apply}>
-            {n === undefined ? 'Apply the variants' : `Apply ${n} variant${n === 1 ? '' : 's'}`}
-          </button>
-        </footer>
+        <div className="sv-fields" role="tabpanel">
+          {mode === 'upload' ? (
+            file || upload ? (
+              <span className="file-chip">
+                <FileArchive size={14} aria-hidden />
+                <span className="file-name">{file?.name ?? upload?.name}</span>
+                <span className="file-size">{megabytes(file?.size ?? upload?.size ?? 0)}</span>
+              </span>
+            ) : (
+              <label className="add-file">
+                <Upload size={14} aria-hidden /> Choose a VCF compressed with bgzip
+                <input type="file" accept=".gz,.bgz" className="visually-hidden" onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} />
+              </label>
+            )
+          ) : (
+            <label className="field">
+              <span>Call set</span>
+              <select
+                value={svSet}
+                onChange={(e) => {
+                  setSvSet(e.target.value)
+                  setSample('')
+                }}
+              >
+                {Object.entries(catalog.sv_sets).map(([name, s]) => (
+                  <option key={name} value={name}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {sampleField(mode === 'upload' ? 'Sample, from the VCF header' : 'Sample')}
+          {haplotypeField}
+        </div>
+        {mode === 'upload' && file && !upload && !failure && (
+          <p className="check">
+            <LoaderCircle size={14} aria-hidden className="spin" /> Reading the samples of the VCF.
+          </p>
+        )}
+        {(failure || upload?.ok === false) && (
+          <p className="sv-box bad" role="alert">
+            <CircleAlert size={15} aria-hidden /> {failure || `${upload?.error?.found} ${upload?.error?.fix}`}
+          </p>
+        )}
+        {!span && <p className="hint">Enter the region in step 1 to see the variants inside it.</p>}
+        {check.isError && (
+          <p className="sv-box bad" role="alert">
+            <CircleAlert size={15} aria-hidden /> {check.error.message}
+          </p>
+        )}
+        {check.isFetching && (
+          <p className="check">
+            <LoaderCircle size={14} aria-hidden className="spin" /> Applying the variants to the loops of the region.
+          </p>
+        )}
+        {check.data && region && (
+          <>
+            <p className="sv-box good">
+              <CircleCheck size={15} aria-hidden /> {check.data.summary}
+            </p>
+            <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />
+            {check.data.variants.length > 0 && (
+              <>
+                <Pager page={variantPage} noun="variants" />
+                <div className="sv-table-wrap">
+                  <table className="sv-table">
+                    <thead>
+                      <tr>
+                        <th>Type</th>
+                        <th>Position</th>
+                        <th>Length</th>
+                        <th>Genotype</th>
+                        <th>Change to the loops</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variantPage.rows.map((v, i) => (
+                        <tr key={i}>
+                          <td>
+                            <span className={`sv-dot sv-${v.type.toLowerCase()}`} aria-hidden />
+                            {NAMES[v.type] ?? v.type}
+                          </td>
+                          <td className="mono">{`${region.chrom}:${v.pos.toLocaleString('en-US')}`}</td>
+                          <td>{basePairs(v.length)}</td>
+                          <td className="mono">{v.genotype}</td>
+                          <td>{v.change}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
-    </div>
+      <footer className="dialog-foot">
+        <p className="foot-note">The haplotype of a phased genotype decides which variants apply. An unphased variant goes to the first haplotype.</p>
+        <button type="button" className="secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="primary" disabled={!ready} onClick={apply}>
+          {n === undefined ? 'Apply the variants' : `Apply ${n} variant${n === 1 ? '' : 's'}`}
+        </button>
+      </footer>
+    </Dialog>
   )
 }

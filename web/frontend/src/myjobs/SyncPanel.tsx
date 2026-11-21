@@ -1,10 +1,9 @@
 import { Check, Copy, Link2, RefreshCw, Unlink } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { Dialog } from '../components/Dialog'
 import { useRecentJobs } from './useRecentJobs'
 import { createList, formatCode, fullCode, joinLink, joinList, startSync, stopSync, syncNow, syncState, useSyncStatus } from './sync'
 import { readList, type SharedList } from '../api'
-import '../styles/dialog.css'
 import './sync.css'
 
 const clock = new Intl.DateTimeFormat('en-GB', { timeStyle: 'short' })
@@ -27,38 +26,32 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 
 /** Asks before this computer leaves the shared list. Escape and Keep syncing close it. */
 function StopDialog({ code, onStop, onClose }: { code: string; onStop: () => void; onClose: () => void }) {
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', esc)
-    return () => window.removeEventListener('keydown', esc)
-  }, [onClose])
-  return createPortal(
-    <div className="dialog-backdrop">
-      <div className="dialog sync-dialog" role="dialog" aria-modal="true" aria-labelledby="sync-stop-title">
-        <header className="dialog-head">
-          <div>
-            <h2 id="sync-stop-title">Stop syncing on this computer</h2>
-            <p className="dialog-sub">The jobs stay on this computer and the code keeps working on the others.</p>
-          </div>
-        </header>
-        <div className="dialog-body">
-          <p>Keep a copy of the code if no other computer has it.</p>
-          <div className="sync-code-row">
-            <code className="sync-code">{code}</code>
-            <CopyButton text={code} label="Copy code" />
-          </div>
+  return (
+    <Dialog
+      id="sync-stop-title"
+      name="sync-dialog"
+      title="Stop syncing on this computer"
+      sub="The jobs stay on this computer and the code keeps working on the others."
+      onClose={onClose}
+      closeButton={false}
+      inBody
+    >
+      <div className="dialog-body">
+        <p>Keep a copy of the code if no other computer has it.</p>
+        <div className="sync-code-row">
+          <code className="sync-code">{code}</code>
+          <CopyButton text={code} label="Copy code" />
         </div>
-        <footer className="dialog-foot">
-          <button type="button" className="secondary" autoFocus onClick={onClose}>
-            Keep syncing
-          </button>
-          <button type="button" className="danger" onClick={onStop}>
-            Stop syncing
-          </button>
-        </footer>
       </div>
-    </div>,
-    document.body,
+      <footer className="dialog-foot">
+        <button type="button" className="secondary" autoFocus onClick={onClose}>
+          Keep syncing
+        </button>
+        <button type="button" className="danger" onClick={onStop}>
+          Stop syncing
+        </button>
+      </footer>
+    </Dialog>
   )
 }
 
