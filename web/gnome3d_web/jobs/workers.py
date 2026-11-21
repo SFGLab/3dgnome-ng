@@ -14,7 +14,6 @@ import json
 import logging
 import os
 import queue
-import shutil
 import threading
 import time
 import traceback
@@ -26,7 +25,7 @@ from ..catalog.model import Catalog
 from ..settings import Settings
 from .request import JobRequest
 from .run import run_job
-from .store import write_json
+from .store import queued, write_json
 
 log = logging.getLogger(__name__)
 
@@ -186,7 +185,7 @@ def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
     # finds a waiting job by its status and queues it again.
     job_dir.mkdir(parents=True, exist_ok=True)
     write_json(job_dir / "request.json", asdict(req))
-    write_json(job_dir / "status.json", {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
+    queued(job_dir)
     if s.queue == "inline":
         # Synchronous. A request returns after its job; for development and tests.
         work(asdict(req), str(job_dir))
@@ -223,7 +222,7 @@ def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
         except (OSError, ValueError):
             write_json(st, {"state": "failed", "error": "The site restarted before this job started. Submit it again.", "finished": time.time()})
             continue
-        write_json(st, {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
+        queued(job)
         pool.submit(req, str(job))
         again.append(job.name)
     return again
@@ -232,18 +231,3 @@ def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
 def resume_after_restart(s: Settings) -> list[str]:
     """`resume_interrupted` for the local pool. Other queues keep their jobs through a restart."""
     return resume_interrupted(s.results_dir, _local_pool(s)) if s.queue == "thread" else []
-
-
-def sweep_private(results_dir: Path, retention_days: int) -> list[str]:
-    """Remove private jobs and uploads older than the retention period, as the form promises
-    users and return their names. Shared jobs are never removed here."""
-    gone = []
-    cutoff = time.time() - retention_days * 86400
-    for root in (results_dir / "private", results_dir / "uploads"):
-        if not root.is_dir():
-            continue
-        for d in root.iterdir():
-            if d.is_dir() and d.stat().st_mtime < cutoff:
-                shutil.rmtree(d)
-                gone.append(d.name)
-    return gone

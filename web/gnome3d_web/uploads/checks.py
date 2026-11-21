@@ -49,7 +49,7 @@ def records(path: Path):  # noqa: ANN201
             yield i, s.split()
 
 
-def _int(text: str) -> int | None:
+def whole(text: str) -> int | None:
     return int(text) if re.fullmatch(r"-?\d+", text) else None
 
 
@@ -62,9 +62,9 @@ def _pair(i: int, cols: list[str], what: str) -> Problem | None:
         )
     if len(cols) < 7:
         return Problem(i, f"Line {i} has {len(cols)} columns where 7 are expected.", "Give chr1 start1 end1 chr2 start2 end2 count on every line.")
-    if any(_int(cols[k]) is None for k in (1, 2, 4, 5)):
+    if any(whole(cols[k]) is None for k in (1, 2, 4, 5)):
         return Problem(i, f"Line {i} has a position that is not a whole number.", "Give the starts and ends in base pairs.")
-    if _int(cols[6]) is None:
+    if whole(cols[6]) is None:
         return Problem(i, f"Line {i} has {cols[6]!r} in column 7.", f"Give the {what} as a whole number.")
     return None
 
@@ -101,7 +101,7 @@ def check_loops(path: Path, region: tuple[str, int, int] | None) -> Check:
 def check_anchors(path: Path) -> Check:
     total, first = 0, None
     for i, cols in records(path):
-        if len(cols) < 3 or _int(cols[1]) is None or _int(cols[2]) is None:
+        if len(cols) < 3 or whole(cols[1]) is None or whole(cols[2]) is None:
             return Check(False, error=Problem(i, f"Line {i} is not chr start end.", "Give chr start end and an optional orientation L, R or N."))
         has = len(cols) >= 4
         if first is None:
@@ -133,7 +133,7 @@ def check_contacts(path: Path, region: tuple[str, int, int] | None) -> Check:
 def check_enhancers(path: Path, region: tuple[str, int, int] | None = None) -> Check:
     total = inside = 0
     for i, cols in records(path):
-        if len(cols) < 3 or _int(cols[1]) is None or _int(cols[2]) is None:
+        if len(cols) < 3 or whole(cols[1]) is None or whole(cols[2]) is None:
             return Check(False, error=Problem(i, f"Line {i} is not chr start end.", "Give one enhancer per line, chr start end."))
         total += 1
         if region and cols[0] == region[0] and int(cols[1]) >= region[1] and int(cols[2]) <= region[2]:

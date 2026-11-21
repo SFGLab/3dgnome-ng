@@ -8,7 +8,6 @@ enhancer within 1 Mb of its TSS.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -30,17 +29,6 @@ class Marks:
     promoters: dict[str, int] = field(default_factory=_no_marks)
     enhancers: list[int] = field(default_factory=_no_beads)
     enhancer_centres: list[int] = field(default_factory=_no_beads)
-
-
-def read_cif(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Positions, starts, ends and an anchor mask of a gnome3d cif, in genomic order."""
-    rows = [ln.split() for ln in Path(path).read_text().splitlines() if ln.startswith("ATOM")]
-    pos = np.array([[float(r[10]), float(r[11]), float(r[12])] for r in rows])
-    start = np.array([int(r[16]) for r in rows])
-    end = np.array([int(r[17]) for r in rows])
-    anchor = np.array([r[18] == "anchor" for r in rows])
-    o = np.argsort(start, kind="stable")
-    return pos[o], start[o], end[o], anchor[o]
 
 
 def _nearest(mids: np.ndarray, p: int) -> int | None:

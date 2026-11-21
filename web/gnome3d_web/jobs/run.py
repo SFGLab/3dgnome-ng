@@ -1,5 +1,4 @@
-"""One modelling job, from a request to finished structures and their marks.
-"""
+"""One modelling job, from a request to finished structures and their marks."""
 
 from __future__ import annotations
 
@@ -22,9 +21,9 @@ from ..engine.inputs import Own, build_inputs
 from ..engine.settings import apply_overrides, validate_overrides
 from ..regions import ANY_SPAN, parse_region
 from ..variants.vcf import read_svs
-from .marks import ep_table, mark_beads, read_cif
+from .marks import ep_table, mark_beads
 from .request import JobRequest
-from .store import _member, _status, _tail, write_json
+from .store import member, read_cif, set_status, tail, write_json
 
 
 # After the name of a gene's second copy in a tandem duplication.
@@ -89,7 +88,7 @@ def run_job(
     engine runs on, every core of this process when None."""
     job.mkdir(parents=True, exist_ok=True)
     write_json(job / "request.json", asdict(req))
-    _status(job, state="running", stage="inputs", started=time.time())
+    set_status(job, state="running", stage="inputs", started=time.time())
     log = job / "engine.log"
     try:
         o = req.own
@@ -112,7 +111,7 @@ def run_job(
             svs, skipped = haps[req.haplotype], haps[2]
         hic = None
         if req.background == "hicdiffusion":
-            _status(job, stage="hicdiffusion")
+            set_status(job, stage="hicdiffusion")
             cond = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra)
             hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
             hic = cond, region.start
@@ -130,7 +129,7 @@ def run_job(
                 expression.check_counts(table, columns, str(e["label"]))
             expression.write_job(job, table, columns, {k: e.get(k, "") for k in ("source", "label", "kind", "unit")})
         apply_overrides(inputs.config, validate_overrides(req.overrides))
-        _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
+        set_status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
 
         cmd = list(engine) if engine else [os.environ.get("ENGINE_PYTHON", "python"), "-m", "gnome3d.cli"]
         cmd += ["--config", str(inputs.config), "--region", inputs.region, "--members", f"0-{req.n_models - 1}", "--out", str(job / "models")]
@@ -148,8 +147,8 @@ def run_job(
         if rc != 0:
             raise RuntimeError(f"the engine exited with {rc}")
 
-        _status(job, stage="marks")
-        cifs = sorted((job / "models").glob("*.cif"), key=_member)
+        set_status(job, stage="marks")
+        cifs = sorted((job / "models").glob("*.cif"), key=member)
         models = [read_cif(c) for c in cifs]
         pos0, starts, ends, _ = models[0]
         borrowed = str(o.get("enhancers_from") or "none") if o else "none"
@@ -186,8 +185,8 @@ def run_job(
             )
         )
         ep_table([m[0] for m in models], marks, genes, starts, ends).to_csv(job / "ep.tsv", sep="\t", index=False)
-        _status(job, state="done", stage="done", finished=time.time())
+        set_status(job, state="done", stage="done", finished=time.time())
     except Exception as e:  # noqa: BLE001
-        tail = _tail(log) or traceback.format_exc()
-        _status(job, state="failed", error=f"{type(e).__name__}: {e}", log_tail=tail, finished=time.time())
+        end = tail(log) or traceback.format_exc()
+        set_status(job, state="failed", error=f"{type(e).__name__}: {e}", log_tail=end, finished=time.time())
     return job

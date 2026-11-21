@@ -1,5 +1,4 @@
-"""Two jobs compared: the distance of each gene to its enhancer and the expression.
-"""
+"""Two jobs compared: the distance of each gene to its enhancer and the expression."""
 
 from __future__ import annotations
 
@@ -11,17 +10,18 @@ import pandas as pd
 from scipy.stats import mannwhitneyu
 
 from .. import expression
-from .views import MAX_GAP, _cached, _json, _nearest, _positions, annotations, genes
+from ..jobs import store
+from .views import MAX_GAP, annotations, cached, genes, nearest, positions
 
 
 def _pair_distances(job: Path) -> dict[str, list[float]]:
     """The enhancer to promoter distance of every gene of a job in each of its structures."""
 
     def make() -> dict[str, list[float]]:
-        pos, _ = _positions(job)
+        pos, _ = positions(job)
         return {str(r["gene"]): [round(float(np.linalg.norm(p[r["promoter_bead"]] - p[r["enhancer_bead"]])), 3) for p in pos] for r in genes(job)}
 
-    return _cached(job, "pair_distances", make)
+    return cached(job, "pair_distances", make)
 
 
 def _rank_p(x: list[float], y: list[float]) -> float | None:
@@ -62,11 +62,11 @@ def _pairs(a: Path, b: Path, shared: bool) -> tuple[dict[str, dict[str, object]]
         return out, None
     ea, eb = annotations(a)["enhancers"], annotations(b)["enhancers"]
     centres = sorted({(max(s1, s2) + min(e1, e2)) // 2 for s1, e1 in ea for s2, e2 in eb if s1 < e2 and s2 < e1})  # type: ignore[union-attr]
-    (pa, ma), (pb, mb) = _positions(a), _positions(b)
+    (pa, ma), (pb, mb) = positions(a), positions(b)
     for name in ga.keys() & gb.keys():
         x, y = ga[name], gb[name]
         for c in sorted(centres, key=lambda c: abs(c - int(x["tss"]))):  # type: ignore[call-overload]
-            (ka, oa), (kb, ob) = _nearest(ma, c), _nearest(mb, c)
+            (ka, oa), (kb, ob) = nearest(ma, c), nearest(mb, c)
             if abs(oa) > MAX_GAP or abs(ob) > MAX_GAP:
                 continue
             va = [round(float(np.linalg.norm(q[x["promoter_bead"]] - q[ka])), 3) for q in pa]
@@ -90,7 +90,7 @@ def compare(a: Path, b: Path, shared: bool = False) -> dict[str, object]:
     each job. `differ` counts the genes with another enhancer in b than in a. `shared` and
     `shared_enhancers` say which enhancers were measured, see `_pairs`.
     """
-    ra, rb = _json(a / "status.json").get("region"), _json(b / "status.json").get("region")
+    ra, rb = store.status(a).get("region"), store.status(b).get("region")
     pairs, n_shared = _pairs(a, b, shared)
     rows = []
     for name, pair in pairs.items():

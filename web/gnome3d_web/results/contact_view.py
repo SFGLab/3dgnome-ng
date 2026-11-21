@@ -1,5 +1,4 @@
-"""The contact maps of a job page.
-"""
+"""The contact maps of a job page."""
 
 from __future__ import annotations
 
@@ -12,7 +11,8 @@ import pandas as pd
 from .. import contacts as cm
 from .. import remote
 from ..engine import hicdiffusion
-from .views import ExploreError, _json, _loop_files, _positions, models
+from ..jobs import store
+from .views import ExploreError, loop_files, positions
 
 
 def _read_deep(url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -27,7 +27,7 @@ def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, a
     """A deep map's window on the job's grid. The pixels of the job's whole region are read once
     per resolution and kept in the job directory. Zooming and panning cut windows from them
     instead of reading the remote file again."""
-    status = _json(job / "status.json").get("region") or f"{chrom}:{start}-{end}"
+    status = store.status(job).get("region") or f"{chrom}:{start}-{end}"
     jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(status))
     rs, re_ = (int(jr[2]), int(jr[3])) if jr else (start, end)
     cache = job / f"explore_deep_{chrom}_{rs}_{re_}_{res}.npz"
@@ -66,7 +66,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         raise ExploreError(f"{region!r} is not chr:start-end")
     chrom, start, end = m[1], int(m[2]), int(m[3])
     # The window is cut to the job's region: outside it there are no beads to count.
-    job_region = _json(job / "status.json").get("region") or ""
+    job_region = store.status(job).get("region") or ""
     jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(job_region))
     if jr:
         jc, js, je = jr[1], int(jr[2]), int(jr[3])
@@ -78,9 +78,9 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     if len(cm.bins_for(start, end, res)) > cm.MAX_BINS:
         fit = cm.coarsest_fit(start, end)
         raise ExploreError(f"{region} at {res // 1000} kb is more than {cm.MAX_BINS} bins on a side. Use {fit // 1000} kb or a shorter window.")
-    n_models = len(models(job))
-    cell = _json(job / "request.json").get("cell_type", "")
-    pos, mid = _positions(job)
+    n_models = len(store.structures(job))
+    cell = store.request(job).get("cell_type", "")
+    pos, mid = positions(job)
     bond = cm.median_bond(pos)
     hic = None
     if hic_url:
@@ -95,7 +95,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         hic_label = f"Hi-C of {cell}, the contacts this job read" + (", the deep map could not be read" if hic_url else "")
     counted = cm.model_map(pos, mid, start, end, res, bond)
 
-    loop_sets = {f"loops_{factor.lower()}": (factor, path) for factor, path in _loop_files(job)}
+    loop_sets = {f"loops_{factor.lower()}": (factor, path) for factor, path in loop_files(job)}
     predicted = job / hicdiffusion.MAP_FILE
     kinds = ["hic", "model", "model_count", *(["hicdiffusion"] if predicted.is_file() else []), *loop_sets]
 

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from ..catalog import genes
 from ..http import job_at, job_of, packed_json
+from ..jobs import store
 from ..jobs.workers import queue_position
 from ..site import Here
 from . import compare, contact_view, views
@@ -61,7 +61,7 @@ def job_routes(kind: str) -> APIRouter:
     @routes.get("/contacts", name=f"{kind}_contacts")
     def contacts(site: Here, request: Request, key: str, region: str, res: int = 25000, upper: str = "hic", lower: str = "model", norm: str = "ice") -> Response:
         d = job_of(site, kind, key)
-        req = json.loads((d / "request.json").read_text()) if (d / "request.json").is_file() else {}
+        req = store.request(d)
         ct = site.catalog.cell_types.get(str(req.get("cell_type", "")))
         # The cell type's deep map stands for the Hi-C only where the job read that cell type's
         # hosted map: not with own contacts, not with a predicted background.
@@ -76,12 +76,12 @@ def job_routes(kind: str) -> APIRouter:
 
     @routes.get("/log", name=f"{kind}_log", response_class=PlainTextResponse)
     def log(site: Here, key: str) -> PlainTextResponse:
-        return PlainTextResponse(views.log_text(job_of(site, kind, key)))
+        return PlainTextResponse(store.log_text(job_of(site, kind, key)))
 
     @routes.get("/files.zip", name=f"{kind}_zip")
     def files_zip(site: Here, key: str) -> Response:
         d = job_of(site, kind, key)
-        return Response(views.zip_bytes(d), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{d.name}.zip"'})
+        return Response(store.zip_bytes(d), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{d.name}.zip"'})
 
     return routes
 

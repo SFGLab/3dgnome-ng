@@ -184,7 +184,7 @@ def test_a_ten_column_loop_file_is_refused_with_the_design_s_message(site: Simpl
     assert combine_changes([("CTCF", "shortens 3 loops"), ("RNAPII", "no anchor inside")]) == "shortens 3 loops", "no change in one factor is left out"
     assert combine_changes([("CTCF", "no anchor inside"), ("RNAPII", "no anchor inside")]) == "no anchor inside", "no change in every factor is said once"
 
-    from gnome3d_web.jobs.workers import sweep_private
+    from gnome3d_web.jobs.store import sweep_private
 
     stale = uploads / lid
     old_t = time.time() - 30 * 86400

@@ -1,5 +1,4 @@
-"""The stored file of an upload, its record and what the dialog is told about it.
-"""
+"""The stored file of an upload, its record and what the dialog is told about it."""
 
 from __future__ import annotations
 
@@ -13,7 +12,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from ..errors import Refused
-from .checks import Check, _int, records
+from .checks import Check, whole, records
 
 
 CHUNK = 1 << 20
@@ -78,7 +77,7 @@ def preview(d: Path, region: tuple[str, int, int]) -> list[list[int]]:
     """The loops of a loops upload inside a region, as anchor midpoints and the count."""
     out = []
     for _, cols in records(data_file(d)):
-        if len(cols) >= 7 and cols[0] == cols[3] == region[0] and _int(cols[6]) is not None:
+        if len(cols) >= 7 and cols[0] == cols[3] == region[0] and whole(cols[6]) is not None:
             a, b = int(cols[1]), int(cols[5])
             if a >= region[1] and b <= region[2]:
                 out.append([(a + int(cols[2])) // 2, (int(cols[4]) + b) // 2, int(cols[6])])

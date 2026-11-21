@@ -15,6 +15,7 @@ from ..errors import Refused
 from ..regions import RegionError, parse_region
 from ..site import Site
 from ..uploads import store as upload_store
+from . import store
 from .request import JobRequest, request_key
 from .workers import enqueue
 
@@ -129,14 +130,12 @@ def create_job(site: Site, fields: dict[str, str], vcf: bytes | Path | None) -> 
         return f"/p/{token}"
     key = request_key(req, catalog)
     job = s.jobs_dir / key
-    st = job / "status.json"
-    if st.is_file() and json.loads(st.read_text()).get("state") in ("running", "done", "queued"):
+    if store.taken(job):
         if fields.get("fresh") != "1":
             return f"/jobs/{key}"
         # The first job of a request has the key of the request. A repeat has a key of its own.
         key = secrets.token_hex(8)
         job = s.jobs_dir / key
-        st = job / "status.json"
     enqueue(s, req, job)
     return f"/jobs/{key}"
 

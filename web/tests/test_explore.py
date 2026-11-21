@@ -146,15 +146,15 @@ def test_a_private_job_answers_under_api_p(site: SimpleNamespace) -> None:
     assert c.get(f"/api/p/{token}/summary").status_code == 200, "a private job answers under /api/p"
     assert c.get(f"/api/jobs/{token}/summary").status_code == 404, "a private job is not under /api/jobs"
     from gnome3d_web.results import views as ex
-    from gnome3d_web.jobs.store import _status
+    from gnome3d_web.jobs.store import log_text, set_status
 
     run = root / "results" / "jobs" / "running0000000001"
     (run / "models").mkdir(parents=True)
     (run / "request.json").write_text(json.dumps({"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": 5}))
-    _status(run, state="queued", stage="queued")
-    _status(run, state="running", stage="inputs")
-    _status(run, stage="modelling")
-    _status(run, stage="modelling")
+    set_status(run, state="queued", stage="queued")
+    set_status(run, state="running", stage="inputs")
+    set_status(run, stage="modelling")
+    set_status(run, stage="modelling")
     for k in (1, 2):
         (run / "models" / f"chr1_0_3000000_s{k}.cif").write_text("data_x\n")
     (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(40)))
@@ -163,7 +163,7 @@ def test_a_private_job_answers_under_api_p(site: SimpleNamespace) -> None:
     assert live["structures_done"] == 2 and live["structures_asked"] == 5, "a running job counts the structures written: " + str(live)
     (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(39)) + f"wrote {run}/models/s3.cif\n")
     tail = ex.summary(run, None)["log_recent"]
-    assert str(run) not in tail and "wrote models/s3.cif" in tail and str(run) not in ex.log_text(run), "the log shows no server path: " + str(tail[-80:])
+    assert str(run) not in tail and "wrote models/s3.cif" in tail and str(run) not in log_text(run), "the log shows no server path: " + str(tail[-80:])
     (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(450)))
     live = ex.summary(run, None)
     assert live["log_recent"].splitlines()[-1] == "line 449" and len(live["log_recent"].splitlines()) == 200, "a running job carries the end of its engine log: " + str(live.get("log_recent"))[-60:]

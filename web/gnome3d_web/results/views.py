@@ -7,14 +7,9 @@ Results that read every structure are cached as explore_<name>.json in the job d
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
-import io
 import json
-import re
 import time
-import zipfile
-from collections.abc import Iterable
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +17,7 @@ import pandas as pd
 from gnome3d.geometry import smooth_chain
 
 from .. import expression
-from ..jobs.marks import read_cif
+from ..jobs import store
 
 
 MAX_GAP = 5_000
@@ -34,40 +29,14 @@ class ExploreError(ValueError):
     """A request the job's data cannot answer, with the reason."""
 
 
-def _json(path: Path) -> dict:
-    return json.loads(path.read_text()) if path.is_file() else {}
-
-
-def _cached(job: Path, name: str, make):  # noqa: ANN001, ANN202
+def cached(job: Path, name: str, make):  # noqa: ANN001, ANN202
     path = job / f"explore_{name}.json"
     if path.is_file():
         return json.loads(path.read_text())
     value = make()
-    if _json(job / "status.json").get("state") == "done":
+    if store.status(job).get("state") == "done":
         path.write_text(json.dumps(value))
     return value
-
-
-def models(job: Path) -> list[Path]:
-    """The job's structure files in member order."""
-    names = _json(job / "marks.json").get("models", [])
-    return [job / "models" / n for n in names]
-
-
-def _public_request(req: dict) -> dict:
-    """The request without the server's paths of uploaded files."""
-    out = {k: v for k, v in req.items() if k not in ("upload_vcf", "own", "expression")}
-    # The source of the expression by its id. The table of an upload has a path on the server.
-    if req.get("expression"):
-        out["expression"] = str(req["expression"].get("source", ""))
-    own = req.get("own") or {}
-    if own:
-        out["own"] = {
-            "loops": [f for f, _ in own.get("loops", [])],
-            **{k: bool(own.get(k)) for k in ("anchors", "contacts", "enhancers")},
-            **{k: own[k] for k in ("loops_from", "enhancers_from") if own.get(k)},
-        }
-    return out
 
 
 def _public_expression(job: Path) -> dict[str, object] | None:
@@ -80,60 +49,39 @@ def _public_expression(job: Path) -> dict[str, object] | None:
     return {"label": meta.get("label", ""), "kind": meta["kind"], "unit": levels[1] if levels else "", "samples": len(meta["columns"]), "source": meta.get("source", "")}  # type: ignore[arg-type]
 
 
-def _sizes(paths: Iterable[Path]) -> list[dict[str, object]]:
-    """The name and the size of each file. A job writes a file under a second name and renames it,
-    and that second file can be gone between the listing and the reading of its size."""
-    out: list[dict[str, object]] = []
-    for p in paths:
-        with contextlib.suppress(FileNotFoundError):
-            if p.is_file() and not p.name.endswith(".tmp"):
-                out.append({"name": p.name, "size": p.stat().st_size})
-    return out
-
-
 def summary(job: Path, ahead: int | None) -> dict[str, object]:
     """The state, the request, the counts and the files of a job."""
-    status = _json(job / "status.json") or {"state": "queued"}
-    files = _sizes(p for p in sorted(job.iterdir()) if not p.name.startswith(("explore_", "upload.")))
+    status = store.status(job)
+    files = store.sizes(p for p in sorted(job.iterdir()) if not p.name.startswith(("explore_", "upload.")))
     ep = job / "ep.tsv"
     return {
         "state": status.get("state"),
         "stage": status.get("stage"),
-        "error": _public_log(str(status["error"]), job) if status.get("error") else None,
-        "log_tail": _public_log(status["log_tail"], job) if status.get("log_tail") else None,
+        "error": store.public_log(str(status["error"]), job) if status.get("error") else None,
+        "log_tail": store.public_log(status["log_tail"], job) if status.get("log_tail") else None,
         "ahead": ahead,
         "started": status.get("started"),
         "finished": status.get("finished"),
         "region": status.get("region"),
-        "request": _public_request(_json(job / "request.json")),
+        "request": store.public_request(store.request(job)),
         "loops": status.get("loops", {}),
         "n_svs": status.get("n_svs"),
-        "structures": len(models(job)),
+        "structures": len(store.structures(job)),
         "genes": max(0, len(ep.read_text().splitlines()) - 1) if ep.is_file() else 0,
         "loop_count": sum(status.get("loops", {}).values()),
         "files": files,
-        "models": _sizes(models(job)),
+        "models": store.sizes(store.structures(job)),
         "expression": _public_expression(job),
         "stages": status.get("stages", []),
         # The clock the stages are timed on. A page counts the time of the running stage from it.
         "now": time.time(),
         "structures_done": len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0,
-        "structures_asked": _json(job / "request.json").get("n_models"),
-        "log_recent": _public_log(_log_tail(job / "engine.log", 200), job) if status.get("state") in ("running", "failed") else "",
+        "structures_asked": store.request(job).get("n_models"),
+        "log_recent": store.public_log(store.log_end(job / "engine.log", 200), job) if status.get("state") in ("running", "failed") else "",
     }
 
 
-def _log_tail(path: Path, n: int) -> str:
-    """The last n lines of a log, read from its end so a long log costs little."""
-    if not path.is_file():
-        return ""
-    with path.open("rb") as f:
-        f.seek(0, 2)
-        f.seek(max(0, f.tell() - 32_768))
-        return "\n".join(f.read().decode(errors="replace").splitlines()[-n:])
-
-
-def _loop_files(job: Path) -> list[tuple[str, Path]]:
+def loop_files(job: Path) -> list[tuple[str, Path]]:
     out = []
     for p in sorted((job / "inputs").glob("*_clusters.bedpe")):
         out.append((_FACTOR.get(p.name.split("_")[0], p.name.split("_")[0].upper()), p))
@@ -143,7 +91,7 @@ def _loop_files(job: Path) -> list[tuple[str, Path]]:
 def loops(job: Path) -> list[dict[str, object]]:
     """The loops the engine read, with factor, ends, span and PET count."""
     rows = []
-    for factor, path in _loop_files(job):
+    for factor, path in loop_files(job):
         for ln in path.read_text().splitlines():
             f = ln.split()
             if len(f) < 7:
@@ -155,7 +103,7 @@ def loops(job: Path) -> list[dict[str, object]]:
 
 def annotations(job: Path) -> dict[str, object]:
     """The genes, enhancers and loops of the job's region."""
-    elements = _json(job / "marks.json").get("elements", [])
+    elements = store.read_json(job / "marks.json").get("elements", [])
     genes = [{"name": e["name"], "tss": (e["start"] + e["end"]) // 2} for e in elements if e["kind"] == "promoter"]
     enh = [[e["start"], e["end"]] for e in elements if e["kind"] == "enhancer"]
     return {"genes": genes, "enhancers": enh, "loops": loops(job)}
@@ -174,13 +122,13 @@ def _chain(pos: np.ndarray, mid: np.ndarray) -> np.ndarray:
 def structure(job: Path, i: int) -> dict[str, object]:
     """One structure, i from 1: the smoothed chain with a genomic position per point, the beads,
     the marked beads and the anchors with their loops."""
-    files = models(job)
+    files = store.structures(job)
     if not 1 <= i <= len(files):
         raise ExploreError(f"structure {i} of {len(files)} does not exist")
-    pos, start, end, anchor = read_cif(files[i - 1])
+    pos, start, end, anchor = store.read_cif(files[i - 1])
     mid = (start + end) // 2
     chain = _chain(pos, mid)
-    marks = _json(job / "marks.json")
+    marks = store.read_json(job / "marks.json")
     names = {e["name"]: (e["start"] + e["end"]) // 2 for e in marks.get("elements", []) if e["kind"] == "promoter"}
     by_bead: dict[int, list[str]] = {}
     for gid, b in marks.get("promoters", {}).items():
@@ -207,8 +155,8 @@ def structure(job: Path, i: int) -> dict[str, object]:
     }
 
 
-def _positions(job: Path) -> tuple[list[np.ndarray], np.ndarray]:
-    loaded = [read_cif(m) for m in models(job)]
+def positions(job: Path) -> tuple[list[np.ndarray], np.ndarray]:
+    loaded = [store.read_cif(m) for m in store.structures(job)]
     mid = (loaded[0][1] + loaded[0][2]) // 2
     return [p for p, *_ in loaded], mid
 
@@ -228,7 +176,7 @@ def picks(job: Path) -> dict[str, int]:
     fixed random pick, as structure numbers from 1."""
 
     def make() -> dict[str, int]:
-        pos, _ = _positions(job)
+        pos, _ = positions(job)
         n = len(pos)
         rg = [float(np.sqrt(((p - p.mean(axis=0)) ** 2).sum(axis=1).mean())) for p in pos]
         if n > 1:
@@ -242,10 +190,10 @@ def picks(job: Path) -> dict[str, int]:
         rnd = int(hashlib.sha256(job.name.encode()).hexdigest(), 16) % n
         return {"medoid": medoid + 1, "compact": int(np.argmin(rg)) + 1, "random": rnd + 1}
 
-    return _cached(job, "picks", make)
+    return cached(job, "picks", make)
 
 
-def _nearest(mid: np.ndarray, bp: int) -> tuple[int, int]:
+def nearest(mid: np.ndarray, bp: int) -> tuple[int, int]:
     k = int(np.argmin(np.abs(mid - bp)))
     return k, int(mid[k]) - bp
 
@@ -253,10 +201,10 @@ def _nearest(mid: np.ndarray, bp: int) -> tuple[int, int]:
 def distance(job: Path, a: int, b: int) -> dict[str, object]:
     """The 3D distance between the beads nearest two positions in every structure, with the
     mean and the standard deviation, 0 for one structure."""
-    pos, mid = _positions(job)
+    pos, mid = positions(job)
     out = {}
     for name, bp in (("a", a), ("b", b)):
-        k, off = _nearest(mid, bp)
+        k, off = nearest(mid, bp)
         if abs(off) > MAX_GAP:
             raise ExploreError(f"position {bp:,} is {abs(off) / 1000:.1f} kb from the nearest bead, more than {MAX_GAP // 1000} kb")
         out[name] = {"bead": k, "bp": int(mid[k]), "offset": off}
@@ -277,8 +225,8 @@ def genes(job: Path) -> list[dict[str, object]]:
         table = pd.read_csv(ep, sep="\t")
         if table.empty:
             return []
-        pos, mid = _positions(job)
-        _, start, end, _ = read_cif(models(job)[0])
+        pos, mid = positions(job)
+        _, start, end, _ = store.read_cif(store.structures(job)[0])
         loop_rows = loops(job)
         levels = expression.job_levels(job)
 
@@ -326,56 +274,4 @@ def genes(job: Path) -> list[dict[str, object]]:
             )
         return rows
 
-    return _cached(job, "genes_v3", make)
-
-
-def _public_log(text: str, job: Path) -> str:
-    """A log with the job's directory on the server cut from every path. A private job's
-    location on disk is not shown."""
-    for p in {str(job.resolve()), str(job)}:
-        text = text.replace(p + "/", "").replace(p, ".")
-    return text
-
-
-def public_status(job: Path) -> dict[str, object]:
-    """The status of a job without the paths of the server in its error and its log."""
-    status = _json(job / "status.json") or {"state": "queued"}
-    for k in ("error", "log_tail"):
-        if status.get(k):
-            status[k] = _public_log(str(status[k]), job)
-    return status
-
-
-def public_file(job: Path, name: str) -> bytes | None:
-    """The request, the status or the log of a job as a download has it, without the paths of
-    the server. None for every other file, which a download has as it is on disk."""
-    if name == "request.json":
-        return json.dumps(_public_request(_json(job / name)), indent=2).encode()
-    if name == "status.json":
-        return json.dumps(public_status(job), indent=2).encode()
-    if name == "engine.log":
-        return log_text(job).encode()
-    return None
-
-
-def log_text(job: Path) -> str:
-    """The engine log."""
-    path = job / "engine.log"
-    return _public_log(path.read_text(errors="replace"), job) if path.is_file() else ""
-
-
-def zip_bytes(job: Path) -> bytes:
-    """Every file of the job but the upload, its structures under models/."""
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in sorted(job.rglob("*")):
-            rel = p.relative_to(job)
-            if not p.is_file() or rel.name.startswith(("explore_", "upload.")) or rel.name.endswith(".tmp") or re.match(r"inputs/", str(rel)):
-                continue
-            stated = public_file(job, rel.name) if rel.parent == Path(".") else None
-            if stated is not None:
-                z.writestr(str(rel), stated)
-                continue
-            with contextlib.suppress(FileNotFoundError):
-                z.write(p, str(rel))
-    return buf.getvalue()
+    return cached(job, "genes_v3", make)

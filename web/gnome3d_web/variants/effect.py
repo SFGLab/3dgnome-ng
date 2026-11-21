@@ -1,5 +1,4 @@
-"""The effect of the variants of a sample on the loops of a region, for the variants dialog.
-"""
+"""The effect of the variants of a sample on the loops of a region, for the variants dialog."""
 
 from __future__ import annotations
 
