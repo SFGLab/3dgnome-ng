@@ -14,11 +14,20 @@ const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word
 const mb = (n: number) => `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)} Mb`
 const round = (p: number) => Math.round(p / STEP) * STEP
 
-/** The stretch drawn around a region: the region with its own length on either side, from 0. */
-export function around(start: number, end: number): [number, number] {
-  const pad = end - start
+/**
+ * The stretch drawn around a region: the region with its own length on either side, from 0. The
+ * stretch is `cap` bp at most. A region that leaves less room gets less on either side, and a
+ * region of `cap` or more is drawn from a little before its start.
+ */
+export function around(start: number, end: number, cap = Infinity): [number, number] {
+  const span = end - start
+  if (span >= cap) {
+    const from = Math.max(0, start - Math.floor(cap / 20))
+    return [from, from + cap]
+  }
+  const pad = Math.min(span, Math.floor((cap - span) / 2))
   const from = Math.max(0, start - pad)
-  return [from, from === 0 ? Math.max(end + pad, 3 * pad) : end + pad]
+  return [from, from === 0 ? Math.max(end + pad, span + 2 * pad) : end + pad]
 }
 
 /** Whether a region is drawn well in a view: inside it and between an eighth and seven tenths of it. */
@@ -33,18 +42,24 @@ type Drag = { kind: 'start' | 'end' | 'move'; at: number; from: [number, number]
  * The loops around a region as arcs over an axis, CTCF above and RNAPII below, the genes as ticks
  * and the region as a box. With `onRegion` the edges of the box are sliders and the box can be
  * moved. The new coordinates are reported when the drag ends.
+ *
+ * `maxSpan` is the longest region of a job in bp. A drag does not make the region longer than
+ * that. A region that is longer already is drawn in the colour of an error and a drag makes it
+ * shorter.
  */
-export function LoopPreview({ cell, region, factors, onRegion }: { cell: string; region: Region; factors: Factors; onRegion?: (text: string) => void }) {
+export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegion }: { cell: string; region: Region; factors: Factors; maxSpan?: number; onRegion?: (text: string) => void }) {
+  // The server draws three times the longest region at most.
+  const cap = 3 * maxSpan
   // The view moves only when the region no longer fits it, so the picture stays still while the
   // region is dragged inside it.
-  const [view, setView] = useState<[number, number]>(() => around(region.start, region.end))
+  const [view, setView] = useState<[number, number]>(() => around(region.start, region.end, cap))
   const [chrom, setChrom] = useState(region.chrom)
   useEffect(() => {
     if (region.chrom !== chrom || !fits(region.start, region.end, view)) {
-      setView(around(region.start, region.end))
+      setView(around(region.start, region.end, cap))
       setChrom(region.chrom)
     }
-  }, [region.chrom, region.start, region.end]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [region.chrom, region.start, region.end, cap]) // eslint-disable-line react-hooks/exhaustive-deps
   const span = `${region.chrom}:${view[0]}-${view[1]}`
   const preview = useQuery({ queryKey: ['preview', cell, span], queryFn: () => api.preview(cell, span), placeholderData: keepPreviousData })
   const svg = useRef<SVGSVGElement>(null)
@@ -81,11 +96,20 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
     const box = svg.current!.getBoundingClientRect()
     return view[0] + (box.width ? (clientX - box.left) / box.width : 0) * width
   }
-  /** The region a drag gives, kept inside the view and at least the shortest span long. */
+  /**
+   * The region a drag gives, kept inside the view, at least the shortest span long and at most
+   * the longest. An edge of a region that is too long already moves inwards alone.
+   */
   const dragged = (d: Drag, p: number): [number, number] => {
     const [a, b] = d.from
-    if (d.kind === 'start') return [round(Math.min(Math.max(a + p - d.at, view[0]), b - MIN_SPAN)), b]
-    if (d.kind === 'end') return [a, round(Math.max(Math.min(b + p - d.at, view[1]), a + MIN_SPAN))]
+    if (d.kind === 'start') {
+      const least = Math.max(view[0], Math.min(a, b - maxSpan))
+      return [Math.max(round(Math.min(Math.max(a + p - d.at, least), b - MIN_SPAN)), least), b]
+    }
+    if (d.kind === 'end') {
+      const most = Math.min(view[1], Math.max(b, a + maxSpan))
+      return [a, Math.min(round(Math.max(Math.min(b + p - d.at, most), a + MIN_SPAN)), most)]
+    }
     const shift = Math.min(Math.max(p - d.at, view[0] - a), view[1] - b)
     return [round(a + shift), round(a + shift) + (b - a)]
   }
@@ -119,8 +143,10 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
     if (next[0] !== region.start || next[1] !== region.end) onRegion?.(text(next[0], next[1]))
   }
   const handlers = { onPointerMove: move, onPointerUp: release, onPointerCancel: release }
+  const tooLong = end - start > maxSpan
+  const longest = `${maxSpan / 1e6} Mb`
   return (
-    <div className="loop-preview">
+    <div className={tooLong ? 'loop-preview too-long' : 'loop-preview'}>
       <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Loops in ${region.label || text(region.start, region.end)}`}>
         <rect className={onRegion ? 'region-box movable' : 'region-box'} x={x(start)} y={0} width={Math.max(x(end) - x(start), 2)} height={H} onPointerDown={onRegion ? grab('move') : undefined} {...(onRegion ? handlers : {})} />
         <text className="side-label" x={6} y={14}>
@@ -177,9 +203,20 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
           <span className="key-line rnapii" />
           {plural(count('RNAPII'), 'RNAPII loop')}
         </span>
-        <span className="preview-span">{`${text(start, end)}, ${mb(end - start)}`}</span>
+        <span className="preview-span">{`${text(start, end)}, ${mb(end - start)}${end - start === maxSpan ? ', the limit' : ''}`}</span>
       </p>
-      {onRegion && <p className="preview-hint">Drag the box to move the region and its two edges to make it longer or shorter. The loops outside the region are drawn faint.</p>}
+      {tooLong ? (
+        <p className="preview-hint too-long" role="status">
+          {`This region is ${mb(end - start)} long and a job takes ${longest} at most.${onRegion ? ' Drag an edge inwards to shorten it.' : ''}`}
+          {onRegion && (
+            <button type="button" className="link-button" onClick={() => onRegion(text(region.start, region.start + maxSpan))}>
+              {`Keep the first ${longest}`}
+            </button>
+          )}
+        </p>
+      ) : (
+        onRegion && <p className="preview-hint">{`Drag the box to move the region and its two edges to make it longer or shorter${Number.isFinite(maxSpan) ? `, up to ${longest}` : ''}. The loops outside the region are drawn faint.`}</p>
+      )}
     </div>
   )
 }

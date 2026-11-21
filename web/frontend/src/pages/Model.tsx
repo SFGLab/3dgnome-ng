@@ -7,7 +7,7 @@ import { served } from '../base'
 import { Background } from '../model/Background'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
-import { EMPTY_FORM, type FormState } from '../model/form'
+import { EMPTY_FORM, longRegion, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { OwnData, type OwnTab } from '../model/OwnData'
@@ -91,10 +91,13 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const lookup = ownCell ? form.own.loopsFrom || cells[0] || 'GM12878' : form.cell
   const region = useRegion(lookup, form.region)
   // The loops stay drawn at the last region while new coordinates are read, so a drag of the
-  // region on them does not blank the picture. A region the server refuses takes them away.
+  // region on them does not blank the picture. A region longer than the limit stays on them too,
+  // to be shortened there. Any other region the server refuses takes them away.
   const lastRegion = useRef<Region>()
   if (region.data) lastRegion.current = region.data
-  const shownRegion = region.data ?? (region.isError || !form.region.trim() ? undefined : lastRegion.current)
+  const maxSpan = (catalog.data?.max_region_mb ?? 20) * 1e6
+  const tooLong = region.isError ? longRegion(form.region, maxSpan) : undefined
+  const shownRegion = region.data ?? tooLong ?? (region.isError || !form.region.trim() ? undefined : lastRegion.current)
   const hasSampleTable = Boolean(catalog.data?.sv_sets[form.svSet]?.sample_table)
   const sampleTable = useQuery({ queryKey: ['sample-table', form.svSet], queryFn: () => api.sampleTable(form.svSet), enabled: hasSampleTable, staleTime: Infinity })
   const schema = useQuery({
@@ -155,7 +158,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             />
           )}
           <RegionField cell={lookup} value={form.region} onChange={(region) => set({ region })} />
-          {shownRegion && !form.own.loops.length && <LoopPreview cell={lookup} region={shownRegion} factors={form.factors} onRegion={(region) => set({ region })} />}
+          {shownRegion && !form.own.loops.length && <LoopPreview cell={lookup} region={shownRegion} factors={form.factors} maxSpan={maxSpan} onRegion={(region) => set({ region })} />}
           {stepError(1)}
         </Step>
         <Step n={2} title="Loops">

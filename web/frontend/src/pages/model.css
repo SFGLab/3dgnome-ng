@@ -309,8 +309,24 @@
 }
 
 /* The region as a box over the loops, its two edges sliders. */
+/* A region longer than a job takes has the colour of an error on its box, its edges and the line
+   under the loops. */
+.loop-preview.too-long {
+  --region: #A11B12;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .loop-preview.too-long {
+    --region: #F2A29C;
+  }
+}
+
+:root[data-theme='dark'] .loop-preview.too-long {
+  --region: #F2A29C;
+}
+
 .region-box {
-  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+  fill: color-mix(in srgb, var(--region, var(--accent)) 12%, transparent);
 }
 
 .region-box.movable {
@@ -323,14 +339,14 @@
 }
 
 .region-edge {
-  stroke: var(--accent);
+  stroke: var(--region, var(--accent));
   stroke-width: 1.5;
   pointer-events: none;
 }
 
 .region-handle {
   fill: var(--surface);
-  stroke: var(--accent);
+  stroke: var(--region, var(--accent));
   stroke-width: 1.5;
   cursor: ew-resize;
   touch-action: none;
@@ -351,6 +367,15 @@
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--faint);
+}
+
+.preview-hint.too-long {
+  color: var(--region);
+}
+
+.preview-hint.too-long .link-button {
+  margin-left: 8px;
+  font-size: 12px;
 }
 
 .gene-tick {

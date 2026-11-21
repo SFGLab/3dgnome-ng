@@ -85,7 +85,8 @@ describe('ContactMapTab', () => {
     const canvas = document.querySelector('canvas')!
     fireEvent.wheel(canvas, { deltaY: -100 })
     const box = document.querySelector<HTMLElement>('.zoom-box')!
-    expect([box.style.left, box.style.top, box.style.width, box.style.height].map(parseFloat).map(Math.round)).toEqual([10, 10, 80, 80])
+    // One notch takes about a tenth off the map, the same on every side.
+    expect([box.style.left, box.style.top, box.style.width, box.style.height].map(parseFloat).map(Math.round)).toEqual([5, 5, 91, 91])
     fireEvent.wheel(canvas, { deltaY: 100 })
     fireEvent.wheel(canvas, { deltaY: 100 })
     expect(document.querySelector('.zoom-box')).toBeNull()

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Loop } from './api'
 import { bp, kb } from './format'
 import './loop-view.css'
+import { wheelFactor } from './wheel'
 
 const W = 1000
 const H = 70
@@ -108,7 +109,7 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
   wheel.current = (e) => {
     if (!onWindow) return
     e.preventDefault()
-    const next = zoomed(window ?? [start, end], bounds ?? [start, end], start + frac(e.clientX) * width, e.deltaY > 0 ? 1.25 : 0.8)
+    const next = zoomed(window ?? [start, end], bounds ?? [start, end], start + frac(e.clientX) * width, wheelFactor(e))
     onWindow(next[0], next[1])
   }
   useEffect(() => {

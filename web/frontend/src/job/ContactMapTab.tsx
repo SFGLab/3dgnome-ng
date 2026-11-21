@@ -6,6 +6,7 @@ import { bp } from './format'
 import { LoopView } from './LoopView'
 import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
 import { parseRegion } from './StructureTab'
+import { wheelFactor } from './wheel'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
 const MAX_BINS = 800
@@ -178,7 +179,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
       e.preventDefault()
       const box = c.getBoundingClientRect()
       const frac = box.width ? (e.clientX - box.left) / box.width : 0.5
-      zoomRef.current(e.deltaY > 0 ? 1.25 : 0.8, undefined, frac)
+      zoomRef.current(wheelFactor(e), undefined, frac)
     }
     c.addEventListener('wheel', onWheel, { passive: false })
     return () => c.removeEventListener('wheel', onWheel)

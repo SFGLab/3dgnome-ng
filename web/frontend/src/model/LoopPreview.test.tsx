@@ -99,6 +99,68 @@ describe('LoopPreview', () => {
     expect(onRegion).toHaveBeenLastCalledWith('chr1:11,170,000-12,270,000')
   })
 
+  it('does not let a drag make the region longer than a job takes', async () => {
+    const onRegion = vi.fn()
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LoopPreview cell="GM12878" region={{ chrom: 'chr1', start: 11500000, end: 12600000, label: '' }} factors="CTCF+RNAPII" maxSpan={1_500_000} onRegion={onRegion} />
+      </QueryClientProvider>,
+    )
+    await screen.findByText('2 CTCF loops')
+    const svg = container.querySelector('svg')!
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 780, height: 150, right: 780, bottom: 150, x: 0, y: 0, toJSON: () => ({}) })
+    const at = (el: Element, type: string, clientX: number) => fireEvent(el, new MouseEvent(type, { clientX, bubbles: true }))
+    // The end is dragged to the edge of the view, 1.1 Mb further, and stops 1.5 Mb after the start.
+    const end = screen.getByRole('slider', { name: 'End of the region' })
+    at(end, 'pointerdown', 520)
+    at(end, 'pointermove', 780)
+    expect(screen.getByText('chr1:11,500,000-13,000,000, 1.50 Mb, the limit')).toBeInTheDocument()
+    at(end, 'pointerup', 780)
+    expect(onRegion).toHaveBeenLastCalledWith('chr1:11,500,000-13,000,000')
+    // The start stops 1.5 Mb before the end.
+    const start = screen.getByRole('slider', { name: 'Start of the region' })
+    at(start, 'pointerdown', 260)
+    at(start, 'pointermove', 0)
+    at(start, 'pointerup', 0)
+    expect(onRegion).toHaveBeenLastCalledWith('chr1:11,100,000-12,600,000')
+    expect(container.querySelector('.loop-preview')).not.toHaveClass('too-long')
+  })
+
+  it('keeps a region longer than a job takes on the loops and lets a drag shorten it', async () => {
+    const onRegion = vi.fn()
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <LoopPreview cell="GM12878" region={{ chrom: 'chr1', start: 11_000_000, end: 13_000_000, label: '' }} factors="CTCF+RNAPII" maxSpan={1_500_000} onRegion={onRegion} />
+      </QueryClientProvider>,
+    )
+    await screen.findByText('2 CTCF loops')
+    expect(container.querySelector('.loop-preview')).toHaveClass('too-long')
+    expect(screen.getByRole('status')).toHaveTextContent('This region is 2.00 Mb long and a job takes 1.5 Mb at most. Drag an edge inwards to shorten it.')
+    // The view is three times the longest region, with the region in its middle.
+    expect(around(11_000_000, 13_000_000, 4_500_000)).toEqual([9_750_000, 14_250_000])
+    const svg = container.querySelector('svg')!
+    svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 780, height: 150, right: 780, bottom: 150, x: 0, y: 0, toJSON: () => ({}) })
+    const at = (el: Element, type: string, clientX: number) => fireEvent(el, new MouseEvent(type, { clientX, bubbles: true }))
+    // An edge of the region moves inwards alone: a drag outwards leaves the region as it is.
+    const end = screen.getByRole('slider', { name: 'End of the region' })
+    at(end, 'pointerdown', 500)
+    at(end, 'pointermove', 700)
+    at(end, 'pointerup', 700)
+    expect(onRegion).not.toHaveBeenCalled()
+    // 780 units are 4.5 Mb, so 130 units inwards are 750 kb.
+    at(end, 'pointerdown', 500)
+    at(end, 'pointermove', 370)
+    at(end, 'pointerup', 370)
+    expect(onRegion).toHaveBeenLastCalledWith('chr1:11,000,000-12,250,000')
+    fireEvent.click(screen.getByRole('button', { name: 'Keep the first 1.5 Mb' }))
+    expect(onRegion).toHaveBeenLastCalledWith('chr1:11,000,000-12,500,000')
+  })
+
+  it('draws a region of the whole view or more from a little before its start', () => {
+    expect(around(50_000_000, 250_000_000, 60_000_000)).toEqual([47_000_000, 107_000_000])
+    expect(around(1_000_000, 250_000_000, 60_000_000)).toEqual([0, 60_000_000])
+  })
+
   it('has no sliders where the region cannot be changed', async () => {
     renderPreview()
     await screen.findByText('2 CTCF loops')

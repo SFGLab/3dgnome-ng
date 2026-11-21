@@ -66,6 +66,29 @@ describe('Model a region page', () => {
     expect(await screen.findByText(/is neither chr:start-end nor a known gene name/)).toBeInTheDocument()
   })
 
+  it('keeps the loops under a region longer than the limit and takes them away for any other refusal', async () => {
+    vi.unstubAllGlobals()
+    mockApi([[/^\/api\/region$/, (u) => {
+      const q = u.searchParams.get('q') ?? ''
+      if (q.startsWith('chr11')) return [400, { error: `'${q}' spans 34,307,000 bp, over the 20,000,000 bp limit` }]
+      return [400, { error: `'${q}' is neither chr:start-end nor a known gene name` }]
+    }]])
+    const { container } = renderModel()
+    const field = await screen.findByLabelText('Region, chr:start-end or a gene name')
+    fireEvent.change(field, { target: { value: 'chr11:37,615,000-71,922,000' } })
+    expect(await screen.findByText(/over the 20,000,000 bp limit/)).toBeInTheDocument()
+    expect(await screen.findByRole('status')).toHaveTextContent('This region is 34.3 Mb long and a job takes 20 Mb at most. Drag an edge inwards to shorten it.')
+    expect(container.querySelector('.loop-preview')).toHaveClass('too-long')
+    expect(screen.getByRole('slider', { name: 'End of the region' })).toHaveAttribute('aria-valuenow', '71922000')
+    // The button of the line brings the region inside the limit and the field follows.
+    fireEvent.click(screen.getByRole('button', { name: 'Keep the first 20 Mb' }))
+    expect(field).toHaveValue('chr11:37,615,000-57,615,000')
+    fireEvent.change(field, { target: { value: 'nowhere' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    expect(await screen.findByText(/is neither chr:start-end nor a known gene name/)).toBeInTheDocument()
+    expect(container.querySelector('.loop-preview')).toBeNull()
+  })
+
   it('fills the form from an example', async () => {
     renderModel()
     fireEvent.click(await screen.findByRole('button', { name: /MYC/ }))

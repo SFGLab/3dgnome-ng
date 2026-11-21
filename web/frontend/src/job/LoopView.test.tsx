@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { Loop } from './api'
 import { describeLoop, LoopView, sameLoop, ticks, zoomed } from './LoopView'
+import { wheelFactor } from './wheel'
 
 const LOOPS: Loop[] = [
   { factor: 'CTCF', chrom: 'chr1', a: [1_000_000, 1_002_000], b: [1_400_000, 1_402_000], span: 398_000, pets: 12 },
@@ -85,8 +86,19 @@ describe('the loop view', () => {
     const { container } = render(<LoopView chrom="chr1" region={[1_200_000, 1_600_000]} bounds={[1_000_000, 2_000_000]} loops={LOOPS} onWindow={onWindow} onReset={onReset} />)
     const svg = container.querySelector('.loop-view-arcs')!
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 72, right: 400, bottom: 72, x: 0, y: 0, toJSON: () => ({}) })
+    // One notch of a mouse wheel takes about a tenth off the part, the same on either side of the pointer.
     fireEvent(svg, new WheelEvent('wheel', { deltaY: -100, clientX: 200, bubbles: true, cancelable: true }))
-    expect(onWindow).toHaveBeenLastCalledWith(1_240_000, 1_560_000)
+    const [a, b] = onWindow.mock.lastCall!
+    expect(b - a).toBeGreaterThan(0.88 * 400_000)
+    expect(b - a).toBeLessThan(0.93 * 400_000)
+    expect(Math.abs(a + b - 2_800_000)).toBeLessThanOrEqual(1)
+    // A small step of a trackpad scales by well under a hundredth.
+    expect(wheelFactor({ deltaY: -4 })).toBeGreaterThan(0.99)
+    expect(wheelFactor({ deltaY: 4 })).toBeLessThan(1.01)
+    // A step in lines counts as its pixels and no event counts for more than a notch.
+    expect(wheelFactor({ deltaY: 3, deltaMode: 1 })).toBeCloseTo(wheelFactor({ deltaY: 48 }))
+    expect(wheelFactor({ deltaY: 5000 })).toBe(wheelFactor({ deltaY: 100 }))
+    expect(wheelFactor({ deltaY: 100 }) * wheelFactor({ deltaY: -100 })).toBeCloseTo(1)
     fireEvent.click(screen.getByRole('button', { name: 'Whole region' }))
     expect(onReset).toHaveBeenCalled()
   })
