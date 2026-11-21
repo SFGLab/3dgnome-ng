@@ -1,26 +1,15 @@
 import { api } from '../api'
 import type { Example } from './examples'
 import type { Factors } from './form'
+import { fromExample, toFormData } from './request'
 import { nameOf, rememberJob } from '../myjobs/recent'
 
 /** Structures an example job asks for. Ten keep the first run short. The server gives every later
  * visitor the same job, the first job of the request. */
 export const EXAMPLE_STRUCTURES = 10
 
-function request(e: Example, factors: Factors, cell = e.cell): FormData {
-  const d = new FormData()
-  d.append('cell_type', cell)
-  d.append('region', e.region)
-  d.append('factors', factors)
-  d.append('background', 'hic')
-  d.append('sv_set', e.svSet ?? '')
-  d.append('sample', e.sample ?? '')
-  d.append('haplotype', '0')
-  d.append('n_models', String(EXAMPLE_STRUCTURES))
-  d.append('overrides', '{}')
-  if (e.expression) d.append('expression', e.expression)
-  return d
-}
+/** The request of an example for one loop set and one cell type, without the settings of the form. */
+const request = (e: Example, factors: Factors, cell = e.cell) => toFormData({ ...fromExample(e), cell, factors, structures: EXAMPLE_STRUCTURES }, {}, false)
 
 /** Submits an example's request, which the server answers with the shared job, finished or
  * running and returns the page to open: the job on its tab, or with the comparison. */

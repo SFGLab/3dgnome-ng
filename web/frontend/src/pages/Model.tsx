@@ -6,9 +6,10 @@ import { api, ApiError, type Region, jobApi } from '../api'
 import { served } from '../base'
 import { Background } from '../model/Background'
 import { CellTypes } from '../model/CellTypes'
-import { EXAMPLES, type Example } from '../model/examples'
+import { EXAMPLES } from '../model/examples'
 import { Expression } from '../model/Expression'
-import { EMPTY_FORM, fromRequest, longRegion, readUploads, type FormState } from '../model/form'
+import { EMPTY_FORM, longRegion, type FormState, withOwn } from '../model/form'
+import { FIELD_STEP, fromExample, fromRequest, readUploads, toFormData } from '../model/request'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { OwnData, type OwnTab } from '../model/OwnData'
@@ -19,70 +20,13 @@ import { changedSettings } from '../model/settings'
 import { SidePanel } from '../model/SidePanel'
 import { EnsembleFields, SettingsTree } from '../model/SettingsTree'
 import { Step } from '../model/Step'
-import { ownField } from '../model/upload'
 import { Variants } from '../model/Variants'
 import { VariantsDialog, type VariantsMode } from '../model/VariantsDialog'
 import '../styles/doc.css'
 import './model.css'
 
-const FIELD_STEP: Record<string, number> = {
-  cell_type: 1,
-  region: 1,
-  own: 1,
-  contacts: 1,
-  factors: 2,
-  loops: 2,
-  sv_set: 3,
-  sample: 3,
-  vcf_upload: 3,
-  background: 4,
-  expression: 5,
-  n_models: 6,
-  overrides: 6,
-}
-
-/** The form as the multipart body of POST /api/jobs. */
-function toFormData(form: FormState, overrides: Record<string, string>): FormData {
-  const d = new FormData()
-  d.append('cell_type', form.cell)
-  d.append('region', form.region)
-  d.append('factors', form.factors)
-  d.append('background', form.background)
-  if (form.expression) d.append('expression', form.expression)
-  const table = form.own.expression
-  if (form.expression === 'own' && table) {
-    d.append('expression_upload', table.upload.id)
-    d.append('expression_columns', JSON.stringify(table.columns))
-    d.append('expression_kind', table.kind)
-  }
-  d.append('sv_set', form.svSet)
-  d.append('sample', form.sample)
-  d.append('haplotype', String(form.haplotype))
-  d.append('n_models', String(form.structures))
-  d.append('overrides', JSON.stringify(overrides))
-  // A request of the form starts a job of its own, also when the site holds a job of the same
-  // request. An example leaves this out and opens the held job.
-  d.append('fresh', '1')
-  if (form.vcfUpload) d.append('vcf_upload', form.vcfUpload.id)
-  const own = form.own
-  if (own.loops.length || own.anchors || own.contacts || own.enhancers || (form.cell === 'own' && (own.loopsFrom || own.enhancersFrom))) d.append('own', ownField(own))
-  return d
-}
-
 function goTo(url: string) {
   window.location.assign(served(url))
-}
-
-function fromExample(e: Example): FormState {
-  return {
-    ...EMPTY_FORM,
-    cell: e.cell,
-    region: e.region,
-    factors: e.factors,
-    svSet: e.svSet ?? '',
-    sample: e.sample ?? '',
-    expression: e.expression ?? '',
-  }
 }
 
 /** The form that starts a job: cell type and region, loops, variants, background and settings. */
@@ -322,12 +266,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           cells={cells}
           onClose={() => setDialog(null)}
           onUse={(own) => {
-            const asOwn = dialog.cell || ownCell
-            const chosen = asOwn ? { ...own, loopsFrom: own.loops.length ? undefined : own.loopsFrom || cells[0], enhancersFrom: own.enhancersFrom ?? 'none' } : own
-            // A table added in the dialog becomes the expression of the job. A table taken away leaves the job without.
-            const added = !!chosen.expression && (dialog.tab === 'expression' || !form.own.expression)
-            const expression = added ? 'own' : !chosen.expression && form.expression === 'own' ? '' : form.expression
-            set(dialog.cell ? { own: chosen, cell: 'own', expression } : { own: chosen, expression })
+            set(withOwn(form, own, dialog, cells))
             setDialog(null)
           }}
         />

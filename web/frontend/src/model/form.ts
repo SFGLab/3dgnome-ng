@@ -1,4 +1,4 @@
-import type { Region, Summary } from '../api'
+import type { Region } from '../api'
 import { regionText } from '../lib/region'
 import { NO_OWN, type OwnChoice } from './upload'
 import { type UploadResult } from '../api'
@@ -53,30 +53,18 @@ export function longRegion(text: string, maxSpan: number): Region | undefined {
 }
 
 /**
- * The form filled with the request of a job, to start another job from it. The files a job read
- * from uploads are not part of its request as the site shows it and are left out: the loops,
- * the contacts and the enhancers of your own data, an uploaded VCF and an uploaded expression table. A job on your own cell
- * type gets the listed cell type its loops came from, or the first one.
+ * The change of the form when the own data dialog is confirmed.
+ *
+ * On your own cell type a job without loops of its own takes the loops of a listed cell type, the
+ * first one unless another is chosen, and no enhancers unless a set is chosen. A table added in
+ * the dialog becomes the expression of the job. A table taken away leaves the job without.
+ * @param opened whether the dialog was opened to make your own cell type, and the step it opened on
+ * @param cells the listed cell types
  */
-export function fromRequest(r: Summary['request'], cells: string[]): FormState {
-  const factors: Factors = r.factors === 'CTCF' || r.factors === 'RNAPII' ? r.factors : 'CTCF+RNAPII'
-  const asked = r.hicdiffusion ? 'hicdiffusion' : (r.background ?? 'hic')
-  const background: Background = asked === 'hicdiffusion' || asked === 'none' ? asked : 'hic'
-  return {
-    ...EMPTY_FORM,
-    cell: r.cell_type === 'own' ? (r.own?.loops_from ?? cells[0] ?? EMPTY_FORM.cell) : r.cell_type,
-    region: r.region,
-    factors,
-    svSet: r.sv_set,
-    // A sample without a call set was read from an uploaded VCF, which the form does not have.
-    sample: r.sv_set ? r.sample : '',
-    haplotype: r.sv_set && r.haplotype === 1 ? 1 : 0,
-    background,
-    expression: r.expression === 'upload' ? '' : (r.expression ?? ''),
-    structures: r.n_models,
-    settings: { ...(r.overrides ?? {}) },
-  }
+export function withOwn(form: FormState, own: OwnChoice, opened: { cell: boolean; tab: string }, cells: string[]): Partial<FormState> {
+  const asOwn = opened.cell || form.cell === 'own'
+  const chosen = asOwn ? { ...own, loopsFrom: own.loops.length ? undefined : own.loopsFrom || cells[0], enhancersFrom: own.enhancersFrom ?? 'none' } : own
+  const added = !!chosen.expression && (opened.tab === 'expression' || !form.own.expression)
+  const expression = added ? 'own' : !chosen.expression && form.expression === 'own' ? '' : form.expression
+  return opened.cell ? { own: chosen, cell: 'own', expression } : { own: chosen, expression }
 }
-
-/** Whether a job read files from uploads, which a form filled from its request lacks. */
-export const readUploads = (r: Summary['request']) => !!r.own || (!r.sv_set && !!r.sample) || r.expression === 'upload'
