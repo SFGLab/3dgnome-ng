@@ -17,9 +17,9 @@ export function Background({ value, region, available, limitMb = 2, lymphoblasto
   const tooLong = region !== undefined && region.end - region.start > limitMb * 1e6
   const reason = !available ? 'HiCDiffusion is not set up on this server.' : tooLong ? `HiCDiffusion predicts regions up to ${limitMb} Mb.` : ''
   const options: [BackgroundId, string, string][] = [
-    ['hic', 'Hi-C of this cell type', 'The Hi-C experiment on this cell line, from 4DN. The default.'],
+    ['hic', 'Hi-C of this cell type', 'The Hi-C experiment on this cell line, from 4DN.'],
     ['hicdiffusion', 'Predicted by HiCDiffusion', `A contact map predicted from the DNA sequence, for regions up to ${limitMb} Mb. Structural variants change the prediction.`],
-    ['none', 'None', 'No contact map. Two points that no loop joins are placed by their distance along the genome alone.'],
+    ['none', 'None', 'Turns off the targets from the Hi-C map. No pair of anchors without a loop gets a Hi-C target and the contacts of a loop do not shorten its target. The exponent of the distance law is still fitted on the contact data.'],
   ]
   return (
     <>
