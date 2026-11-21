@@ -68,7 +68,12 @@ A route takes the site as the parameter `site: Here`. No module keeps state of t
 is keyed by the path of the file it read.
 
 `jobs/store.py` alone states the names of the files of a job directory and what a download
-gives of them. The other modules call it.
+gives of them. The other modules call it. `public_files` is the one rule of the files a visitor
+may have. The summary lists them, a download serves one of them and the zip holds them all.
+
+`Settings.from_env` in `context.py` and in the function of a worker reads the environment. A
+request of a job reads none of it. The form route applies the limits of the site before it
+builds the request.
 
 A request the site refuses raises `Refused` with the form field it concerns, and the answer is
 400 with the message and the field. A cell type the catalog lacks raises `UnknownCell`, and the

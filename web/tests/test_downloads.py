@@ -95,3 +95,26 @@ def test_a_request_with_hosted_expression_has_the_source_and_no_path(site: Simpl
     assert on_disk["expression"]["source"] == "LINES" and "path" not in on_disk["expression"] and str(site.root) not in json.dumps(on_disk), "the request on disk has the source by its id: " + str(on_disk["expression"])
     assert c.get(f"{site.shared}/files/request.json").json()["expression"] == "LINES", "the downloaded request has the source"
     assert c.get(f"/api{site.shared}/summary").json()["expression"]["samples"] == 2, "the job read the table of that source"
+
+
+
+def test_the_summary_a_download_and_the_zip_have_the_same_files(site: SimpleNamespace) -> None:
+    c = site.c
+    summary = c.get(f"/api{site.shared}/summary").json()
+    files, structures = [f["name"] for f in summary["files"]], [f["name"] for f in summary["models"]]
+    assert {"expression.json", "expression.tsv", "request.json"} <= set(files) and structures, "the job lists its files and its structures: " + str(files)
+    refused = [n for n in files + structures if c.get(f"{site.shared}/files/{n}").status_code != 200]
+    assert refused == [], "every listed file downloads: " + str(refused)
+    held = sorted(zipfile.ZipFile(io.BytesIO(c.get(f"/api{site.shared}/files.zip").content)).namelist())
+    assert held == sorted(files + ["models/" + n for n in structures]), "the zip holds the listed files and no other: " + str(held)
+
+
+@pytest.mark.parametrize("name", ["upload.vcf.gz", "explore_genes_v3.json", "config.ini", "status.json.tmp"])
+def test_a_file_of_the_site_is_no_download(site: SimpleNamespace, name: str) -> None:
+    (site.job / "explore_genes_v3.json").write_text("{}")
+    (site.job / "status.json.tmp").write_text("{}")
+    assert (site.job / "upload.vcf.gz").is_file(), "the job holds its upload"
+    assert site.c.get(f"{site.private}/files/{name}").status_code == 404, f"{name} is not served"
+    listed = [f["name"] for f in site.c.get(f"/api{site.private}/summary").json()["files"]]
+    held = zipfile.ZipFile(io.BytesIO(site.c.get(f"/api{site.private}/files.zip").content)).namelist()
+    assert name not in listed and name not in held, f"{name} is neither listed nor in the zip: " + str((listed, held))

@@ -63,7 +63,6 @@ def summary(job: Path, ahead: int | None) -> Summary:
     """The state, the request, the counts and the files of a job."""
     status = store.status(job)
     error, end = status.get("error"), status.get("log_tail")
-    files = store.sizes(p for p in sorted(job.iterdir()) if not p.name.startswith(("explore_", "upload.")))
     ep = job / "ep.tsv"
     return {
         "state": status["state"],
@@ -81,7 +80,7 @@ def summary(job: Path, ahead: int | None) -> Summary:
         "structures": len(store.structures(job)),
         "genes": max(0, len(ep.read_text().splitlines()) - 1) if ep.is_file() else 0,
         "loop_count": sum(status.get("loops", {}).values()),
-        "files": files,
+        "files": store.listed(job),
         "models": store.sizes(store.structures(job)),
         "expression": _public_expression(job),
         "stages": status.get("stages", []),

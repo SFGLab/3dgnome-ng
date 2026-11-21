@@ -186,32 +186,41 @@ def log_text(job: Path) -> str:
     return public_log(path.read_text(errors="replace"), job) if path.is_file() else ""
 
 
-# The files of a job a visitor may download by name, the structures among them.
-DOWNLOADS = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|expression\.tsv|[A-Za-z0-9_.:-]+\.cif)$")
+# The files of a job a visitor may have beside its structures. Every other file of a job
+# directory is the site's own: an upload, the inputs of the engine, a kept answer of a page.
+PUBLIC = ("engine.log", "ep.tsv", "expression.json", "expression.tsv", "hicdiffusion.bedpe", "marks.json", "request.json", "status.json")
+STRUCTURE = re.compile(r"[A-Za-z0-9_.:-]+\.cif")
+
+
+def public_files(job: Path) -> list[Path]:
+    """The files of a job a visitor may have, the structures last in member order. The summary
+    lists them, a download serves one of them by its name and the zip holds them all."""
+    models = job / "models"
+    found = sorted((p for p in models.glob("*.cif") if STRUCTURE.fullmatch(p.name)), key=member) if models.is_dir() else []
+    return [p for p in (job / name for name in PUBLIC) if p.is_file()] + found
+
+
+def listed(job: Path) -> list[FileSize]:
+    """The public files of a job beside its structures, each with its size."""
+    return sizes(p for p in public_files(job) if p.parent == job)
 
 
 def download(job: Path, name: str) -> Path | None:
-    """The file of a job a download names, None for a name that is no download or a file the job lacks."""
-    if not DOWNLOADS.match(name):
-        return None
-    path = job / "models" / name if name.endswith(".cif") else job / name
-    return path if path.is_file() else None
+    """The public file of a job a download names, None for every other name."""
+    return next((p for p in public_files(job) if p.name == name), None)
 
 
 def zip_bytes(job: Path) -> bytes:
-    """Every file of the job but the upload, its structures under models/."""
+    """The public files of a job as one zip, its structures under models/."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for p in sorted(job.rglob("*")):
-            rel = p.relative_to(job)
-            if not p.is_file() or rel.name.startswith(("explore_", "upload.")) or rel.name.endswith(".tmp") or re.match(r"inputs/", str(rel)):
-                continue
-            stated = public_file(job, rel.name) if rel.parent == Path(".") else None
+        for p in sorted(public_files(job)):
+            stated = public_file(job, p.name) if p.parent == job else None
             if stated is not None:
-                z.writestr(str(rel), stated)
+                z.writestr(p.name, stated)
                 continue
             with contextlib.suppress(FileNotFoundError):
-                z.write(p, str(rel))
+                z.write(p, str(p.relative_to(job)))
     return buf.getvalue()
 
 
