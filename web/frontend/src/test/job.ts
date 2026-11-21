@@ -1,5 +1,5 @@
 /** Fixed answers of the job endpoints for tests. */
-import type { Structure, Summary } from '../job/api'
+import type { Structure, Summary } from '../api'
 
 export const KEY = 'abcdef0123456789'
 
@@ -8,8 +8,9 @@ export const SUMMARY_DONE: Summary = {
   started: 1000, finished: 1372, region: 'chr1:11500000-12600000',
   request: { cell_type: 'GM12878', region: 'chr1:11,500,000-12,600,000', factors: 'CTCF+RNAPII', background: 'hic', sv_set: '', sample: '', haplotype: 0, n_models: 100 },
   loops: { CTCF: 118, RNAPII: 64 }, n_svs: 0, structures: 100, genes: 312, loop_count: 182,
-  files: [{ name: 'ep.tsv', size: 38000 }, { name: 'marks.json', size: 6000 }, { name: 'engine.log', size: 22000 }],
+  files: [{ name: 'engine.log', size: 22000 }, { name: 'ep.tsv', size: 38000 }, { name: 'marks.json', size: 6000 }, { name: 'request.json', size: 400 }, { name: 'status.json', size: 900 }],
   models: Array.from({ length: 100 }, (_, i) => ({ name: `chr1_11500000_12600000_s${i + 1}.cif`, size: 412000 })),
+  skipped_svs: 0, expression: null, stages: [], now: 1372, structures_done: 100, structures_asked: 100, log_recent: '',
 }
 
 export const PICKS = { medoid: 17, compact: 42, random: 5 }
@@ -42,11 +43,11 @@ export const DISTANCE = {
 
 export const GENES = [
   {
-    gene: 'TNFRSF8', tss: 12_063_302, enhancer: 12_449_484, linear_bp: 385_000, distance: 6.7, promoter_bead: 0, enhancer_bead: 2,
+    gene: 'TNFRSF8', gene_id: 'ENSG00000120949', expression: null, promoter_loops: 1, tss: 12_063_302, enhancer: 12_449_484, linear_bp: 385_000, distance: 6.7, promoter_bead: 0, enhancer_bead: 2,
     min: 4.1, q1: 5.9, median: 6.1, q3: 8.8, max: 9.8, sd: 1.9, n: 5, joined_by: 'RNAPII',
   },
   {
-    gene: 'DHRS3', tss: 12_540_102, enhancer: 12_568_000, linear_bp: 28_000, distance: 2.1, promoter_bead: 1, enhancer_bead: 2,
+    gene: 'DHRS3', gene_id: 'ENSG00000162496', expression: null, promoter_loops: 1, tss: 12_540_102, enhancer: 12_568_000, linear_bp: 28_000, distance: 2.1, promoter_bead: 1, enhancer_bead: 2,
     min: 1.5, q1: 1.9, median: 2.1, q3: 2.3, max: 2.9, sd: 0.4, n: 5, joined_by: 'CTCF',
   },
 ]

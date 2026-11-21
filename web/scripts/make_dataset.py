@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def genes_from_gtf(gtf: Path, out: Path) -> int:
-    """gene_id, name, chrom, tss, strand of every gene line."""
+    """Returns gene_id, name, chrom, tss and strand of every gene line."""
     opener = gzip.open if str(gtf).endswith(".gz") else open
     n = 0
     with opener(gtf, "rt") as fh, out.open("w") as w:
@@ -41,8 +41,8 @@ def genes_from_gtf(gtf: Path, out: Path) -> int:
     return n
 
 
-# The site fills the stretches no loop covers with beads, which the production config leaves
-# empty: its maps are read by eye and by the rank agreement, design/gap-fill.md.
+# The site fills the stretches no loop covers with beads, which the production config leaves empty.
+# Its maps are read by eye and by the rank agreement, see design/gap-fill.md.
 HOLES = "\n[holes]\nuse_hole_beads = yes\nflank_beads = 5\n"
 
 

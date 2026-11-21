@@ -4,7 +4,7 @@ r"""Renders the figures of section 2 of the Method page, blocks and target dista
     python web/design/render_method.py figures web/design/method_data web/design/images
 
 `tables` reads the GM12878 inputs of production and the contact probability table of three cell
-lines from `playground/ps_curve.py`, and writes the small tables the figures plot. `figures`
+lines from `playground/ps_curve.py`. It writes the small tables the figures plot. `figures`
 draws `method_blocks.png`, `method_exponent.png`, `method_default.png`, `method_loops.png` and
 `method_hic.png` of section 2 and `method_anchor_terms.png` of section 3 from those tables alone.
 """
@@ -37,9 +37,7 @@ REGION = (236_000_000, 242_100_000)
 WIDTH = 7.6
 
 
-# ---------------------------------------------------------------------------------------------
 # Tables
-# ---------------------------------------------------------------------------------------------
 
 
 def tables(data_root: str, ps_curve: str, out: Path) -> None:
@@ -162,9 +160,7 @@ def anchor_tables(data_root: str, out: Path) -> dict[str, int]:
     }
 
 
-# ---------------------------------------------------------------------------------------------
 # Figures
-# ---------------------------------------------------------------------------------------------
 
 
 def style(ax: plt.Axes, grid: bool = True) -> None:
@@ -194,7 +190,7 @@ def save(fig: plt.Figure, path: Path) -> None:
 
 
 def blocks(tab: Path, out: Path) -> None:
-    """Loops of one region as arcs, the count of loops over each position and the blocks."""
+    """Draws the loops of one region as arcs, the count of loops over each position and the blocks."""
     loops = pd.read_csv(tab / "block_loops.csv")
     bl = pd.read_csv(tab / "blocks.csv")
     anchors = pd.read_csv(tab / "block_anchors.csv")
@@ -259,7 +255,7 @@ def blocks(tab: Path, out: Path) -> None:
 
 
 def exponent(tab: Path, out: Path) -> None:
-    """Contact probability of one chromosome with the fit of the exponent, and the background it gives."""
+    """Draws the contact probability of one chromosome with the fit of the exponent and the background it gives."""
     curve = pd.read_csv(tab / "contact_curve.csv")
     fit = json.loads((tab / "fits.json").read_text())["contacts"]
     nu, lo, hi = fit["nu"], fit["lo"], fit["hi"]
@@ -303,7 +299,7 @@ def exponent(tab: Path, out: Path) -> None:
 
 
 def default(tab: Path, out: Path) -> None:
-    """Contact probability of three cell lines with their exponents and the mean, the default."""
+    """Draws the contact probability of three cell lines with their exponents and the mean, the default."""
     three = pd.read_csv(tab / "three_cells.csv")
     lo, hi = 2e4, 1e6
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(WIDTH, 3.5), gridspec_kw={"width_ratios": [1.45, 1]})
@@ -355,7 +351,7 @@ def default(tab: Path, out: Path) -> None:
 
 
 def loop_targets(tab: Path, out: Path) -> None:
-    """PET count against span with the typical count, and the target of a loop of each strength."""
+    """Draws the PET count against span with the typical count and the target of a loop of each strength."""
     loops = pd.read_csv(tab / "loop_counts.csv")
     fits = json.loads((tab / "fits.json").read_text())
     f, nu = fits["loops"], fits["contacts"]["nu"]
@@ -405,7 +401,7 @@ def loop_targets(tab: Path, out: Path) -> None:
 
 
 def hic_targets(tab: Path, out: Path) -> None:
-    """The target of a Hi-C cell against its observed over expected count and against separation."""
+    """Draws the target of a Hi-C cell against its observed over expected count and against separation."""
     nu = json.loads((tab / "fits.json").read_text())["contacts"]["nu"]
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(WIDTH, 3.5))
     r = np.logspace(np.log10(0.25), np.log10(16), 200)
@@ -444,7 +440,7 @@ def hic_targets(tab: Path, out: Path) -> None:
 
 
 def anchor_terms(tab: Path, out: Path) -> None:
-    """The kind of target of every anchor pair of the region and the windows of the window term."""
+    """Draws the kind of target of every anchor pair of the region and the windows of the window term."""
     from matplotlib.colors import ListedColormap
     from matplotlib.patches import Patch
 

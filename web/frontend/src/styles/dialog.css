@@ -1,6 +1,6 @@
-/* The frame of a dialog, shared by the dialogs of the model page and of the sync panel. A
-   component imports this file before its own stylesheet, and a rule of that stylesheet with one
-   class then overrides the frame. */
+/* The frame of a dialog, shared by the dialogs of the model page and of the
+   sync panel. A component imports this file before its own stylesheet. A
+   rule of that stylesheet with one class then overrides the frame. */
 .dialog-backdrop {
   position: fixed;
   inset: 0;

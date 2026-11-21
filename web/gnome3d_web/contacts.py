@@ -1,7 +1,10 @@
-"""Contact maps of a job on one grid: the Hi-C, the model as MultiMM's 1/(d+1)^3 map or as
-counted contacts, ICE balancing and the stratum adjusted correlation of the validation battery
-(legacy/validation/metrics/hic.py). The site and the battery report one number.
+"""Contact maps of a job on one grid. The module has the Hi-C map, the model as the 1/(d+1)^3 map of
+MultiMM or as counted contacts, ICE balancing and the stratum adjusted correlation of the validation
+battery. The site and the battery report one number.
 """
+
+# pandas states the type of a column and of a selection too loosely for these checks.
+# pyright: reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
@@ -11,28 +14,34 @@ from scipy.spatial import cKDTree
 
 CONTACT_RADIUS = 1.5
 RESOLUTIONS = (1_000, 2_000, 5_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000)
-MAX_BINS = 800
+# A map of this many bins on a side is an answer of 12 MB. It is the 20 Mb of the longest job at
+# 25 kb and a twentieth more, for a start off the grid of the bins and for the bases that
+# insertions add to the region.
+MAX_BINS = 840
 
 
 def bins_for(start: int, end: int, res: int) -> np.ndarray:
-    """The left edges of the bins of a window."""
+    """Returns the left edges of the bins of a window."""
     return np.arange(start - start % res, end, res)
 
 
 def median_bond(positions: list[np.ndarray]) -> float:
-    """The median distance between consecutive beads over the structures, the battery's contact
-    radius."""
+    """Returns the median distance between consecutive beads over the
+    structures, the contact radius of the battery."""
     steps = np.concatenate([np.linalg.norm(np.diff(p, axis=0), axis=1) for p in positions if len(p) > 1] or [np.array([CONTACT_RADIUS])])
     return float(np.median(steps))
 
 
 def multimm_map(positions: list[np.ndarray], mids: np.ndarray, start: int, end: int, res: int) -> np.ndarray:
-    """MultiMM's map as the battery computes it. Per structure it is 1/(d+1)^3 of the distance
-    between bin centroids, in units of the median step between neighbouring bins, averaged over
-    the structures.
+    """Computes the map of MultiMM as the battery computes it. Per structure
+    it is 1/(d+1)^3 of the distance between bin centroids, in units of the
+    median step between neighbouring bins, averaged over the structures.
 
     @param positions the bead positions of each structure, in one bead order
     @param mids the genomic midpoints of the beads in that order
+    @param start the start of the window in bp
+    @param end the end of the window in bp
+    @param res the bin size in bp
     """
     edges = bins_for(start, end, res)
     n = len(edges)
@@ -56,10 +65,15 @@ def multimm_map(positions: list[np.ndarray], mids: np.ndarray, start: int, end: 
 
 
 def model_map(positions: list[np.ndarray], mids: np.ndarray, start: int, end: int, res: int, radius: float = CONTACT_RADIUS) -> np.ndarray:
-    """Bead pairs closer than `radius`, summed over the structures, binned by bead midpoint.
+    """Counts the bead pairs closer than `radius`, summed over the
+    structures and binned by bead midpoint.
 
     @param positions the bead positions of each structure, in one bead order
     @param mids the genomic midpoints of the beads in that order
+    @param start the start of the window in bp
+    @param end the end of the window in bp
+    @param res the bin size in bp
+    @param radius the distance under which two beads are in contact
     """
     edges = bins_for(start, end, res)
     n = len(edges)
@@ -78,7 +92,7 @@ def model_map(positions: list[np.ndarray], mids: np.ndarray, start: int, end: in
 
 
 def hic_map(singletons: pd.DataFrame, chrom: str, start: int, end: int, res: int) -> np.ndarray:
-    """The contact pairs of a BEDPE file in a window, each end placed by its start column."""
+    """Reads the contact pairs of a BEDPE file in a window, each end placed by its start column."""
     edges = bins_for(start, end, res)
     n = len(edges)
     t = singletons[(singletons[0] == chrom) & (singletons[3] == chrom)]
@@ -94,10 +108,15 @@ def hic_map(singletons: pd.DataFrame, chrom: str, start: int, end: int, res: int
 
 
 def window_map(counts: np.ndarray, first: int, step: int, start: int, end: int, res: int) -> np.ndarray:
-    """A square map on bins of its own put onto the grid of a window. A bin of the map gives a
-    bin of the grid the share of its length that is inside it.
+    """Puts a square map on bins of its own onto the grid of a window. A bin of the map gives a bin
+    of the grid the share of its length that is inside it.
 
     @param counts the map, bin `i` from `first + i * step`
+    @param first the start of the first bin of the map in bp
+    @param step the bin size of the map in bp
+    @param start the start of the window in bp
+    @param end the end of the window in bp
+    @param res the bin size of the grid in bp
     """
     edges = bins_for(start, end, res)[:, None]
     lo = (first + np.arange(counts.shape[0]) * step)[None, :]
@@ -106,7 +125,8 @@ def window_map(counts: np.ndarray, first: int, step: int, start: int, end: int, 
 
 
 def ice(m: np.ndarray, iterations: int = 200) -> np.ndarray:
-    """Iterative correction: rows and columns scaled until every non empty row has one sum."""
+    """Balances a map by iterative correction. Rows and columns are scaled
+    until every non empty row has one sum."""
     out = m.astype(float).copy()
     live = out.sum(axis=1) > 0
     if not live.any():
@@ -124,10 +144,9 @@ def ice(m: np.ndarray, iterations: int = 200) -> np.ndarray:
 
 
 def scc(a: np.ndarray, b: np.ndarray, res: int, max_bp: int = 2_000_000) -> float | None:
-    """The stratum adjusted correlation as the battery computes it, legacy/validation/metrics/hic.py
-    _scc: the Pearson correlation of each whole diagonal up to max_bp, zeros included, weighted by
-    its length and the two standard deviations. None when no diagonal has two maps with
-    variance."""
+    """Returns the stratum adjusted correlation as the battery computes it. It is the Pearson
+    correlation of each whole diagonal up to max_bp, zeros included, weighted by its length and the
+    two standard deviations. None when no diagonal has two maps with variance."""
     n = len(a)
     num = den = 0.0
     for k in range(1, min(n - 1, max_bp // res) + 1):
@@ -144,11 +163,16 @@ def scc(a: np.ndarray, b: np.ndarray, res: int, max_bp: int = 2_000_000) -> floa
 
 
 def rank_strata(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> list[tuple[int, int, float]]:
-    """The Spearman correlation of each diagonal over the kept bins, as (separation in bins,
-    pairs, correlation). Stops at max_bp or before a diagonal with under min_filled of its pairs
-    above zero in either map.
+    """Returns the Spearman correlation of each diagonal over the kept bins,
+    as (separation in bins, pairs, correlation).
 
+    @param a one map
+    @param b the other map on the same grid
+    @param res the bin size in bp
     @param keep the bins compared, every bin when None
+    @param max_bp the largest separation compared
+    @param min_filled the least share of the pairs of a diagonal above zero in both maps. The first
+        diagonal under it ends the comparison.
     """
     from scipy.stats import spearmanr
 
@@ -168,8 +192,8 @@ def rank_strata(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None 
 
 
 def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> float | None:
-    """The diagonals of rank_strata averaged with the length of the diagonal as weight. None
-    when no diagonal counts.
+    """Averages the diagonals of rank_strata with the length of the diagonal
+    as weight. None when no diagonal counts.
     """
     strata = rank_strata(a, b, res, keep, max_bp, min_filled)
     den = sum(n for _, n, _ in strata)
@@ -177,20 +201,24 @@ def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | No
 
 
 def rank_reach(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> int:
-    """The largest separation in bp that rank_agreement counted, 0 when none."""
+    """Returns the largest separation in bp that rank_agreement counted, 0 when none."""
     strata = rank_strata(a, b, res, keep, max_bp, min_filled)
     return strata[-1][0] * res if strata else 0
 
 
 def coarsest_fit(start: int, end: int) -> int:
-    """The finest resolution with no more than MAX_BINS bins over a window."""
+    """Returns the finest resolution with no more than MAX_BINS bins over a window."""
     return next(r for r in RESOLUTIONS if len(bins_for(start, end, r)) <= MAX_BINS)
 
 
 def loop_map(rows: list[tuple[int, int, int]], start: int, end: int, res: int) -> np.ndarray:
-    """Loops as a map: each loop's PET count at the bins of its two anchor midpoints.
+    """Bins loops as a map. Each loop has its PET count at the bins of its two anchor midpoints.
 
-    @param rows (midpoint of anchor a, midpoint of anchor b, PET count) of the loops on the chromosome
+    @param rows the midpoint of anchor a, the midpoint of anchor b and the
+        PET count of each loop on the chromosome
+    @param start the start of the window in bp
+    @param end the end of the window in bp
+    @param res the bin size in bp
     """
     edges = bins_for(start, end, res)
     n = len(edges)
@@ -204,9 +232,9 @@ def loop_map(rows: list[tuple[int, int, int]], start: int, end: int, res: int) -
 
 
 def loop_enrichment(loops: np.ndarray, other: np.ndarray) -> float | None:
-    """The mean observed over expected of a map at the loop pixels, the expected of each diagonal
-    taken from its pixels that hold no loop. Above 1 the map is raised where the loops are. None
-    without a loop pixel that has an expectation."""
+    """Returns the mean observed over expected of a map at the loop pixels. The expected of each
+    diagonal is taken from its pixels that hold no loop. Above 1 the map is raised at the loops.
+    None without a loop pixel that has an expectation."""
     ratios = []
     n = len(loops)
     for k in range(1, n):

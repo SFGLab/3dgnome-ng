@@ -1,3 +1,5 @@
+import type { Part } from '../flags'
+
 /** Every work the site cites, in the order of the Cite page. Copy from web/design/site.pen. */
 export type Reference = {
   key: string
@@ -9,6 +11,8 @@ export type Reference = {
   doi?: string
   url?: string
   unconfirmed?: boolean
+  /** The feature of the site the work belongs to. The Cite page leaves it out while the feature is off. */
+  feature?: Part
 }
 
 export const REFERENCES: Reference[] = [
@@ -173,6 +177,31 @@ export const REFERENCES: Reference[] = [
     authors: 'Browning BL, Zhou Y, Browning SR', venue: 'American Journal of Human Genetics 103, 338-348',
   },
   {
+    key: 'mage2024', group: 'data', year: 2024, doi: '10.1038/s41586-024-07708-2',
+    title: 'Sources of gene expression variation in a globally diverse human cohort',
+    authors: 'Taylor DJ, Chhetri SB, Tassia MG, et al.', venue: 'Nature 632, 122-130',
+  },
+  {
+    key: 'geuvadis2013', group: 'data', year: 2013, doi: '10.1038/nature12531',
+    title: 'Transcriptome and genome sequencing uncovers functional variation in humans',
+    authors: 'The Geuvadis Consortium, Lappalainen T, Sammeth M, et al.', venue: 'Nature 501, 506-511',
+  },
+  {
+    key: 'trios2015', group: 'data', year: 2015, feature: 'trios', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB11271',
+    title: 'Strand-specific Illumina TruSeq mRNA sequencing libraries of 1000 Genomes Trios',
+    authors: 'Center for Human Genetic Research', venue: 'European Nucleotide Archive, study PRJEB11271',
+  },
+  {
+    key: 'deseq2', group: 'algorithms', year: 2014, doi: '10.1186/s13059-014-0550-8',
+    title: 'Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2',
+    authors: 'Love MI, Huber W, Anders S', venue: 'Genome Biology 15, 550',
+  },
+  {
+    key: 'pydeseq2', group: 'algorithms', year: 2023, doi: '10.1093/bioinformatics/btad547',
+    title: 'PyDESeq2: a python package for bulk RNA-seq differential expression analysis',
+    authors: 'Muzellec B, Teleńczuk M, Cabeli V, Andreux M', venue: 'Bioinformatics 39, btad547',
+  },
+  {
     key: 'hicdiffusion2024', group: 'data', year: 2024, doi: '10.1186/s12864-024-10885-z',
     title: 'HiCDiffusion - diffusion-enhanced, transformer-based prediction of chromatin interactions from DNA sequences',
     authors: 'Chiliński M, Plewczynski D', venue: 'BMC Genomics 25, 964',
@@ -183,12 +212,12 @@ export const REFERENCES: Reference[] = [
 export type Accession = { id: string; url: string }
 
 /**
- * A row of the Cite page's data table.
- * `accessions` are the records the data came from, the experiment or set first and its files
- * after it. `pending` says what is still to be recorded and stands in the accession column.
- * A row without `ref` has no confirmed source to cite yet.
+ * A row of the data table of the Cite page. `accessions` are the records the data came from, the
+ * experiment or set first and its files after it. `pending` states what is still to be recorded and
+ * is shown in the accession column. A row without `ref` has no confirmed source to cite yet. A row
+ * with `feature` is shown while that feature of the site is on.
  */
-export type DataSource = { data: string; usedFor: string; accessions: Accession[]; note?: string; pending?: string; label: string; ref?: string }
+export type DataSource = { data: string; usedFor: string; accessions: Accession[]; note?: string; pending?: string; label: string; ref?: string; feature?: Part }
 
 const encode = (id: string): Accession => ({ id, url: `https://www.encodeproject.org/${id.startsWith('ENCSR') ? 'experiments' : 'files'}/${id}/` })
 const fourDn = (id: string): Accession => ({ id, url: `https://data.4dnucleome.org/${id.startsWith('4DNES') ? 'experiment-set-replicates' : 'files-processed'}/${id}/` })
@@ -199,23 +228,23 @@ export const DATA_SOURCES: DataSource[] = [
   { data: 'CTCF in situ ChIA-PET loops, H1ESC', usedFor: 'loops', accessions: [fourDn('4DNESR9S8R38'), encode('ENCSR095SXC'), geo('GSE242609')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'CTCF in situ ChIA-PET loops, HFFc6', usedFor: 'loops', accessions: [fourDn('4DNESCQ7ZD21')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
   {
-    data: 'RNAPII ChIA-PET loops and peaks, GM12878', usedFor: 'loops',
+    data: 'RNAPII ChIA-PET loops and peaks, GM12878', usedFor: 'loops, peaks for filtering RNAPII loops',
     accessions: ['ENCSR905HWW', 'ENCFF040KUS', 'ENCFF913VWM', 'ENCFF109HCZ', 'ENCFF578JKO'].map(encode),
     label: 'ENCODE, Nature 2020', ref: 'encode2020',
   },
   {
-    data: 'RNAPII ChIA-PET loops and peaks, H1ESC', usedFor: 'loops',
+    data: 'RNAPII ChIA-PET loops and peaks, H1ESC', usedFor: 'loops, peaks for filtering RNAPII loops',
     accessions: ['ENCSR782EKZ', 'ENCFF324UIT', 'ENCFF753NSM', 'ENCFF665IXY', 'ENCFF116RLS'].map(encode),
     label: 'ENCODE, Nature 2020', ref: 'encode2020',
   },
   {
-    data: 'RNAPII ChIA-PET loops and peaks, BJ', usedFor: 'loops of HFFc6', note: 'BJ is another foreskin fibroblast line. It stands in for HFFc6.',
+    data: 'RNAPII ChIA-PET loops and peaks, BJ', usedFor: 'loops of HFFc6, peaks for filtering RNAPII loops', note: 'BJ is another foreskin fibroblast line. It stands in for HFFc6.',
     accessions: ['ENCSR956IXE', 'ENCFF601NEC', 'ENCFF808QOQ', 'ENCFF775SCY', 'ENCFF428VXI', 'ENCFF084CXY', 'ENCFF953MBK'].map(encode),
     label: 'ENCODE, Nature 2020', ref: 'encode2020',
   },
-  { data: 'CTCF ChIP-seq peaks, GM12878', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000DZN', 'ENCFF796WRU'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
-  { data: 'CTCF ChIP-seq peaks, H1ESC', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000BNH', 'ENCFF497ZGV'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
-  { data: 'CTCF ChIP-seq peaks, HFFc6', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR163ULN', 'ENCFF414XTM'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, GM12878', usedFor: 'filtering CTCF loops', accessions: ['ENCSR000DZN', 'ENCFF796WRU'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, H1ESC', usedFor: 'filtering CTCF loops', accessions: ['ENCSR000BNH', 'ENCFF497ZGV'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, HFFc6', usedFor: 'filtering CTCF loops', accessions: ['ENCSR163ULN', 'ENCFF414XTM'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
   { data: 'Hi-C, GM12878', usedFor: 'contact background, agreement', accessions: ['4DNES3JX38V5', '4DNFIXP4QG5B'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'Hi-C, H1ESC', usedFor: 'contact background, agreement', accessions: ['4DNES2M5JIGV', '4DNFI6HDY7WZ'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'Hi-C, HFFc6', usedFor: 'contact background, agreement', accessions: ['4DNES2R6PUEK', '4DNFIB59T7NN'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
@@ -226,8 +255,31 @@ export const DATA_SOURCES: DataSource[] = [
   },
   { data: 'Micro-C, H1ESC', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI2TK7L2F')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'Micro-C, HFFc6', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI18Q799K')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
-  { data: 'Gene expression, total RNA-seq of GM12878, H1 and HFFc6', usedFor: 'link to expression', accessions: ['ENCSR820PHH', 'ENCSR895ZTB', 'ENCSR420ZKB'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
-  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line. The atlas gives no accession.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
+  {
+    data: 'Gene expression, total RNA-seq of GM12878, H1 and HFFc6', usedFor: 'expression of a job, link to expression',
+    accessions: ['ENCSR820PHH', 'ENCSR895ZTB', 'ENCSR420ZKB', 'ENCFF800HIP', 'ENCFF991KKX', 'ENCFF675NTU', 'ENCFF379NOY', 'ENCFF307KUI', 'ENCFF294BSI', 'ENCFF937TEI'].map(encode),
+    note: 'Read counts of the aligned reads of each replicate over the genes of GENCODE release 29, counted with featureCounts.',
+    label: 'ENCODE, Nature 2020', ref: 'encode2020',
+  },
+  {
+    data: 'Gene expression, mRNA-seq of the nine people of three 1000 Genomes trios', usedFor: 'expression of a job',
+    accessions: [{ id: 'PRJEB11271', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB11271' }],
+    note: 'Read counts of one library a person, on their lymphoblastoid cell lines. The people are HG00512 to HG00514, HG00731 to HG00733 and NA19238 to NA19240.',
+    label: 'ENA study PRJEB11271, 2015', ref: 'trios2015', feature: 'trios',
+  },
+  {
+    data: 'Gene expression, MAGE, 731 people of the 1000 Genomes panel', usedFor: 'expression of a job',
+    accessions: [{ id: 'PRJNA851328', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJNA851328' }],
+    note: 'TMM values of the lymphoblastoid cell lines, TMM.filtered.TSS.MAGE.v1.0.bed.gz of MAGE v1.0.',
+    label: 'Taylor et al., Nature 2024', ref: 'mage2024',
+  },
+  {
+    data: 'Gene expression, GEUVADIS, 462 people of the 1000 Genomes panel', usedFor: 'expression of a job',
+    accessions: [{ id: 'E-GEUV-1', url: 'https://www.ebi.ac.uk/biostudies/arrayexpress/studies/E-GEUV-1' }],
+    note: 'RPKM of the lymphoblastoid cell lines, GD660.GeneQuantRPKM.txt.gz. A person with several libraries has their mean.',
+    label: 'Lappalainen et al., Nature 2013', ref: 'geuvadis2013',
+  },
+  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
   { data: 'Genes, GENCODE release 40, basic annotation', usedFor: 'promoter marks and gene names', accessions: [{ id: 'GENCODE v40', url: 'https://www.gencodegenes.org/human/release_40.html' }], label: 'Frankish et al., NAR 2021', ref: 'gencode2021' },
   {
     data: 'Structural variants, 1000 Genomes 30x, 3,202 samples', usedFor: 'variant structures',
@@ -254,15 +306,15 @@ export const DATA_SOURCES: DataSource[] = [
     accessions: [{ id: 'GCA_000001405.15', url: 'https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_000001405.15/' }],
     note: 'GRCh38, the UCSC hg38 FASTA.', label: 'Schneider et al., Genome Research 2017', ref: 'grch38',
   },
-  { data: 'HiCDiffusion model', usedFor: 'contact background from sequence', accessions: [], note: 'The checkpoints of the authors. They have no accession.', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
+  { data: 'HiCDiffusion model', usedFor: 'contact background from sequence', accessions: [], note: 'The checkpoints of the authors.', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
 ]
 
-/** The link of a reference, its DOI or its URL. */
+/** Returns the link of a reference, its DOI or its URL. */
 export function referenceLink(r: Reference): string | undefined {
   return r.doi ? `https://doi.org/${r.doi}` : r.url
 }
 
-/** A reference as one line of plain text. */
+/** Returns a reference as one line of plain text. */
 export function referenceText(r: Reference): string {
   const link = r.doi ? ` doi:${r.doi}` : r.url ? ` ${r.url}` : ''
   return `${r.authors}. ${r.title}. ${r.venue} (${r.year}).${link}`

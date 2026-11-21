@@ -286,3 +286,6 @@ data/
 
 # superpowers
 .superpowers/
+
+# The job directories of the site's tests are kept whole, with their logs.
+!web/tests/job_on_disk/**/engine.log

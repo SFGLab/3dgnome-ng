@@ -7,15 +7,16 @@ import { Method } from './pages/Method'
 import { Model } from './pages/Model'
 import { Examples } from './pages/Examples'
 import { MyJobs } from './pages/MyJobs'
+import { NotFound } from './pages/NotFound'
 import { Privacy } from './pages/Privacy'
 import { Results } from './pages/Results'
 import { Title } from './pages/Title'
 import { BASE } from './base'
 import { hidden } from './flags'
 import { ROUTES } from './routes'
-import { startSync } from './sync/sync'
+import { startSync } from './myjobs/sync'
 
-// The explorer carries three.js and loads only on a job page.
+// The explorer includes three.js and loads only on a job page.
 const Job = lazy(() => import('./pages/Job').then((m) => ({ default: m.Job })))
 
 /** The site's routes. */
@@ -39,7 +40,7 @@ export function App() {
           <Route path={ROUTES.privacy} element={<Privacy />} />
           <Route path="/jobs/:key" element={<Job kind="jobs" />} />
           <Route path="/p/:key" element={<Job kind="p" />} />
-          <Route path="*" element={null} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
       </Layout>

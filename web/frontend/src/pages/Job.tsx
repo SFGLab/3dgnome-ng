@@ -1,9 +1,9 @@
+import { askedOf, ApiError, jobApi, type Loop } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { jobApi, type Loop } from '../job/api'
 import { JobSidePanel } from '../job/SidePanel'
-import { Compare } from '../job/Compare'
+import { Compare } from '../job/compare/Compare'
 import { Progress } from '../job/Progress'
 import { ContactMapTab } from '../job/ContactMapTab'
 import { GenesPanel } from '../job/GenesPanel'
@@ -11,9 +11,16 @@ import { LogTab } from '../job/LogTab'
 import { LoopsTab } from '../job/LoopsTab'
 import { StructureTab } from '../job/StructureTab'
 import { JobTabs, type Tab } from '../job/Tabs'
-import './job.css'
+import { NotFound } from './NotFound'
+import { scoped } from '../lib/css'
+import sheet from '../job/job.module.css'
 
-/** The explorer of one job: its side panel, its tabs and its state while it is not done. */
+const cn = scoped(sheet)
+
+/** Returns true for an answer of the server that it has no such job. */
+const missing = (error: unknown) => error instanceof ApiError && error.status === 404
+
+/** The explorer of one job, with its side panel, its tabs and its state while it is not done. */
 export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: number }) {
   const { key = '' } = useParams()
   const api = useMemo(() => jobApi(kind, key), [kind, key])
@@ -29,23 +36,27 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const [geneFilter, setGeneFilter] = useState('')
   const [loop, setLoop] = useState<Loop | null>(null)
   const summary = useQuery({
-    queryKey: ['summary', api.base],
-    queryFn: api.summary,
-    refetchInterval: (q) => (q.state.data && ['done', 'failed'].includes(q.state.data.state) ? false : pollMs),
+    ...askedOf(api).summary(),
+    // A finished job is not asked for again. A job the site does not have
+    // is not asked for again either.
+    refetchInterval: (q) => ((q.state.data && ['done', 'failed'].includes(q.state.data.state)) || missing(q.state.error) ? false : pollMs),
+    retry: (failures, error) => !missing(error) && failures < 3,
   })
+  // The address of a job the site does not have, a deleted private job for one, gets the page of a missing address.
+  if (summary.isError && missing(summary.error)) return <NotFound />
   if (summary.isError)
     return (
-      <div className="job-page">
-        <p className="job-message">{summary.error.message}</p>
+      <div className={cn('job-page')}>
+        <p className={cn('job-message')}>{summary.error.message}</p>
       </div>
     )
-  if (!summary.data) return <div className="job-page" aria-busy="true" />
+  if (!summary.data) return <div className={cn('job-page')} aria-busy="true" />
   const s = summary.data
   const pick = async (which: 'medoid' | 'compact' | 'random') => setSelected((await api.picks())[which])
   return (
-    <div className="job-page">
+    <div className={cn('job-page')}>
       <JobSidePanel api={api} summary={s} selected={selected} onSelect={setSelected} onPick={(w) => void pick(w)} />
-      <div className="job-main">
+      <div className={cn('job-main')}>
         {s.state === 'done' ? (
           <>
             <JobTabs
@@ -56,7 +67,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
               onTab={(t) => go({ tab: t })}
               onCompare={() => go(comparing ? { tab } : { tab, compare: '' })}
             />
-            <div className="tab-body" role="tabpanel">
+            <div className={cn('tab-body')} role="tabpanel">
               {comparing && (
                 <Compare
                   key={compareTo}
@@ -113,12 +124,12 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
             </div>
           </>
         ) : s.state === 'failed' ? (
-          <div className="job-message">
+          <div className={cn('job-message')}>
             <p className="field-error">{s.error}</p>
-            {s.log_tail && <pre className="log-tail">{s.log_tail}</pre>}
+            {s.log_tail && <pre className={cn('log-tail')}>{s.log_tail}</pre>}
           </div>
         ) : (
-          <div className="job-message">
+          <div className={cn('job-message')}>
             <Progress summary={s} />
           </div>
         )}

@@ -1,7 +1,4 @@
-"""One job end to end with a stand in engine, the cache key and the failure path.
-
-    pytest web/tests/test_jobs.py
-"""
+"""One job end to end with a stand in engine, the cache key and the failure path."""
 
 from __future__ import annotations
 
@@ -14,8 +11,9 @@ from typing import Any
 import pytest
 from fixture import make_data
 
-from gnome3d_web.catalog import Catalog
-from gnome3d_web.jobs import JobRequest, request_key, run_job
+from gnome3d_web.catalog.model import Catalog
+from gnome3d_web.jobs.request import JobRequest, request_key
+from gnome3d_web.jobs.run import run_job
 
 FAKE = [sys.executable, str(Path(__file__).resolve().parent / "fake_engine.py")]
 
@@ -51,8 +49,39 @@ def test_the_key_of_a_request_is_the_one_sites_already_hold(shared: SimpleNamesp
     # or of the way a request is normalised, leaves every job of a running site unfound.
     pinned = request_key(JobRequest(cell_type="GMX", region="chr1:0-2000000", factors="CTCF"), cat)
     assert pinned == "c873ddce1421a87d", "the key of a request is the one sites already hold: " + str(pinned)
-    assert JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=100).n_models == 100, "100 structures are kept"
-    assert JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=101).n_models == 100, "101 structures become 100"
+
+
+PINNED = {
+    "c873ddce1421a87d": {},
+    "96071a273062bc05": {"overrides": {"main.max_pet_length": "500000"}},
+    "605cacfc38f29170": {"background": "none"},
+    "f66e8e743343f8d5": {"background": "hicdiffusion"},
+    "fb02098fea02316a": {"sv_set": "DEMO", "sample": "P1", "haplotype": 1},
+    "0270be8d18354544": {"region": "ALPHA"},
+    "06fcd575c78e41b2": {"factors": "CTCF+RNAPII"},
+    "25b7a3d8dfead60b": {"n_models": 5},
+    "fc12af0964faecb8": {"n_models": 100},
+    "7d5e0b32a2eb3e80": {"expression": {"source": "LINES", "columns": ["a1", "a2"], "kind": "counts", "unit": "", "label": "Lines RNA-seq of GMX, 2 replicates"}},
+}
+
+
+@pytest.mark.parametrize("key", PINNED)
+def test_the_keys_of_the_kinds_of_request_are_the_ones_sites_hold(key: str, shared: SimpleNamespace) -> None:
+    fields = {"cell_type": "GMX", "region": "chr1:0-2000000", "factors": "CTCF", **PINNED[key]}
+    now = request_key(JobRequest(**fields), shared.cat)  # type: ignore[arg-type]
+    assert now == key, f"the key of a request with {PINNED[key]} is the one sites already hold: {now}"
+
+
+def test_requests_that_ask_for_the_same_job_have_one_key(shared: SimpleNamespace) -> None:
+    cat = shared.cat
+    key = lambda **more: request_key(JobRequest(**{"cell_type": "GMX", "region": "chr1:0-2000000", "factors": "CTCF", **more}), cat)  # type: ignore[arg-type]  # noqa: E731
+    assert key(sample="P1", haplotype=1) == key(), "a sample without a call set is not in the key"
+    assert key(background="hic") == key(), "the Hi-C background is the request without a background"
+    assert key(overrides={}) == key() and key(expression={}) == key(), "empty overrides and no expression are the request without them"
+    table = {"source": "LINES", "columns": ["a1", "a2"], "kind": "counts"}
+    moved = {**table, "label": "Another label", "unit": "TPM", "path": "/another/place/lines.tsv"}
+    assert key(expression=table) == key(expression=moved) == "7d5e0b32a2eb3e80", "the label of a table and its place on a server are not in the key"
+    assert key(expression={**table, "columns": ["a1"]}) != key(expression=table) != key(expression={**table, "source": "OTHER"}), "its columns and its source are"
 
 
 def test_the_contact_background_is_in_the_key(other: Any, shared: SimpleNamespace) -> None:
@@ -105,7 +134,7 @@ def test_marks_list_promoter_and_enhancer_beads(status_and_res: SimpleNamespace)
 
 def test_a_listed_cell_type_marks_its_own_enhancers(shared: SimpleNamespace) -> None:
     cat = shared.cat
-    from gnome3d_web.jobs import _lifted_marks
+    from gnome3d_web.jobs.run import _lifted_marks
 
     ct = cat.cell_types["GMX"]
     _, enh = _lifted_marks(ct, "chr1", [], None)
@@ -122,8 +151,6 @@ def log_and_first_and_part(other: Any, shared: SimpleNamespace) -> SimpleNamespa
     part = Path(d) / "results" / "part"
     run_job(other, cat, part, engine=FAKE)
     first = (part / "engine.log").read_text()
-    kept = sorted((part / "models").glob("*.cif"))[0]
-    stamp = kept.stat().st_mtime_ns
     sorted((part / "models").glob("*.cif"))[1].rename(part / "models" / "gone")
     run_job(other, cat, part, engine=FAKE)
     log = (part / "engine.log").read_text()

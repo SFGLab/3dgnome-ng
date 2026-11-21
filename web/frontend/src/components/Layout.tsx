@@ -6,7 +6,10 @@ import { CiteStrip } from './CiteStrip'
 import { PrivacyNotice } from './PrivacyNotice'
 import { ThemeSwitch } from './ThemeSwitch'
 import { Wordmark } from './Wordmark'
-import './layout.css'
+import { scoped } from '../lib/css'
+import sheet from './layout.module.css'
+
+const cn = scoped(sheet)
 
 const NAV: [string, string][] = [
   ['Model a region', ROUTES.model],
@@ -20,8 +23,8 @@ const NAV: [string, string][] = [
 /** The top bar, the page, the cite strip and the privacy notice of a first visit. */
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    <div className="layout">
-      <header className="top-bar">
+    <div className={cn('layout')}>
+      <header className={cn('top-bar')}>
         <Link className="brand" to={ROUTES.title}>
           <Wordmark />
         </Link>

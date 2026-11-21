@@ -2,8 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { recentJobs, rememberJob } from '../model/recent'
-import { resetSync, syncState } from '../sync/sync'
+import { recentJobs, rememberJob } from '../myjobs/recent'
+import { resetSync, syncState } from '../myjobs/sync'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { mockLists } from '../test/lists'
@@ -132,8 +132,8 @@ describe('My jobs', () => {
     expect(dialog).toHaveTextContent('The jobs stay on this computer and the code keeps working on the others.')
     expect(checkCopy(container)).toEqual([])
     expect(checkCopy(dialog)).toEqual([])
-    // Stop syncing is the red button at the end, where a dialog has its action. Keep syncing is
-    // plain, at the place of Cancel, and has the focus. It closes the dialog and changes nothing.
+    // Stop syncing is the red button at the end, the place of the action of a dialog. Keep syncing
+    // is plain, at the place of Cancel. It has the focus, closes the dialog and changes nothing.
     const [keep, stop] = within(dialog).getAllByRole('button').slice(-2)
     expect(keep).toHaveTextContent('Keep syncing')
     expect(keep).toHaveClass('secondary')

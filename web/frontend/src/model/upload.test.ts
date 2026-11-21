@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { guessFactor, megabytes, ownField } from './upload'
+import { guessFactor, NO_OWN, ownData, ownField } from './upload'
+import { megabytes } from '../lib/format'
+import { type UploadResult } from '../api'
 
 describe('upload helpers', () => {
   it('writes a file size in MB and in kB under a tenth of a MB', () => {
@@ -16,12 +18,21 @@ describe('upload helpers', () => {
   })
 
   it('names each upload by its id in the job field', () => {
-    const u = { id: 'abc12345', kind: 'loops' as const, name: 'a', size: 1, ok: true, summary: '', error: null, samples: [] }
+    const u = { id: 'abc12345', kind: 'loops' as const, name: 'a', size: 1, ok: true, summary: '', error: null, samples: [], counts: false }
     expect(JSON.parse(ownField({ loops: [{ factor: 'CTCF', upload: u }], anchors: null, contacts: u, enhancers: null }))).toEqual({
       loops: [{ factor: 'CTCF', upload: 'abc12345' }],
       anchors: null,
       contacts: 'abc12345',
       enhancers: null,
     })
+  })
+
+  it('names the data of the own data card as the data of a listed cell type is named', () => {
+    const file = (kind: UploadResult['kind']): UploadResult => ({ id: kind, kind, name: `${kind}.bed`, size: 1, ok: true, summary: '', error: null, samples: [], counts: false })
+    expect(ownData(NO_OWN)).toEqual([])
+    expect(ownData({ ...NO_OWN, loops: [{ factor: 'CTCF', upload: file('loops') }, { factor: 'RNAPII', upload: file('loops') }], contacts: file('contacts'), enhancers: file('enhancers') })).toEqual(['CTCF', 'RNAPII', 'contacts', 'enhancers'])
+    // A set taken from a listed cell type has the name of that cell type. No enhancers is no chip.
+    expect(ownData({ ...NO_OWN, contacts: file('contacts'), loopsFrom: 'H1ESC', enhancersFrom: 'GM12878' })).toEqual(['H1ESC loops', 'contacts', 'GM12878 enhancers'])
+    expect(ownData({ ...NO_OWN, loopsFrom: 'H1ESC', enhancersFrom: 'none' })).toEqual(['H1ESC loops'])
   })
 })

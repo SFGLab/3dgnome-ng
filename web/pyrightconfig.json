@@ -1,0 +1,18 @@
+{
+  "include": [
+    "gnome3d_web"
+  ],
+  "extraPaths": [
+    ".",
+    "vendor",
+    ".."
+  ],
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.12",
+  "reportMissingTypeStubs": false,
+  "reportMissingModuleSource": false,
+  "pythonPlatform": "Linux",
+  "exclude": [
+    "gnome3d_web/engine/hicdiffusion_env"
+  ]
+}

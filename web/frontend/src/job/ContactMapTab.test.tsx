@@ -4,13 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, KEY, SUMMARY_DONE } from '../test/job'
-import { jobApi } from './api'
+import { jobApi, square } from '../api'
 import { ContactMapTab } from './ContactMapTab'
 
 const MAP = {
   bins: [11_500_000, 11_525_000, 11_550_000],
-  upper: [[5, 2, 1], [2, 6, 3], [1, 3, 7]],
-  lower: [[9, 4, 1], [4, 8, 2], [1, 2, 9]],
+  // Each map as the server sends it, each pair of bins once, row i from column i on.
+  upper: [[5, 2, 1], [6, 3], [7]],
+  lower: [[9, 4, 1], [8, 2], [9]],
   upper_label: 'Hi-C of GM12878',
   lower_label: 'This job, 1/(d+1)³ between bins, mean of 100 structures',
   scc: 0.37,
@@ -43,10 +44,44 @@ describe('ContactMapTab', () => {
     expect(url).toContain('lower=model')
   })
 
+  it('opens the longest job at 25 kb and a longer region at the finest resolution it fits', async () => {
+    const asked = async (region: string) => {
+      const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+      const view = render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region }} />
+        </QueryClientProvider>,
+      )
+      await screen.findByText('0.21')
+      const first = f.mock.calls.map(([u]) => new URL(String(u), 'http://x')).find((u) => u.pathname.endsWith('/contacts'))!
+      view.unmount()
+      vi.unstubAllGlobals()
+      return first.searchParams.get('res')
+    }
+    // 20 Mb with the bases of its insertions, from a start off the grid, is 801 bins at 25 kb.
+    expect(await asked('chr3:120184079-140189332')).toBe('25000')
+    // 30 Mb is 1,200 bins at 25 kb and 600 at 50 kb.
+    expect(await asked('chr3:120000000-150000000')).toBe('50000')
+  })
+
+  it('rebuilds the whole of each map from the one half the server sends', async () => {
+    expect(square(MAP.upper)).toEqual([[5, 2, 1], [2, 6, 3], [1, 3, 7]])
+    expect(square(MAP.lower)).toEqual([[9, 4, 1], [4, 8, 2], [1, 2, 9]])
+    expect(square([])).toEqual([])
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    const maps = await jobApi('jobs', KEY).contacts({ region: 'chr1:11500000-11575000', res: 25000, upper: 'hic', lower: 'model', norm: 'ice' })
+    // The cell below the diagonal is the cell above it.
+    expect(maps.upper[2][0]).toBe(1)
+    expect(maps.lower[1][0]).toBe(4)
+    expect(maps.upper.map((r) => r.length)).toEqual([3, 3, 3])
+  })
+
   it('shows the agreement with Hi-C and how it was computed', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
     const card = await screen.findByRole('region', { name: 'Agreement of the two halves' })
+    // A map that is read can be saved as a PNG.
+    expect(screen.getByRole('button', { name: 'Save the map as a PNG' })).toBeEnabled()
     expect(within(card).getByText('0.21')).toBeInTheDocument()
     expect(within(card).getByText('Spearman correlation')).toBeInTheDocument()
     expect(within(card).getByText('Pairs of bins the same distance apart are compared, up to 2 Mb. The fall of contacts with distance adds nothing to this number.')).toBeInTheDocument()
@@ -85,7 +120,8 @@ describe('ContactMapTab', () => {
     const canvas = document.querySelector('canvas')!
     fireEvent.wheel(canvas, { deltaY: -100 })
     const box = document.querySelector<HTMLElement>('.zoom-box')!
-    expect([box.style.left, box.style.top, box.style.width, box.style.height].map(parseFloat).map(Math.round)).toEqual([10, 10, 80, 80])
+    // One notch takes about a tenth off the map, the same on every side.
+    expect([box.style.left, box.style.top, box.style.width, box.style.height].map(parseFloat).map(Math.round)).toEqual([5, 5, 91, 91])
     fireEvent.wheel(canvas, { deltaY: 100 })
     fireEvent.wheel(canvas, { deltaY: 100 })
     expect(document.querySelector('.zoom-box')).toBeNull()

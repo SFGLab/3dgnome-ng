@@ -213,6 +213,7 @@ note under `design/` states hardware by its model.
   `design/microc-loops.md` have the RNAPII work.
 - `design/tools-comparison.md`, `design/validation-2026-09.md` and `design/validation-metrics.md` have the validation.
 - `design/4dn-data-access.md` has the access to 4DN files.
-- `design/website/` has the deployment, the data directory, the settings, the frontend and the jobs of the site.
+- `design/website/` has the deployment, the data directory, the settings, the frontend, the jobs and the layout of the
+  server code of the site.
 - `legacy/README.md` has the retired code. `legacy/3dnome/` is read only.
 - `data/memory/MEMORY.md` is the index of the project memory, a local folder outside git.

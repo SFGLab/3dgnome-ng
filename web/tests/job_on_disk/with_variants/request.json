@@ -1,0 +1,15 @@
+{
+  "cell_type": "GMX",
+  "region": "chr1:800000-2800000",
+  "factors": "CTCF+RNAPII",
+  "sv_set": "DEMO",
+  "sample": "P1",
+  "haplotype": 0,
+  "n_models": 2,
+  "hicdiffusion": false,
+  "upload_vcf": "",
+  "overrides": {},
+  "background": "hic",
+  "own": {},
+  "expression": {}
+}

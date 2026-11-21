@@ -1,7 +1,4 @@
-"""Engine inputs for one request.
-
-    pytest web/tests/test_inputs.py
-"""
+"""Engine inputs for one request."""
 
 from __future__ import annotations
 
@@ -13,8 +10,8 @@ from types import SimpleNamespace
 import pytest
 from fixture import make_data
 
-from gnome3d_web.catalog import Catalog
-from gnome3d_web.inputs import Own, build_inputs
+from gnome3d_web.catalog.model import Catalog
+from gnome3d_web.engine.inputs import Own, build_inputs, loop_network
 from gnome3d_web.regions import Region
 from personal3d.variants import SV
 
@@ -216,3 +213,24 @@ def test_the_rules_run_with_triosformer_s_motif_cutoff(shared: SimpleNamespace, 
     finally:
         rewrite.apply = real
     assert seen == [motifs.THRESHOLD], "the rules run with triosformer's motif cutoff: " + str(seen)
+
+
+def test_the_loops_the_job_and_the_preview_of_variants_rewire(tmp_path: Path) -> None:
+    ct = Catalog.load(make_data(tmp_path / "data")).cell_types["GMX"]
+    region = Region("chr1", 0, 3_000_000)
+    anchors, length, network = loop_network(ct, region, "RNAPII", [], None)
+    assert sorted(set(anchors[1])) == [1_300_000, 1_500_000] and set(anchors[3]) == {"N"}, "RNAPII alone keeps the anchors of its loop ends, without orientation: " + str(anchors.values.tolist())
+    assert network == [("RNAPII", [["chr1", 1_300_000, 1_301_000, "chr1", 1_500_000, 1_501_000, "N", "N", 4]])], "and its loops have no orientation: " + str(network)
+    assert length == 1_501_000 + 10_000_000, "the chromosome ends 10 Mb after the last anchor"
+    anchors, _, network = loop_network(ct, region, "CTCF+RNAPII", [], None)
+    assert len(anchors) == 16 and [(f, len(c)) for f, c in network] == [("CTCF", 14), ("RNAPII", 1)], "two factors keep every anchor and give their loops, CTCF first"
+    mine = tmp_path / "mine.bedpe"
+    mine.write_text("chr1\t900200\t900400\tchr1\t1300200\t1300400\t5\nchr1\t2000000\t2000400\tchr1\t2400000\t2400400\t3\n")
+    own_anchors = tmp_path / "anchors.bed"
+    own_anchors.write_text("chr1\t900000\t901000\tR\nchr1\t1300000\t1301000\tL\n")
+    anchors, _, network = loop_network(ct, region, "CTCF", [("H3K27ac", mine)], own_anchors)
+    assert network == [("H3K27ac", [["chr1", 900_000, 901_000, "chr1", 1_300_000, 1_301_000, "R", "L", 5], ["chr1", 2_000_000, 2_000_400, "chr1", 2_400_000, 2_400_400, "N", "N", 3]])], (
+        "an end of an own loop is moved to the anchor that holds it and has its orientation, an end on no anchor stays: " + str(network)
+    )
+    anchors, _, _ = loop_network(ct, region, "CTCF", [("H3K27ac", mine)], None)
+    assert anchors.values.tolist() == [["chr1", 900_200, 900_400, "N"], ["chr1", 1_300_200, 1_300_400, "N"], ["chr1", 2_000_000, 2_000_400, "N"], ["chr1", 2_400_000, 2_400_400, "N"]], "without own anchors the loop ends are the anchors: " + str(anchors.values.tolist())

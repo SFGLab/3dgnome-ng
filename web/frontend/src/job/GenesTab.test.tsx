@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { checkCopy } from '../test/copy'
 import { GENES } from '../test/job'
-import type { GeneRow } from './api'
+import type { GeneRow } from '../api'
 import { GenesTab } from './GenesTab'
 
 const ROWS: GeneRow[] = [
@@ -23,6 +23,26 @@ describe('GenesTab', () => {
     expect(within(screen.getByRole('table')).getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
       'Gene', 'Nearest enhancer', 'Separation', '3D distance', 'Over 5 structures', 'Loop between them',
     ])
+  })
+
+  it('offers the table as a CSV file beside the file of the engine', () => {
+    renderTab()
+    expect(screen.getByRole('button', { name: 'Save the table as genes.csv' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ep\.tsv/ })).toBeInTheDocument()
+  })
+
+  it('shows the expression of each gene when the job has it, in its unit', () => {
+    renderTab()
+    expect(screen.queryByRole('columnheader', { name: /Expression/ })).toBeNull()
+    document.body.innerHTML = ''
+    renderTab({ rows: ROWS.map((r, i) => ({ ...r, expression: i === 0 ? 312.4 : i === 1 ? 4.25 : null })), expressionUnit: 'TPM' })
+    const head = screen.getByRole('columnheader', { name: /Expression, TPM/ })
+    const column = screen.getAllByRole('columnheader').indexOf(head)
+    const cells = () => screen.getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell')[column].textContent)
+    // A level of 100 or more has no decimals and a gene without a level an empty cell.
+    expect(cells().filter(Boolean).sort()).toEqual(['312', '4.3'].sort())
+    fireEvent.click(head)
+    expect(cells()[cells().length - 1]).toBe('312')
   })
 
   it('sorts by 3D distance and by a column header', () => {

@@ -1,6 +1,5 @@
-"""The JSON endpoints the frontend reads: catalog, region, loop preview, settings and job submission.
-
-    pytest web/tests/test_api.py
+"""The JSON endpoints the frontend reads, which are the catalog, the region, the loop preview, the
+settings and the job submission.
 """
 
 from __future__ import annotations

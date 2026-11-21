@@ -8,7 +8,6 @@
  "acceptance_plain": "p_{\\mathrm{accept}} = \\min\\left(1,\\ \\exp\\left(-\\frac{c\\, E'}{E\\, T}\\right)\\right)\\quad \\mathrm{for}\\ \\Delta E \\geq 0",
  "t_loop_simple": "k \\left(\\frac{d_{ij} - t_{ij}}{t_{ij}}\\right)^2",
  "t_background": "w_b \\left(\\frac{d_{ij} - b_{ij}}{\\min(d_{ij}, b_{ij})}\\right)^2",
- "t_repulsion": "\\max\\left(0,\\ \\frac{1}{d_{ij}} - \\frac{1}{r_c}\\right)",
  "t_gyration": "w_g\\, n_w \\left(\\frac{R_g(w)}{R_w} - 1\\right)^2",
  "t_ev": "w_{ev} \\left(\\frac{r_0 - d_{ij}}{r_0}\\right)^2,\\ d_{ij} < r_0",
  "t_bond": "w_d k \\left(\\frac{d_{i,i+1} - t_i}{t_i}\\right)^2",

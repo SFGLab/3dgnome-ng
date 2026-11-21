@@ -17,7 +17,7 @@ BUCKET = "https://4dn-open-data-public.s3.amazonaws.com"
 
 
 def deep_maps() -> dict[str, tuple[str, str]]:
-    """Cell line to the bucket url and the name of its deep 4DN Hi-C map."""
+    """Returns for each cell line the bucket url and the name of its deep 4DN Hi-C map."""
     keys = {}
     for line in (ROOT / "legacy" / "validation" / "manifests" / "4dn_keys.tsv").read_text().splitlines()[1:]:
         acc, key, _ = line.split("\t")

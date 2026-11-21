@@ -1,5 +1,9 @@
-import './barchart.css'
+
 import { Better, type Direction, type Series } from './BarChart'
+import { scoped } from '../lib/css'
+import sheet from './barchart.module.css'
+
+const cn = scoped(sheet)
 
 /** One tool's run. A run without seconds did not finish and shows its note in place of a time. */
 export type ToolRun = { series: Series; name: string; beads: number; seconds: number | null; note?: string }
@@ -11,8 +15,8 @@ type Measure = { key: string; label: string; dir: Direction; dirText?: string; r
 const TIE = 0.02
 
 /**
- * The runs of several tools on one task as a table of bars: the beads of the model, the runtime and
- * the runtime per 1,000 beads. Every column has its own scale.
+ * The runs of several tools on one task as a table of bars, with the beads of the model, the
+ * runtime and the runtime per 1,000 beads. Every column has its own scale.
  */
 export function ToolRuns({ title, subtitle, unit, runs }: { title: string; subtitle: string; unit: 'seconds' | 'minutes'; runs: ToolRun[] }) {
   const measures: Measure[] = [
@@ -23,7 +27,7 @@ export function ToolRuns({ title, subtitle, unit, runs }: { title: string; subti
   const max = measures.map((m) => Math.max(...runs.map((r) => m.value(r) ?? 0), 1e-9))
   const min = measures.map((m) => Math.min(...runs.map((r) => m.value(r) ?? Infinity)))
   return (
-    <figure className="bar-chart tool-runs" aria-label={title}>
+    <figure className={cn('bar-chart tool-runs')} aria-label={title}>
       <figcaption>
         <span className="chart-title">{title}</span>
         <span className="chart-sub">{subtitle}</span>
@@ -49,13 +53,13 @@ export function ToolRuns({ title, subtitle, unit, runs }: { title: string; subti
                 const best = m.ranks && v !== null && v <= min[i] * (1 + TIE)
                 return (
                   <td key={m.key} data-label={`${m.label}, ${m.dir === 'higher' ? '↑' : '↓'} ${m.dirText ?? `${m.dir} is better`}`} title={`${r.name}, ${m.label}: ${v === null ? (r.note ?? '') : m.text(v)}${best ? ', best' : ''}`}>
-                    <div className="bar-row">
-                      {v !== null && <span className={`bar ${r.series}`} style={{ width: `${(v / max[i]) * 68}%` }} />}
-                      <span className={v === null ? 'bar-value muted' : 'bar-value'} data-testid={`${m.key}-value`}>
+                    <div className={cn('bar-row')}>
+                      {v !== null && <span className={cn(`bar ${r.series}`)} style={{ width: `${(v / max[i]) * 68}%` }} />}
+                      <span className={cn(v === null ? 'bar-value muted' : 'bar-value')} data-testid={`${m.key}-value`}>
                         {v === null ? (m.key === 'bar' ? (r.note ?? '') : '') : m.text(v)}
                       </span>
                       {best && (
-                        <span className="best" data-testid={`${m.key}-best`}>
+                        <span className={cn('best')} data-testid={`${m.key}-best`}>
                           ✓ best
                         </span>
                       )}

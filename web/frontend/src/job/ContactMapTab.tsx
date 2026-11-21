@@ -1,82 +1,40 @@
+import { askedOf } from '../api'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import type { Contacts, JobApi, Summary } from './api'
-import { bp } from './format'
+import { Camera, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { JobApi, Summary } from '../api'
+import { bp } from '../lib/format'
 import { LoopView } from './LoopView'
-import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
-import { parseRegion } from './StructureTab'
+import { shownMaps, type Show } from './heatmap'
+import { mapPicture } from './export/mapPicture'
+import { saveDataUrl } from './export/savePng'
+import { type Locus, parseRegion, readRegion, regionText } from '../lib/region'
+import { wheelFactor } from './wheel'
+import { draw } from './mapDraw'
+import { RESOLUTIONS, MAX_BINS, clamp, binCount, fitting } from './mapWindow'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
 
-const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
-const MAX_BINS = 800
-const NO_DATA: [number, number, number] = [226, 225, 221]
+const cn = scoped(sheet)
 const SETTLE_MS = 250
 const PREDICTED = 'hicdiffusion.bedpe'
 // HiCDiffusion predicts 8,192 bp bins. This is the resolution of the tab nearest to them.
 const PREDICTED_RES = 10_000
-
-/** A window cut to the job's region and at least ten bins wide, or the whole region when it
- * does not overlap it. */
-function clamp(l: Locus, job: Locus, res: number): Locus {
-  if (l.chrom !== job.chrom || l.end <= job.start || l.start >= job.end) return job
-  const width = Math.min(Math.max(l.end - l.start, res * 10), job.end - job.start)
-  const start = Math.min(Math.max(l.start, job.start), job.end - width)
-  return { chrom: job.chrom, start: Math.round(start), end: Math.round(start + width) }
-}
-
-/** The finest resolution not finer than `res` that keeps a window under MAX_BINS bins. */
-const fitting = (l: Locus, res: number) => RESOLUTIONS.find((r) => r >= res && (l.end - l.start) / r <= MAX_BINS) ?? RESOLUTIONS[RESOLUTIONS.length - 1]
 const SHOWS: [Show, string][] = [
   ['observed', 'Observed'],
   ['oe', 'O/E'],
   ['pearson', 'Pearson'],
 ]
-
-type Locus = { chrom: string; start: number; end: number }
-/** The separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
+/** Returns the separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
 const reach = (bp?: number) => (bp ? `, up to ${bp >= 1e6 ? `${bp / 1e6} Mb` : `${bp / 1000} kb`}` : '')
-const fmt = (l: Locus) => `${l.chrom}:${bp(l.start)}-${bp(l.end)}`
-const parse = (t: string): Locus | null => {
-  const m = t.replace(/,/g, '').match(/^(\w+):(\d+)-(\d+)$/)
-  return m && Number(m[3]) > Number(m[2]) ? { chrom: m[1], start: Number(m[2]), end: Number(m[3]) } : null
-}
 
-type Half = { m: number[][]; range: [number, number]; loops: boolean }
-
-/** Each half on its own colour range. A loop half has no empty bins to grey: a row without a loop
- * is a row of zeros, drawn white. */
-function draw(canvas: HTMLCanvasElement, up: Half, low: Half, log: boolean, show: Show) {
-  const [upper, lower] = [up.m, low.m]
-  const ctx = canvas.getContext('2d')
-  const n = upper.length
-  if (!ctx || !n) return
-  canvas.width = n
-  canvas.height = n
-  // Each half on its own scale: the lower half's values are brought to the upper half's range.
-  const span = Math.max(Math.abs(up.range[0]), Math.abs(up.range[1]))
-  const none = upper.map(() => false)
-  const [emptyUp, emptyLow] = [up.loops ? none : emptyRows(upper), low.loops ? none : emptyRows(lower)]
-  const img = ctx.createImageData(n, n)
-  for (let i = 0; i < n; i++)
-    for (let j = 0; j < n; j++) {
-      const v = j >= i ? upper[i][j] : lower[i][j]
-      const range = j >= i ? up.range : low.range
-      // The maps hold no pair within one bin. The main diagonal is drawn as no data.
-      const empty = j >= i ? emptyUp[i] || emptyUp[j] : emptyLow[i] || emptyLow[j]
-      const [r, g, b] =
-        i === j || empty ? NO_DATA : show === 'oe' ? diverging(v > 0 ? Math.log2(v) : -span, span) : show === 'pearson' ? diverging(v, span) : colour(v, range[0], range[1], log)
-      const k = (i * n + j) * 4
-      img.data.set([r, g, b, 255], k)
-    }
-  ctx.putImageData(img, 0, 0)
-}
-
-/** The Contact map tab: the job's Hi-C and its model on one grid, upper and lower half. */
+/** The Contact map tab, with the Hi-C of the job and its model on one grid, upper and lower half. */
 export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary }) {
   const job = parseRegion(summary.region)!
   const [locus, setLocus] = useState<Locus>(job)
-  const [text, setText] = useState(fmt(job))
-  const [res, setRes] = useState(25_000)
+  const [text, setText] = useState(regionText(job))
+  // The map opens at 25 kb, or at the finest resolution the region fits when it is too long for that.
+  const [res, setRes] = useState(() => fitting(job, 25_000))
   const [show, setShow] = useState<Show>('observed')
   const [norm, setNorm] = useState<'ice' | 'raw'>('ice')
   const [upperKind, setUpper] = useState('hic')
@@ -106,41 +64,21 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     return () => clearTimeout(t)
   }, [locus])
   const region = `${settled.chrom}:${settled.start}-${settled.end}`
-  const maps = useQuery<Contacts, Error>({
-    queryKey: ['contacts', api.base, region, res, upperKind, lowerKind, norm],
-    queryFn: () => api.contacts({ region, res, upper: upperKind, lower: lowerKind, norm }),
+  const maps = useQuery({
+    ...askedOf(api).contacts({ region, res, upper: upperKind, lower: lowerKind, norm }),
     retry: false,
     // The map on screen stays, dimmed, while the next view is read.
     placeholderData: keepPreviousData,
   })
-  const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
-  const upper = maps.data ? transform(maps.data.upper, show) : []
-  const lower = maps.data ? transform(maps.data.lower, show) : []
-  const round = (v: number) => Math.round(v * 100) / 100
-  // Each half gets its own range; a range typed in applies to the upper half and the lower half
-  // keeps the same share of its own spread.
-  const oeSpan =
-    maps.data && show === 'oe'
-      ? Math.max(
-          0.5,
-          round(
-            percentile(
-              upper.map((r) => r.map((v) => (v > 0 ? Math.abs(Math.log2(v)) : 0))),
-              0.95,
-            ),
-          ),
-        )
-      : 1
-  const auto = (m: number[][]): [number, number] => (show === 'oe' ? [-oeSpan, oeSpan] : show === 'pearson' ? [-1, 1] : halfRange(m, log))
-  const autoUp = maps.data ? auto(upper) : ([0, 1] as [number, number])
-  const autoLow = maps.data ? auto(lower) : ([0, 1] as [number, number])
-  const shownRange: [number, number] = range ?? [round(autoUp[0]), round(autoUp[1])]
-  const scale = show === 'observed' && autoUp[1] > 0 ? autoLow[1] / autoUp[1] : 1
-  const lowRange: [number, number] = range ? [range[0] * scale, range[1] * scale] : autoLow
+  const annotations = useQuery(askedOf(api).annotations())
+  // The halves as drawn and their ranges are worked out once for a map and its settings, not at
+  // every move of the pointer over it.
+  const view = useMemo(() => (maps.data ? shownMaps(maps.data.upper, maps.data.lower, show, log, range) : null), [maps.data, show, log, range])
+  const shownRange: [number, number] = view?.upperRange ?? range ?? [0, 1]
+  const [upperLoops, lowerLoops] = [upperKind.startsWith('loops_'), lowerKind.startsWith('loops_')]
   useEffect(() => {
-    if (canvas.current && maps.data)
-      draw(canvas.current, { m: upper, range: shownRange, loops: upperKind.startsWith('loops_') }, { m: lower, range: lowRange, loops: lowerKind.startsWith('loops_') }, log, show)
-  })
+    if (canvas.current && view) draw(canvas.current, { m: view.upper, range: view.upperRange, loops: upperLoops }, { m: view.lower, range: view.lowerRange, loops: lowerLoops }, log, show)
+  }, [view, upperLoops, lowerLoops, log, show])
   // The window asked for as a part of the map on screen, its start and its width, while the map
   // on screen is still the wider one. It is the square the next map will fill.
   const bins = maps.data?.bins ?? []
@@ -152,7 +90,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     const r = fitting(next, res)
     if (r !== res) setRes(r)
     setLocus(next)
-    setText(fmt(next))
+    setText(regionText(next))
     return next
   }
   const zoom = (f: number, centre = (locus.start + locus.end) / 2, frac?: number) => {
@@ -163,12 +101,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     moveTo({ chrom: locus.chrom, start, end: start + width })
   }
   const go = () => {
-    const want = parse(text)
+    const want = readRegion(text)
     if (!want) return
     const next = moveTo(want)
-    setNote(next.start !== want.start || next.end !== want.end || next.chrom !== want.chrom ? `The job covers ${fmt(job)}. The map shows only that region.` : '')
+    setNote(next.start !== want.start || next.end !== want.end || next.chrom !== want.chrom ? `The job covers ${regionText(job)}. The map shows only that region.` : '')
   }
-  // A native listener, since React's wheel handler is passive and cannot stop the page scrolling.
+  // A native listener. The wheel handler of React is passive and cannot stop the page scrolling.
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
   useEffect(() => {
@@ -178,7 +116,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
       e.preventDefault()
       const box = c.getBoundingClientRect()
       const frac = box.width ? (e.clientX - box.left) / box.width : 0.5
-      zoomRef.current(e.deltaY > 0 ? 1.25 : 0.8, undefined, frac)
+      zoomRef.current(wheelFactor(e), undefined, frac)
     }
     c.addEventListener('wheel', onWheel, { passive: false })
     return () => c.removeEventListener('wheel', onWheel)
@@ -189,12 +127,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     return [Math.floor(((e.clientY - box.top) / box.height) * n), Math.floor(((e.clientX - box.left) / box.width) * n)]
   }
   return (
-    <div className="contacts-tab">
+    <div className={cn('contacts-tab')}>
       <div className="contacts-main">
-        <div className="map-toolbar">
-          {/* No label stands over a control, as on the other tabs. Each control says what it is by
-              its own text and has its name for a screen reader and as a tooltip. */}
-          <span className="locus-input">
+        <div className={cn('map-toolbar')}>
+          {/* No control has a label over it, as on the other tabs. Each control states its purpose
+              by its own text and has its name for a screen reader and as a tooltip. */}
+          <span className={cn('locus-input')}>
             <input aria-label="Locus" title="Locus" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} />
             <button type="button" onClick={go}>
               Go
@@ -213,7 +151,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           </select>
           <select aria-label="Resolution" title="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
             {RESOLUTIONS.map((r) => {
-              const tooFine = (locus.end - locus.start) / r > MAX_BINS
+              const tooFine = binCount(locus, r) > MAX_BINS
               return (
                 <option key={r} value={r} disabled={tooFine}>
                   {`${r / 1000} kb bins${tooFine ? ', zoom in to use' : ''}`}
@@ -221,16 +159,16 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               )
             })}
           </select>
-          <div className="zoom-buttons">
-            <button type="button" className="icon-tool" aria-label="Zoom out" onClick={() => zoom(2)}>
+          <div className={cn('zoom-buttons')}>
+            <button type="button" className={cn('icon-tool')} aria-label="Zoom out" onClick={() => zoom(2)}>
               <ZoomOut size={15} aria-hidden />
             </button>
-            <button type="button" className="icon-tool" aria-label="Zoom in" onClick={() => zoom(0.5)}>
+            <button type="button" className={cn('icon-tool')} aria-label="Zoom in" onClick={() => zoom(0.5)}>
               <ZoomIn size={15} aria-hidden />
             </button>
             <button
               type="button"
-              className="icon-tool"
+              className={cn('icon-tool')}
               aria-label="Back to the job region"
               onClick={() => {
                 moveTo(job)
@@ -239,10 +177,25 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             >
               <RefreshCw size={15} aria-hidden />
             </button>
+            <button
+              type="button"
+              className={cn('icon-tool')}
+              aria-label="Save the map as a PNG"
+              disabled={!maps.data}
+              onClick={() => {
+                const map = canvas.current
+                if (!map || !maps.data) return
+                const out = mapPicture(map, { chrom: settled.chrom, bins: maps.data.bins, res, upper: maps.data.upper_label, lower: maps.data.lower_label })
+                if (!out) return
+                saveDataUrl(out.toDataURL('image/png'), `contact_map_${settled.chrom}_${settled.start}_${settled.end}`)
+              }}
+            >
+              <Camera size={15} aria-hidden />
+            </button>
           </div>
         </div>
         {(annotations.data?.loops.length ?? 0) > 0 && (
-          <div className="loop-overview">
+          <div className={cn('loop-overview')}>
             <LoopView
               chrom={job.chrom}
               region={[job.start, job.end]}
@@ -264,21 +217,21 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             />
           </div>
         )}
-        {note && <p className="map-note">{note}</p>}
+        {note && <p className={cn('map-note')}>{note}</p>}
         {maps.isError && <p className="field-error">{maps.error.message}</p>}
-        <div className={`contact-frame${maps.data ? '' : ' empty'}${maps.isFetching ? ' loading' : ''}`}>
+        <div className={cn(`contact-frame${maps.data ? '' : ' empty'}${maps.isFetching ? ' loading' : ''}`)}>
           {maps.isFetching && (
-            <div className="map-loading" role="status">
-              <div className="map-loading-card">
-                <span className="map-spinner" aria-hidden />
+            <div className={cn('map-loading')} role="status">
+              <div className={cn('map-loading-card')}>
+                <span className={cn('map-spinner')} aria-hidden />
                 <strong>{`Reading the map at ${res / 1000} kb.`}</strong>
               </div>
             </div>
           )}
-          {target && <div className="zoom-box" aria-hidden style={{ left: `${target[0] * 100}%`, top: `${target[0] * 100}%`, width: `${target[1] * 100}%`, height: `${target[1] * 100}%` }} />}
+          {target && <div className={cn('zoom-box')} aria-hidden style={{ left: `${target[0] * 100}%`, top: `${target[0] * 100}%`, width: `${target[1] * 100}%`, height: `${target[1] * 100}%` }} />}
         <canvas
           ref={canvas}
-          className="contact-canvas"
+          className={cn('contact-canvas')}
           onMouseMove={(e) => {
             if (!maps.data) return
             const [i, j] = at(e)
@@ -298,13 +251,13 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
         />
         </div>
         {maps.data && (
-          <p className={`hover-bar mono${hover ? '' : ' idle'}`}>{hover ?? 'Move over the map to read a pair of positions. Double click to zoom in.'}</p>
+          <p className={cn(`hover-bar mono${hover ? '' : ' idle'}`)}>{hover ?? 'Move over the map to read a pair of positions. Double click to zoom in.'}</p>
         )}
       </div>
-      <div className="side-cards">
-        <section className="side-card" aria-label="Colour range">
-          <p className="card-label">Colour range</p>
-          <div className="range-inputs">
+      <div className={cn('side-cards')}>
+        <section className={cn('side-card')} aria-label="Colour range">
+          <p className={cn('card-label')}>Colour range</p>
+          <div className={cn('range-inputs')}>
             <label>
               min <input type="number" value={shownRange[0]} onChange={(e) => setRange([Number(e.target.value), shownRange[1]])} />
             </label>
@@ -312,7 +265,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               max <input type="number" value={shownRange[1]} onChange={(e) => setRange([shownRange[0], Number(e.target.value)])} />
             </label>
           </div>
-          <label className="check">
+          <label className={cn('check')}>
             <input type="checkbox" checked={log} onChange={(e) => setLog(e.target.checked)} /> Log scale, separate for each half
           </label>
         </section>
@@ -337,21 +290,21 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           </select>
         </label>
         {maps.data && (
-          <section className="side-card" aria-label="Agreement of the two halves">
-            <p className="card-label">Agreement of the two halves</p>
+          <section className={cn('side-card')} aria-label="Agreement of the two halves">
+            <p className={cn('card-label')}>Agreement of the two halves</p>
             {/* The full account of each number is its tooltip. */}
-            <p className="big" title={maps.data.rank_about}>
-              <span className="big-value">{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className="unit">Spearman correlation</span>
+            <p className={cn('big')} title={maps.data.rank_about}>
+              <span className={cn('big-value')}>{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className={cn('unit')}>Spearman correlation</span>
             </p>
-            <p className="card-text">{`Pairs of bins the same distance apart are compared${reach(maps.data.rank_reach)}. The fall of contacts with distance adds nothing to this number.`}</p>
-            <p className="card-text" title={maps.data.scc_about}>{`SCC ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, the same comparison on the values and not their ranks.`}</p>
+            <p className={cn('card-text')}>{`Pairs of bins the same distance apart are compared${reach(maps.data.rank_reach)}. The fall of contacts with distance adds nothing to this number.`}</p>
+            <p className={cn('card-text')} title={maps.data.scc_about}>{`SCC ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, the same comparison on the values and not their ranks.`}</p>
             {typeof maps.data.loop_enrichment === 'number' && (
-              <p className="card-text">{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
+              <p className={cn('card-text')}>{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
             )}
           </section>
         )}
-        <p className="card-text">Scroll to zoom and double click to centre. Grey bins contain no bead.</p>
-        <p className="card-text">
+        <p className={cn('card-text')}>Scroll to zoom and double click to centre. Grey bins contain no bead.</p>
+        <p className={cn('card-text')}>
           O/E divides each contact by the average contact at its distance, blue below and red above it. Pearson correlates the rows of O/E, red for rows that rise and fall
           together.
         </p>

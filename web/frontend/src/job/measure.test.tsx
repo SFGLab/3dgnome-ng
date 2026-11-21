@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, DISTANCE, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../test/job'
-import { jobApi } from './api'
-import { solidSpan, StructureTab } from './StructureTab'
+import { jobApi } from '../api'
+import { StructureTab } from './StructureTab'
+import { solidSpan } from './structure'
 
 vi.mock('./Scene', () => ({
   Scene: (p: { onPick?: (i: number) => void; markers?: { label: string }[] }) => (

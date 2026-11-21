@@ -1,5 +1,11 @@
-import { useEffect, useRef } from 'react'
-import type { Summary } from './api'
+import { duration } from '../lib/format'
+import { Check } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { Summary } from '../api'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 const WORDS: Record<string, string> = {
   queued: 'Queued',
@@ -10,7 +16,7 @@ const WORDS: Record<string, string> = {
   done: 'Done',
 }
 
-/** The share of the bar each stage fills; modelling fills its share by structures written. */
+/** Returns the share of the bar each stage fills. Modelling fills its share by structures written. */
 function weights(hicdiffusion: boolean): [string, number][] {
   return hicdiffusion
     ? [
@@ -26,11 +32,13 @@ function weights(hicdiffusion: boolean): [string, number][] {
       ]
 }
 
-const since = (s: number) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`)
 
 /**
- * A queued or running job: the stage with its count, the bar and the stages, then the end of the
- * engine log, which follows its last line unless the reader has scrolled up.
+ * A queued or running job. It has the stage with its count, the bar and the stages, then the end of
+ * the engine log, which follows its last line unless the reader has scrolled up. The stages are the
+ * ones the job goes through, in order. A finished stage has a tick and the time it took and the
+ * running one a spinner and its time so far. A stage to come has neither. A waiting job has no
+ * engine yet and no log.
  */
 export function Progress({ summary }: { summary: Summary }) {
   const stage = summary.state === 'queued' ? 'queued' : (summary.stage ?? 'inputs')
@@ -54,8 +62,23 @@ export function Progress({ summary }: { summary: Summary }) {
       : stage === 'modelling' && asked
         ? `${WORDS.modelling}, ${done} of ${asked} written`
         : (WORDS[stage] ?? stage)
-  const stages = summary.stages ?? []
-  const t0 = stages[0]?.at ?? 0
+  const reached = summary.stages ?? []
+  // The time of the running stage is counted on the clock of the server, from its answer on.
+  const got = useMemo(() => ({ at: Date.now(), now: summary.now ?? Date.now() / 1000 }), [summary])
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const now = got.now + (Date.now() - got.at) / 1000
+  const plan = ['queued', ...ws.map(([name]) => name)]
+  const rows = plan.map((name) => {
+    const i = reached.findIndex((s) => s.stage === name)
+    if (name === stage) return { name, state: 'now' as const, took: i >= 0 ? Math.max(0, now - reached[i].at) : null }
+    // A stage is over once a later one began. It took the time up to that beginning.
+    if (i >= 0 && i + 1 < reached.length) return { name, state: 'done' as const, took: reached[i + 1].at - reached[i].at }
+    return { name, state: 'next' as const, took: null }
+  })
   const log = useRef<HTMLPreElement>(null)
   const follow = useRef(true)
   useEffect(() => {
@@ -74,36 +97,37 @@ export function Progress({ summary }: { summary: Summary }) {
     return () => cancelAnimationFrame(frame)
   }, [summary.log_recent])
   return (
-    <div className="progress">
-      <div className="progress-head">
-        <p className="progress-line">{line}</p>
-        <span className="progress-pct">{`${pct}%`}</span>
+    <div className={cn(stage === 'queued' ? 'progress waiting' : 'progress')}>
+      <div className={cn('progress-head')}>
+        <p className={cn('progress-line')}>{line}</p>
+        <span className={cn('progress-pct')}>{`${pct}%`}</span>
       </div>
-      <div className="progress-bar" role="progressbar" aria-label="Progress of the job" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+      <div className={cn('progress-bar')} role="progressbar" aria-label="Progress of the job" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
         <span style={{ width: `${pct}%` }} />
       </div>
-      {stages.length > 0 && (
-        <ul className="status-log" aria-label="Status log">
-          {stages.map((s) => (
-            <li key={s.stage}>
-              <span>{WORDS[s.stage] ?? s.stage}</span>
-              <span className="status-time">{since(s.at - t0)}</span>
-            </li>
-          ))}
-        </ul>
+      <ol className={cn('status-log')} aria-label="Stages of the job">
+        {rows.map((r) => (
+          <li key={r.name} className={cn(r.state)} aria-current={r.state === 'now' ? 'step' : undefined}>
+            {r.state === 'done' ? <Check className={cn('stage-mark')} size={13} aria-hidden /> : <span className={cn(r.state === 'now' ? 'stage-mark stage-spinner' : 'stage-mark stage-dot')} aria-hidden />}
+            <span>{WORDS[r.name] ?? r.name}</span>
+            {r.took !== null && <span className={cn('status-time')}>{duration(r.took)}</span>}
+          </li>
+        ))}
+      </ol>
+      {stage !== 'queued' && (
+        <pre
+          className={cn('log-tail live')}
+          aria-label="End of the engine log"
+          ref={log}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            // The log follows its end while the reader is at the end.
+            follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+          }}
+        >
+          {summary.log_recent || 'The engine has not written to its log yet.'}
+        </pre>
       )}
-      <pre
-        className="log-tail live"
-        aria-label="End of the engine log"
-        ref={log}
-        onScroll={(e) => {
-          const el = e.currentTarget
-          // The log follows its end while the reader is at the end.
-          follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
-        }}
-      >
-        {summary.log_recent || 'The engine has not written to its log yet.'}
-      </pre>
     </div>
   )
 }

@@ -1,8 +1,14 @@
-import './structure-preview.css'
+import { scoped } from '../lib/css'
+import sheet from './structure-preview.module.css'
+
+const cn = scoped(sheet)
+
+
 
 /**
- * A structure drawn flat: its beads in drawing units from A, each with a depth step, the two marked
- * beads and the distance between them over the ensemble. Written by web/scripts/make_previews.py.
+ * A structure drawn flat. It has its beads in drawing units from A, each
+ * with a depth step, the two marked beads and the distance between them
+ * over the ensemble. web/scripts/make_previews.py writes it.
  */
 export type PreviewData = { points: number[][]; a: number; b: number; mean: number; sd: number; n: number; structure: number; here: number }
 
@@ -14,7 +20,7 @@ const REACH = 5
 
 const r1 = (v: number) => Math.round(v * 10) / 10
 
-/** The chain from bead i to the next as a smooth piece: a Catmull-Rom segment written as a cubic. */
+/** Returns the chain from bead i to the next as a smooth piece, a Catmull-Rom segment in the form of a cubic. */
 function piece(pts: number[][], i: number): string {
   const p0 = pts[Math.max(0, i - 1)]
   const p1 = pts[i]
@@ -45,20 +51,20 @@ export function StructurePreview({ data, label, view }: { data: PreviewData; lab
   const under = (y0: number) => points.filter((p) => p[0] > B[0] / 2 - 110 && p[0] < B[0] / 2 + 110 && p[1] > y0 && p[1] < y0 + 50).length
   const ly = under(-84) <= under(34) ? -84 : 34
   return (
-    <svg className="structure-preview" viewBox={view.join(' ')} role="img" aria-label={label}>
+    <svg className={cn('structure-preview')} viewBox={view.join(' ')} role="img" aria-label={label}>
       {rest.map((d, k) => (
         <g key={k}>
-          <path className="edge" d={d + between[k]} />
-          <path className={`chain step${k}`} d={d} />
-          <path className={`chain between step${k}`} d={between[k]} />
+          <path className={cn('edge')} d={d + between[k]} />
+          <path className={cn(`chain step${k}`)} d={d} />
+          <path className={cn(`chain between step${k}`)} d={between[k]} />
         </g>
       ))}
-      <path className="edge mark" d={pieces(points, a - REACH, a + REACH) + pieces(points, b - REACH, b + REACH)} />
-      <path className="mark promoter" d={pieces(points, a - REACH, a + REACH)} />
-      <path className="mark enhancer" d={pieces(points, b - REACH, b + REACH)} />
-      <line className="ab" x1={0} y1={0} x2={B[0]} y2={B[1]} />
-      <rect className="ab-box" x={B[0] / 2 - 100} y={ly} width={200} height={50} rx={10} />
-      <text className="ab-text" x={B[0] / 2} y={ly + 36}>
+      <path className={cn('edge mark')} d={pieces(points, a - REACH, a + REACH) + pieces(points, b - REACH, b + REACH)} />
+      <path className={cn('mark promoter')} d={pieces(points, a - REACH, a + REACH)} />
+      <path className={cn('mark enhancer')} d={pieces(points, b - REACH, b + REACH)} />
+      <line className={cn('ab')} x1={0} y1={0} x2={B[0]} y2={B[1]} />
+      <rect className={cn('ab-box')} x={B[0] / 2 - 100} y={ly} width={200} height={50} rx={10} />
+      <text className={cn('ab-text')} x={B[0] / 2} y={ly + 36}>
         {text}
       </text>
       {(
@@ -68,8 +74,8 @@ export function StructurePreview({ data, label, view }: { data: PreviewData; lab
         ] as const
       ).map(([name, p]) => (
         <g key={name}>
-          <circle className="end" cx={p[0]} cy={p[1]} r={28} />
-          <text className="end-text" x={p[0]} y={p[1] + 12}>
+          <circle className={cn('end')} cx={p[0]} cy={p[1]} r={28} />
+          <text className={cn('end-text')} x={p[0]} y={p[1] + 12}>
             {name}
           </text>
         </g>

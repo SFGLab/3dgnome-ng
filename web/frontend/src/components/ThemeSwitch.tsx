@@ -1,5 +1,9 @@
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { scoped } from '../lib/css'
+import sheet from './layout.module.css'
+
+const cn = scoped(sheet)
 
 type Theme = 'system' | 'light' | 'dark'
 const KEY = 'gnome3d-theme'
@@ -33,7 +37,7 @@ export function ThemeSwitch() {
     }
   }, [theme])
   return (
-    <div className="theme-switch" role="radiogroup" aria-label="Theme">
+    <div className={cn('theme-switch')} role="radiogroup" aria-label="Theme">
       {CHOICES.map(([id, label, Icon]) => (
         <button key={id} type="button" role="radio" aria-checked={theme === id} aria-label={label} title={label} onClick={() => setTheme(id)}>
           <Icon size={14} aria-hidden />

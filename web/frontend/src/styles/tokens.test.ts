@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'tokens.css'), 'utf8')
 
-/** The custom property names declared in the first block that starts with `selector`. */
+/** Returns the custom property names declared in the first block that starts with `selector`. */
 function names(selector: string): Set<string> {
   const start = css.indexOf(selector)
   if (start < 0) return new Set()

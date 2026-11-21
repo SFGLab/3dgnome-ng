@@ -45,6 +45,12 @@ pre {
   cursor: pointer;
 }
 
+/* A link drawn with the buttons that read as links has their look, with no line
+   until the pointer is on it. */
+a.link-button {
+  text-decoration: none;
+}
+
 /* A button drawn as a link is underlined under the pointer, as a link is. */
 :is(.link-button, .sync-link, .reset):hover {
   text-decoration: underline;
@@ -59,9 +65,6 @@ pre {
   gap: 6px;
   font-size: 12px;
   color: var(--muted);
-}
-
-.field {
   min-width: 0;
 }
 
@@ -128,7 +131,7 @@ select {
  * A tab, a choice of a segmented control, a node of a tree and a step have no background. They get
  * a tint and the ink colour under the pointer.
  */
-:is(.job-tab, .segmented button, .node, .wizard-steps [role='tab'], .dialog-tabs [role='tab']):not([aria-selected='true'], [aria-pressed='true'], .open):hover {
+:is(.job-tab, .segmented button, .node, .wizard-steps [role='tab']):not([aria-selected='true'], [aria-pressed='true'], .open):hover {
   background-color: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink);
 }
@@ -177,9 +180,10 @@ a:not(.button, .button-link, .cite-button, .chip-button, .action, .brand, .recen
   }
 }
 
-/* The raised NG of the site's name. Its capitals end level with the capitals of the name: it
-   stays on the name's baseline and is lifted by the height of the name's capitals less its own.
-   The capitals of Inter are 0.727 em tall, `--cap`. `--ng` is its size against the name's. */
+/* The raised NG of the site's name. Its capitals end level with the capitals
+   of the name. It stays on the baseline of the name and is lifted by the
+   height of the capitals of the name less its own. The capitals of Inter are
+   0.727 em tall, `--cap`. `--ng` is its size against the size of the name. */
 sup.ng {
   --ng: 0.42;
   --cap: 0.727;

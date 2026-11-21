@@ -17,11 +17,12 @@ export default defineConfig({
           '/api': 'http://127.0.0.1:8000',
           '^/jobs($|/)': 'http://127.0.0.1:8000',
           '/p/': 'http://127.0.0.1:8000',
-          '/model/classic': 'http://127.0.0.1:8000',
         },
   },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    // A test finds an element by the plain name of its class. The scoped names of the build are not made.
+    css: { modules: { classNameStrategy: 'non-scoped' } },
   },
 })

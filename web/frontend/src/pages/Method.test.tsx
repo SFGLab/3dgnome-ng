@@ -2,7 +2,8 @@ import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { checkCopy } from '../test/copy'
-import { METHOD_REFERENCES, Method } from './Method'
+import { Method } from './Method'
+import { METHOD_REFERENCES } from '../content/methodReferences'
 
 function renderMethod() {
   return render(

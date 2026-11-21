@@ -1,9 +1,9 @@
 import type { Factors } from './form'
 
 /**
- * The examples: each a request that fills the form and the tab or second loop set its finished job
- * opens on. Each description is read from the hosted data and must be checked again when the data
- * changes.
+ * The examples. Each is a request that fills the form, with the tab or the
+ * second loop set of its finished job. Each description is read from the
+ * hosted data and must be checked again when the data changes.
  */
 export type Example = {
   id: string
@@ -17,6 +17,10 @@ export type Example = {
   sample?: string
   tab?: 'structure' | 'genes' | 'contacts' | 'loops'
   compareFactors?: Factors
+  /** The hosted expression of the job, by the id of its source. */
+  expression?: string
+  /** A second cell type the job is compared with, on the same region and loops. */
+  compareCell?: string
   /** A gene the job opens with selected, its promoter and enhancer marked in each structure. */
   gene?: string
 }
@@ -62,6 +66,18 @@ export const EXAMPLES: Example[] = [
     description: 'The same locus without the RNAPII loop that joins the enhancer',
     region: 'TNFRSF8',
     factors: 'CTCF',
+  },
+  {
+    id: 'VPS13D',
+    title: 'VPS13D in GM12878 and H1ESC',
+    cell: 'GM12878',
+    cellLabel: 'GM12878, H1ESC',
+    description: 'The distance of a gene to its nearest enhancer beside its expression, two cell types compared with ENCODE RNA-seq',
+    region: 'chr1:11,500,000-12,600,000',
+    factors: 'CTCF+RNAPII',
+    expression: 'ENCODE',
+    compareCell: 'H1ESC',
+    gene: 'VPS13D',
   },
   {
     id: 'contacts',
