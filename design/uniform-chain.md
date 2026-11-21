@@ -1257,6 +1257,55 @@ rows of twenty structures, raw and balanced SCC per bead pair at 25 kb:
   radius and 8.44 without the dropout. Without the dropout they have 8.49 and 8.64. The mean form gives the size
   back and the product goes over it.
 
+### Trial of the bias of the bins and of the tuning of the cells
+
+`design/figures/uniform-2026-11-19/bias20/`, `tune20/` and their `scores-` folders at 25, 10 and 5 kb,
+`slurm/ensemble/uniform_confirm20.sh` with `TAG=bias20` and `TAG=tune20`, commit 059d374. The chosen config at a
+radius of 3.0, with `contact_bias = weights` and with the keys that act on the push of a cell. Eighteen rows of
+twenty structures. Raw and balanced SCC per bead pair at 25 kb, and the mean distance of two beads 4 Mb apart in
+bonds, which is 15.0 on the default chain and 18.2 by the law:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | Rg | distance at 500 kb, 1 Mb, 4 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 10.0 | 8.6, 11.4, 15.0 |
+| ladder, expectation by the separation alone | 0.413, 0.411 | 0.574 | 0.735 | 2.3 | 17 of 360 | 1.131 | 11.2 | 9.2, 12.4, 18.4 |
+| the same, pseudo count 4 | 0.380, 0.378 | 0.566 | 0.727 | 2.2 | 20 of 360 | 1.102 | 10.6 | 8.7, 11.9, 17.3 |
+| ladder, weights | 0.359, 0.392 | 0.594 | 0.751 | 1.6 | 0 of 360 | 1.183 | 12.3 | 9.4, 13.1, 22.1 |
+| ladder, weights, pseudo count 1 | 0.356, 0.390 | 0.598 | 0.749 | 1.5 | 1 of 360 | 1.161 | 11.9 | 9.3, 12.8, 20.9 |
+| ladder, weights, pseudo count 2 | 0.350, 0.379 | 0.599 | 0.747 | 1.6 | 8 of 360 | 1.149 | 11.6 | 9.1, 12.6, 20.1 |
+| ladder, weights, pseudo count 4 | 0.338, 0.367 | 0.598 | 0.741 | 1.6 | 6 of 360 | 1.130 | 11.2 | 8.9, 12.3, 18.9 |
+| ladder, weights, z 3 | 0.338, 0.366 | 0.540 | 0.723 | 1.5 | 13 of 360 | 1.147 | 11.0 | 9.2, 12.6, 17.1 |
+| ladder to 10 kb, weights | 0.348, 0.387 | 0.464 | 0.708 | 1.7 | 22 of 360 | 1.165 | 10.6 | 9.7, 12.7, 15.7 |
+| ladder, weights, clip of the cell distance at 1.5 | 0.355, 0.386 | 0.602 | 0.745 | 1.6 | 6 of 360 | 1.143 | 11.5 | 9.1, 12.6, 19.7 |
+| cells at 5 kb, weights | 0.345, 0.377 | 0.488 | 0.674 | 2.0 | 30 of 360 | 1.040 | 10.1 | 9.0, 11.6, 15.0 |
+
+No structure has a stretched piece. The clip is `[heatmaps] distance_heatmap_stretching`, which also clips the
+heatmap of the coarse stage.
+
+- The weights take 0.054 ± 0.008 of raw SCC and 0.019 ± 0.005 of balanced SCC. That part of the score was the
+  coverage of the bins. With the weights the arm is 0.155 ± 0.019 of raw and 0.124 ± 0.020 of balanced SCC above
+  the default chain, on 18 and 16 rows of 18.
+- With the weights the ends overlap in no structure of 360, Spearman rises by 0.020 and balanced Pearson by
+  0.016.
+- The weights do not take the expansion away. The region is larger with them, 12.3 bonds of radius of gyration
+  against 11.2, and the distance at 4 Mb is 22.1 bonds. The push at the long range is not the coverage.
+- The pseudo count draws the long range in step by step and costs SCC from 2 on: 1 costs 0.003 ± 0.004 of
+  either SCC, 2 costs 0.009 and 0.013, 4 costs 0.021 and 0.026.
+- The threshold of 3 has the long range of the law, 17.1 bonds at 4 Mb, and loses 0.021 and 0.026 of SCC and
+  0.054 of Spearman.
+- The ladder to 10 kb has the long range of the default chain, 15.7 bonds, the largest distance at 500 kb, the
+  lowest Spearman, 0.464, and the ends overlap in 22 structures.
+- The cells at 5 kb alone have the decay of the default chain, 1.040, a Spearman under it, 0.488, and the ends
+  overlap in 30 structures.
+- Every arm with a ladder is 6 to 13 percent over the default chain at 500 kb and 8 to 14 percent at 1 Mb, and
+  has an exponent over Hi-C of 1.13 to 1.18. No key of this trial takes the expansion of that range away and
+  keeps the scores of the ladder.
+
+The equal evidence on the two sides of the test gives unequal distances. A cell of 5 expected counts with none
+observed is 2.2 deviations under and its ratio asks for 2.2 times the law. A cell with 10 observed is 2.2
+deviations over and its ratio asks for 0.80 of the law. A distance from a quantity that is symmetric in the
+evidence is not built.
+
 ## Settings
 
 A setting is added when a run reads it.
