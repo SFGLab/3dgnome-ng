@@ -2,6 +2,7 @@
 
     python playground/thin_cooler.py MCOOL OUT_DIR LABEL REGION [REGION ...]
     python playground/thin_cooler.py --weights MCOOL HALF_MCOOL
+    python playground/thin_cooler.py --chromosomes MCOOL OUT_DIR LABEL CHROM [CHROM ...]
 
 Each raw count of a 1 kb cell inside a region is split by a binomial draw at one half. The two
 halves of a Poisson count are independent Poisson counts. Half `a` is the input of a run and half
@@ -13,6 +14,12 @@ their contacts beyond it. Half `a` also gets `LABEL_hic_25kb_singletons.bedpe`, 
 25 kb as the singletons of a run. The seed is fixed.
 
 The second form gives an existing half the weights of MCOOL in place.
+
+The third form splits whole chromosomes for the ensembles of a published result. It splits the
+counts of the 5 kb cells between two bins of one chromosome, the resolution of the contact cells
+of a run, and reads the map in parts of 50 million cells. The halves are
+`OUT_DIR/a/LABEL.mcool` and `OUT_DIR/b/LABEL.mcool` at 5, 10 and 25 kb with the weights of MCOOL.
+A run reads the singletons of production beside half `a`.
 """
 
 from __future__ import annotations
@@ -28,9 +35,13 @@ import pandas as pd
 RES = [1000, 2000, 5000, 10000, 25000]
 
 
-def copy_weights(mcool: Path, half: Path) -> None:
+WHOLE_RES = [5000, 10000, 25000]
+PART = 50_000_000
+
+
+def copy_weights(mcool: Path, half: Path, resolutions: list[int] = RES) -> None:
     """Writes the balancing weights of the map into the half at every resolution."""
-    for res in RES:
+    for res in resolutions:
         weight = cooler.Cooler(f"{mcool}::/resolutions/{res}").bins()[:]["weight"].to_numpy()
         with h5py.File(half, "r+") as f:
             group = f[f"resolutions/{res}/bins"]
@@ -78,8 +89,46 @@ def thin(mcool: Path, out: Path, label: str, regions: list[str], seed: int = 202
             )
 
 
+def thin_chromosomes(mcool: Path, out: Path, label: str, chroms: list[str], seed: int = 20261120) -> None:
+    """Splits the counts within each chromosome of `chroms` at 5 kb into the two halves."""
+    clr = cooler.Cooler(f"{mcool}::/resolutions/{WHOLE_RES[0]}")
+    bins = clr.bins()[:][["chrom", "start", "end"]]
+    order = [c for c in clr.chromnames if c in set(chroms)]
+    assert len(order) == len(set(chroms)), f"not in the map: {sorted(set(chroms) - set(order))}"
+    with clr.open("r") as f:
+        offset = f["indexes/bin1_offset"][:]
+
+    def parts(name: str):  # noqa: ANN202
+        # The two calls draw the same numbers: one generator per chromosome over the same parts.
+        for chrom in order:
+            lo, hi = clr.extent(chrom)
+            rng = np.random.default_rng([seed, clr.chromnames.index(chrom)])
+            for p0 in range(int(offset[lo]), int(offset[hi]), PART):
+                part = clr.pixels()[p0 : min(p0 + PART, int(offset[hi]))]
+                part = part[part["bin2_id"] < hi]
+                total = part["count"].to_numpy().astype(np.int64)
+                first = rng.binomial(total, 0.5)
+                part = part[["bin1_id", "bin2_id"]].assign(count=first if name == "a" else total - first)
+                yield part[part["count"] > 0]
+
+    for name in ("a", "b"):
+        target = out / name
+        target.mkdir(parents=True, exist_ok=True)
+        base = target / f"{label}.5kb.cool"
+        final = target / f"{label}.mcool"
+        assert not base.exists() and not final.exists(), f"{base} or {final} exists"
+        cooler.create_cooler(str(base), bins, parts(name), ordered=True, dtypes={"count": np.int32})
+        cooler.zoomify_cooler(str(base), str(final), WHOLE_RES, chunksize=10_000_000, nproc=4)
+        copy_weights(mcool, final, WHOLE_RES)
+        for res in WHOLE_RES:
+            n = int(cooler.Cooler(f"{final}::/resolutions/{res}").info["sum"])
+            print(f"{name} {label} at {res} bp: {n:,} contacts -> {final}")
+
+
 if __name__ == "__main__":
     if sys.argv[1] == "--weights":
         copy_weights(Path(sys.argv[2]), Path(sys.argv[3]))
+    elif sys.argv[1] == "--chromosomes":
+        thin_chromosomes(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4], sys.argv[5:])
     else:
         thin(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], sys.argv[4:])
