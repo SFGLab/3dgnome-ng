@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 import zlib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
 from gnome3d.pipeline.ib.cells import available_resolution, hold_by_cells, read_cells
+from gnome3d.pipeline.ib.components import hold_by_components, read_components
 from gnome3d.pipeline.ib.maxent import anchor_draw
 from gnome3d.pipeline.ib.nodes import (
     ContactNodes,
@@ -258,6 +260,13 @@ def solve_nodes(
             exp_dist = hold_by_cells(
                 exp_dist, nodes.mid, count, offset, expected, mapped, law, s, finest, node_bias
             )
+    if s.data_components and float(s.background_weight) > 0.0:
+        track = str(s.data_components)
+        if not os.path.isabs(track) and not os.path.isfile(track):
+            track = os.path.join(str(s.data_dir), track)
+        exp_dist = hold_by_components(
+            exp_dist, nodes.mid, read_components(track).get(chr_, []), law, s
+        )
     exp_dist = cb.repulsion_range(exp_dist, [int(x) for x in nodes.mid], s)
     pos0: F32Array = np.ascontiguousarray(centre, dtype=np.float32)
     if s.arcs_start == "walk":

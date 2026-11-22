@@ -1618,6 +1618,57 @@ quantity per locus, a domain boundary or a compartment value, of which a region 
 target per pair of loci, of which it has 1,225. A model cannot store a map of pairs in a track per locus, and the
 score on the pairs stays a test.
 
+### Components per locus: the gathering and the term under trial
+
+The maintainer on 2026-11-22: extend the gathering of the A/B compartments to a few numbers per locus and see
+whether structure can be derived from them. MultiMM, whose compartment term the model has, takes the eight ranks
+of CALDER per locus and a table of affinities between classes. The model reads the first two levels, four
+classes, and every run so far fed it one signed eigenvector.
+
+The gathering was measured on counts disjoint from the score. The components of a locus come from the whole map
+of its chromosome arm at 100 kb with the block of the region left out, which is the counts of the locus with
+the rest of the arm. They are scored on the block of the region of half b, by band, over the 18 rows:
+
+| per locus quantity | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|
+| one component | 0.21 | 0.22 | 0.39 | 0.38 |
+| three components | 0.06 | 0.13 | 0.50 | 0.63 |
+| five components | 0.07 | 0.13 | 0.55 | 0.70 |
+| ten components | 0.13 | 0.19 | 0.53 | 0.68 |
+| three components, 2 Mb around the region left out too | 0.08 | 0.12 | 0.51 | 0.62 |
+| classes of loci with a table of their mean affinity, 4 classes | 0.10 | 0.25 | 0.26 | 0.35 |
+| 8 classes | 0.05 | 0.25 | 0.32 | 0.43 |
+| 16 classes | 0.11 | 0.29 | 0.43 | 0.50 |
+
+- Three to five numbers per locus, gathered from counts that hold none of the region, give the pattern inside
+  the region beyond 1 Mb at 0.50 to 0.70, where the two halves of the map share 0.88 and 0.81. A locus has an
+  identity that its contacts with the rest of the chromosome state.
+- The components hold more than classes of loci with a table, at the same or a smaller count of numbers.
+- By cell line with three components, between 1 and 2 Mb and beyond: GM12878 0.70 and 0.80, HFFC6 0.51 and 0.64,
+  H1ESC 0.29 and 0.45.
+- Under 1 Mb the components hold 0.1 to 0.2. That range is the loops and the cells.
+
+The maps of the two halves on the workstation hold the counts of the trial regions alone, and no arm can be
+gathered from them.
+
+`playground/component_track.py` writes the track. Per arm it takes the log of the count over the mean of its
+diagonal, with half of that mean added on both sides, takes the mean of each diagonal off, and keeps the
+eigenvectors of largest absolute eigenvalue. The affinity of two bins is the signed sum of the products of their
+values and has a mean of zero at every separation. A track without that step had one component of the same sign
+on every bin and asked every pair apart.
+
+The term under trial, `[data] components`, off when empty:
+
+| pair of nodes | target |
+|---|---|
+| with a loop | the loop target, as before |
+| held by its contact cell at 5 kb | the distance of the cell, as before |
+| without a loop, closer than `background_range_bp` | the background of the law, as before |
+| any other pair with both nodes in one arm of the track | the background times `exp(-affinity / 3)`, clipped as a cell distance, as a background spring |
+| any other pair | no spring, as before |
+
+Hi-C enters as numbers per locus. The run reads no count of a pair beyond the cells at 5 kb.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:

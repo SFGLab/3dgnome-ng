@@ -49,6 +49,7 @@ class Settings:
     data_anchor_activity: str
     data_anchor_contacts: str
     data_contact_map: str
+    data_components: str
 
     # ---- template ----
 
@@ -295,6 +296,7 @@ class Settings:
         self.data_anchor_activity = ""
         self.data_anchor_contacts = ""
         self.data_contact_map = ""
+        self.data_components = ""
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -617,6 +619,7 @@ class Settings:
         self.data_anchor_activity = gets("data", "anchor_activity", self.data_anchor_activity)
         self.data_anchor_contacts = gets("data", "anchor_contacts", self.data_anchor_contacts)
         self.data_contact_map = gets("data", "contact_map", self.data_contact_map)
+        self.data_components = gets("data", "components", self.data_components)
 
         # [template]
 
