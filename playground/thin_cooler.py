@@ -17,7 +17,8 @@ The second form gives an existing half the weights of MCOOL in place.
 
 The third form splits whole chromosomes for the ensembles of a published result. It splits the
 counts of the 5 kb cells between two bins of one chromosome, the resolution of the contact cells
-of a run, and reads the map in parts of 50 million cells. The halves are
+of a run, and reads the map in parts of about 50 million rows. The rows of one cell are summed
+before the draw. The halves are
 `OUT_DIR/a/LABEL.mcool` and `OUT_DIR/b/LABEL.mcool` at 5, 10 and 25 kb with the weights of MCOOL.
 A run reads the singletons of production beside half `a`.
 """
@@ -103,9 +104,16 @@ def thin_chromosomes(mcool: Path, out: Path, label: str, chroms: list[str], seed
         for chrom in order:
             lo, hi = clr.extent(chrom)
             rng = np.random.default_rng([seed, clr.chromnames.index(chrom)])
-            for p0 in range(int(offset[lo]), int(offset[hi]), PART):
-                part = clr.pixels()[p0 : min(p0 + PART, int(offset[hi]))]
+            b0 = lo
+            while b0 < hi:
+                # A part ends at the end of a bin. The deep maps hold a cell in two rows of one
+                # bin, each with a share of its count, and the rows of a cell are summed here.
+                b1 = int(np.searchsorted(offset, offset[b0] + PART, side="right")) - 1
+                b1 = min(max(b1, b0 + 1), hi)
+                part = clr.pixels()[int(offset[b0]) : int(offset[b1])]
                 part = part[part["bin2_id"] < hi]
+                part = part.groupby(["bin1_id", "bin2_id"], as_index=False)["count"].sum()
+                b0 = b1
                 total = part["count"].to_numpy().astype(np.int64)
                 first = rng.binomial(total, 0.5)
                 part = part[["bin1_id", "bin2_id"]].assign(count=first if name == "a" else total - first)
