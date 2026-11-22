@@ -8,7 +8,7 @@ import { FACTORS } from '../../lib/format'
 import { type CameraLink } from '../cameraLink'
 import { Scene, type SceneHandle } from '../Scene'
 import { saveDataUrl } from '../export/savePng'
-import { chainColors, focusRanges } from '../structure'
+import { beadAt, chainColors, focusRanges } from '../structure'
 import { parseRegion } from '../../lib/region'
 import { parseJobUrl } from '../../routes'
 import { scoped } from '../../lib/css'
@@ -83,6 +83,7 @@ export function Panel({
   link,
   linkId,
   pair,
+  enhancer = null,
   choices,
   onPick,
 }: {
@@ -97,6 +98,8 @@ export function Panel({
    * comparison does not hold, which is then not marked.
    */
   pair?: { bead?: number; mean: number; sd: number } | null
+  /** A position inside the enhancer to mark for the selected gene, in place of the enhancer of the comparison. */
+  enhancer?: number | null
   choices?: Choice[]
   onPick?: (url: string) => void
 }) {
@@ -115,7 +118,11 @@ export function Panel({
   // The scene builds its tubes anew for a new list of points. The list is kept for a structure.
   const points = useMemo(() => (structure.data?.chain ?? []).map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure.data])
   const row = pair === null ? undefined : genes.data?.find((r) => r.gene === gene)
-  const enhancerBead = pair?.bead ?? row?.enhancer_bead
+  // The enhancer an example names is measured in this job from the TSS of the gene.
+  const named = !!row && enhancer !== null
+  const own = useQuery({ ...askedOf(api).distance(row?.tss ?? 0, enhancer ?? 0), enabled: named })
+  const enhancerBead = named && structure.data ? beadAt(structure.data.beads, enhancer!) : (pair?.bead ?? row?.enhancer_bead)
+  const stat = named ? own.data : row ? { mean: pair?.mean ?? row.distance, sd: pair?.sd ?? row.sd } : undefined
   // The promoter and the enhancer of the selected gene, marked A and B as on the Structure tab.
   const markers =
     row && structure.data
@@ -149,16 +156,16 @@ export function Panel({
             className={cn('icon-tool panel-save')}
             aria-label={`Save the structure of ${label} as a PNG`}
             onClick={() => {
-              const url = scene.current?.png(row ? `A to B ${(pair?.mean ?? row.distance).toFixed(1)} ± ${(pair?.sd ?? row.sd).toFixed(1)}` : undefined)
+              const url = scene.current?.png(stat ? `A to B ${stat.mean.toFixed(1)} ± ${stat.sd.toFixed(1)}` : undefined)
               if (url) saveDataUrl(url, `structure_${linkId === 'a' ? 'this_job' : 'other_job'}_${index}`)
             }}
           >
             <Camera size={15} aria-hidden />
           </button>
         )}
-        {row && (
+        {stat && (
           <span className={cn('ab-label')}>
-            A to B <strong>{`${(pair?.mean ?? row.distance).toFixed(1)} ± ${(pair?.sd ?? row.sd).toFixed(1)}`}</strong>
+            A to B <strong>{`${stat.mean.toFixed(1)} ± ${stat.sd.toFixed(1)}`}</strong>
           </span>
         )}
       </div>

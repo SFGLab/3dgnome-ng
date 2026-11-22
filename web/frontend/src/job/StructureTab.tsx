@@ -53,6 +53,8 @@ type Props = {
   summary: Summary
   selected: number
   gene?: string | null
+  /** A position inside the enhancer to mark for the selected gene, in place of its nearest enhancer. */
+  enhancer?: number | null
   onGene?: (gene: string | null) => void
   onOpenGenes?: (gene: string) => void
   /** The loop marked in the model and in the loop view. */
@@ -64,7 +66,7 @@ type Props = {
  * The Structure tab. It has the selected structure in 3D, its loops in two dimensions under it,
  * measurement between two beads over the ensemble and the card of a selected gene or loop.
  */
-export function StructureTab({ api, summary, selected, gene: geneProp, onGene, onOpenGenes = () => {}, loop: loopProp, onLoop }: Props) {
+export function StructureTab({ api, summary, selected, gene: geneProp, enhancer = null, onGene, onOpenGenes = () => {}, loop: loopProp, onLoop }: Props) {
   const [mode, setMode] = useState<Mode>('elements')
   const [measure, setMeasure] = useState(false)
   const [picks, setPicks] = useState<number[]>([])
@@ -84,7 +86,8 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
   const s = structure.data
   // A selected loop is its two anchors, the beads that hold the middles of its two ends.
   const loopBeads = s && loop ? [beadAt(s.beads, (loop.a[0] + loop.a[1]) / 2), beadAt(s.beads, (loop.b[0] + loop.b[1]) / 2)] : null
-  const pair = row ? [row.promoter_bead, row.enhancer_bead] : (loopBeads ?? picks)
+  const named = !!row && !!s && enhancer !== null
+  const pair = row ? [row.promoter_bead, named ? beadAt(s!.beads, enhancer!) : row.enhancer_bead] : (loopBeads ?? picks)
   const distance = useQuery({ ...askedOf(api).distance(s && pair.length === 2 ? mid(s, pair[0]) : 0, s && pair.length === 2 ? mid(s, pair[1]) : 0), enabled: !!s && pair.length === 2 })
   const region = parseRegion(summary.region)
   if (!s || !annotations.data || !region) return <Unanswered of={[structure, annotations]} className={cn('view-box')} />
@@ -154,7 +157,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
             }
           />
         )}
-        {row && <GeneCard row={row} chrom={region.chrom} onOpenGenes={onOpenGenes} />}
+        {row && <GeneCard row={row} chrom={region.chrom} onOpenGenes={onOpenGenes} marked={named ? enhancer! : undefined} />}
         {!row && loop && <LoopCard loop={loop} />}
       </div>
     </div>

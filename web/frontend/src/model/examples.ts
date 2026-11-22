@@ -23,6 +23,11 @@ export type Example = {
   compareCell?: string
   /** A gene the job opens with selected, its promoter and enhancer marked in each structure. */
   gene?: string
+  /**
+   * The enhancer of the gene that the example is about, by a position inside it. The job marks it in place of the
+   * enhancer nearest to the gene, which can be a bead beside the promoter.
+   */
+  enhancer?: number
 }
 
 export const EXAMPLES: Example[] = [
@@ -36,6 +41,7 @@ export const EXAMPLES: Example[] = [
     factors: 'CTCF+RNAPII',
     compareFactors: 'CTCF',
     gene: 'GCSAM',
+    enhancer: 112497118,
   },
   {
     id: 'MYC',

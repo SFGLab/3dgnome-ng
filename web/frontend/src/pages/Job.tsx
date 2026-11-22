@@ -32,7 +32,13 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const compareTo = params.get('compare')
   const comparing = compareTo !== null
   const go = (next: Record<string, string>) => setParams(next)
-  const [gene, setGene] = useState<string | null>(params.get('gene'))
+  const [gene, setGeneState] = useState<string | null>(params.get('gene'))
+  // An example names the enhancer of its gene. It is marked until another gene is selected.
+  const [enhancer, setEnhancer] = useState<number | null>(Number(params.get('enhancer')) || null)
+  const setGene = (g: string | null) => {
+    if (g !== gene) setEnhancer(null)
+    setGeneState(g)
+  }
   const [geneFilter, setGeneFilter] = useState('')
   const [loop, setLoop] = useState<Loop | null>(null)
   const summary = useQuery({
@@ -75,6 +81,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   summary={s}
                   selected={selected}
                   gene={gene}
+                  enhancer={enhancer}
                   onGene={setGene}
                   initial={compareTo || null}
                   onOther={(url) => go({ tab, compare: url ?? '' })}
@@ -87,6 +94,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   summary={s}
                   selected={selected}
                   gene={gene}
+                  enhancer={enhancer}
                   onGene={setGene}
                   loop={loop}
                   onLoop={setLoop}

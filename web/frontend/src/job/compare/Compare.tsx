@@ -22,6 +22,7 @@ export function Compare({
   summary,
   selected,
   gene,
+  enhancer = null,
   initial = null,
   onOther,
   onGene,
@@ -35,6 +36,8 @@ export function Compare({
   onOther?: (url: string | null) => void
   /** Called with the gene of a clicked row of the table. Both sides then mark its pair. A click
    * on the selected row, or on the button of the toolbar, calls it with null. */
+  /** A position inside the enhancer to mark for the selected gene in both jobs, in place of its nearest enhancer. */
+  enhancer?: number | null
   onGene?: (gene: string | null) => void
   onClose: () => void
 }) {
@@ -96,7 +99,7 @@ export function Compare({
         </button>
       </div>
       <div className={cn('compare-panels')}>
-        <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" pair={chosen ? { bead: chosen.enhancer_bead_a, ...chosen.a } : absent} />
+        <Panel api={api} label="this job" structure={selected} gene={gene} enhancer={enhancer} link={linked ? link : undefined} linkId="a" pair={chosen ? { bead: chosen.enhancer_bead_a, ...chosen.a } : absent} />
         {otherApi ? (
           <Panel
             key={otherApi.url}
@@ -104,6 +107,7 @@ export function Compare({
             label={otherJob?.name || otherJob?.label || 'the other job'}
             structure={1}
             gene={gene}
+            enhancer={enhancer}
             link={linked ? link : undefined}
             linkId="b"
             pair={chosen ? { bead: chosen.enhancer_bead_b, ...chosen.b } : absent}

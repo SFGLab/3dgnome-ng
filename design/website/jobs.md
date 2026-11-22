@@ -112,3 +112,7 @@ per kilobase, the config `CANONICAL_UNIFORM` of the engine.
   `design/website/settings.md`.
 - An example asks for the uniform chain on a site that offers it and for loop anchors on a site that does
   not, `model/request.ts::fromExample`. The drawings of the title page are made from the jobs of the examples.
+- A job pairs a gene with the enhancer nearest to it in 3D within 1 Mb, which for about a third of the genes is
+  under 5 kb from the TSS, a bead or two away. An example about one enhancer names it, `enhancer` of
+  `model/examples.ts`. The job page and the comparison then open with `gene` and `enhancer` in the address,
+  mark that enhancer as B and measure it from the TSS in each job. Another selected gene ends this.

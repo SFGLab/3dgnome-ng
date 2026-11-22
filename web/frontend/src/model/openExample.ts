@@ -18,6 +18,8 @@ const request = (e: Example, factors: Factors, cell = e.cell) => toFormData({ ..
 export async function openExample(e: Example): Promise<string> {
   // The two jobs of a compare example have the names of their loop sets,
   // not the title of the example.
+  // The gene the job opens with and, for an example about one enhancer, that enhancer.
+  const marked = { ...(e.gene ? { gene: e.gene } : {}), ...(e.gene && e.enhancer ? { enhancer: String(e.enhancer) } : {}) }
   const named = (f: Factors) => `${e.cellLabel} ${e.title}, ${f === 'CTCF+RNAPII' ? 'CTCF and RNAPII' : f} loops`
   if (e.compareCell) {
     // Two cell types on one region. Each job has the name of its cell type.
@@ -33,8 +35,8 @@ export async function openExample(e: Example): Promise<string> {
   if (e.compareFactors) {
     const other = await api.submit(request(e, e.compareFactors))
     rememberJob({ url: other.url, label: named(e.compareFactors), name: nameOf(other.url), at: Date.now() })
-    return `${url}?${new URLSearchParams({ compare: other.url, ...(e.gene ? { gene: e.gene } : {}) })}`
+    return `${url}?${new URLSearchParams({ compare: other.url, ...marked })}`
   }
-  const q = new URLSearchParams({ ...(e.tab ? { tab: e.tab } : {}), ...(e.gene ? { gene: e.gene } : {}) }).toString()
+  const q = new URLSearchParams({ ...(e.tab ? { tab: e.tab } : {}), ...marked }).toString()
   return q ? `${url}?${q}` : url
 }

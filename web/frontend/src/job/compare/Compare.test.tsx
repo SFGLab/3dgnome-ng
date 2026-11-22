@@ -21,11 +21,11 @@ const COMPARE = {
 }
 const ONE_GENE = { gene: 'TNFRSF8', a: [5, 6, 7, 9], b: [12, 15, 16, 20], p: 0.004 }
 
-function renderCompare(gene: string | null = 'TNFRSF8') {
+function renderCompare(gene: string | null = 'TNFRSF8', enhancer: number | null = null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene={gene} onClose={vi.fn()} />
+      <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene={gene} enhancer={enhancer} onClose={vi.fn()} />
     </QueryClientProvider>,
   )
 }
@@ -118,6 +118,35 @@ describe('Compare', () => {
     expect(screen.getByRole('button', { name: 'Save the structure of TNFRSF8 CTCF as a PNG' })).toBeInTheDocument()
     // The table is saved whole as a CSV file.
     expect(screen.getByRole('button', { name: 'Save the table as distance_changes.csv' })).toBeInTheDocument()
+  })
+
+  it('marks and measures the enhancer that an example names, in place of the nearest one', async () => {
+    const asked: string[] = []
+    mockApi([
+      [new RegExp(`${OTHER}/summary$`), () => [200, CTCF_SUMMARY]],
+      [/summary$/, () => [200, SUMMARY_DONE]],
+      [/structure\/\d+$/, () => [200, STRUCTURE]],
+      [/annotations$/, () => [200, ANNOTATIONS]],
+      [/genes$/, () => [200, GENES]],
+      [/\/api\/compare\/gene$/, () => [200, ONE_GENE]],
+      [/\/api\/compare$/, () => [200, COMPARE]],
+      [
+        /\/distance$/,
+        (u) => {
+          const url = u.toString()
+          asked.push(url)
+          return [200, url.includes(OTHER) ? { mean: 5.7, sd: 2.4, n: 10, values: [], a: { bead: 0, bp: 0 }, b: { bead: 1, bp: 0 } } : { mean: 3.2, sd: 0.6, n: 10, values: [], a: { bead: 0, bp: 0 }, b: { bead: 1, bp: 0 } }]
+        },
+      ],
+    ])
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    renderCompare('TNFRSF8', 12449484)
+    fireEvent.click(await screen.findByRole('button', { name: /TNFRSF8 CTCF/ }))
+    // Each side shows the distance of its own job to the named enhancer, not the row of the gene table.
+    expect(await screen.findByText('3.2 ± 0.6')).toBeInTheDocument()
+    expect(await screen.findByText('5.7 ± 2.4')).toBeInTheDocument()
+    expect(asked.every((u) => u.includes('b=12449484'))).toBe(true)
+    expect(asked.some((u) => u.includes(OTHER))).toBe(true)
   })
 
   it('selects the gene of a clicked row of the table', async () => {
