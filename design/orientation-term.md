@@ -98,7 +98,8 @@ chain without the term, `prod` the default chain. Differences are over the rows 
 
 ## Design of the rewrite, 2026-11-22
 
-The maintainer chose to rewrite the term on 2026-11-22. This is the design on paper. Nothing of it is built.
+The maintainer chose to rewrite the term on 2026-11-22. This is the design on paper. Steps 1 to 3 of the build
+are done.
 
 ### The direction of a site
 
@@ -164,7 +165,33 @@ are as they are.
 5. With the rewrite adopted: the JAX kernel gets the same form, the term as it is and its key are deleted. The
    batch executor refuses `stretch` until then.
 
+## Trace of the rewrite, 2026-11-22
+
+The numba kernel has the rewrite as `[motif_orientation] form = stretch` since 450522e. The same trace as above,
+GM12878 chr1 11 to 13 Mb, 4 structures an arm: the term as it is, the rewrite and no term. The misfit is read
+with the vector over three beads a side for every arm.
+
+| | default: as it is | rewrite | no term | uniform: as it is | rewrite | no term |
+|---|---|---|---|---|---|---|
+| bonds within two beads of a site over 2 targets | 25.2 % | 0.8 % | 1.1 % | 31.0 % | 4.3 % | 4.2 % |
+| the same over 3 targets | 9.1 % | 0.0 % | 0.0 % | 16.3 % | 0.4 % | 0.3 % |
+| longest bond, in targets | 6.9 | 2.7 | 3.0 | 6.6 | 3.4 | 3.3 |
+| bends sharper than 120 degrees within two beads of a site | 26.4 % | 5.8 % | 4.6 % | 21.3 % | 7.0 % | 5.7 % |
+| bond energy of the final chains | 146 | 21 | 19 | 167 | 38 | 35 |
+| misfit over three beads a side, before the stage | 0.322 | 0.322 | 0.322 | 0.329 | 0.329 | 0.329 |
+| misfit over three beads a side, after | 0.183 | 0.147 | 0.326 | 0.111 | 0.185 | 0.338 |
+| misfit over the two neighbours, after | 0.076 | 0.259 | 0.338 | 0.007 | 0.265 | 0.319 |
+
+- The rewrite leaves the bonds and the bends at the sites as the model without the term has them, on both chains.
+- The chain turns at the sites: the misfit over three beads a side falls from 0.32 to 0.15 on the default chain
+  and from 0.33 to 0.19 on the uniform chain. It does not reach zero at a weight of 0.6.
+- On the default chain the rewrite gives the stretch more direction than the term as it is, 0.147 against 0.183.
+  The term as it is turns the two neighbours and leaves the rest of the stretch. On the uniform chain the term
+  as it is reaches 0.111.
+
+The arm `o_st` on the 18 held out rows is building on the workstation as `ornst20`.
+
 ## Open
 
-The term stretches a quarter to a third of the bonds at its sites and is worth 0.007 of balanced SCC on the
-uniform chain. The design of the term is the maintainer's choice.
+The scores of the rewrite on held out inputs, against the term as it is and against no term. With the rewrite
+adopted, the same form in the JAX kernel and the removal of the form `neighbours` and of the key.
