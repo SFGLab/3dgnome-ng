@@ -21,6 +21,10 @@
 # Expects $ROOT/out/lr/<LINE>_<ARM>/<chr>, $ROOT/data/<LINE>/ with the run's loop files,
 # $ROOT/genes/genes_<chr>.tsv, the code under $REPO and $E3DX, the deep maps under $HIC/<LINE>/
 # and the enhancer3d inputs under $E3D. A step whose output is there is skipped.
+#
+# ARMS is the list of arms, E C R M by default. With SCORE_MAPS the structure and shortrange steps
+# score against $SCORE_MAPS/<LINE>.mcool in place of the deep map, half b of
+# slurm/ensemble/redo_halves.sh for arms that read half a.
 set -euo pipefail
 ROOT="${ROOT:-$HOME/xc_lr}"
 REPO="${REPO:-$ROOT/repo}"
@@ -36,7 +40,8 @@ OUT="$ROOT/out/readouts"
 MIN_COVERED="${MIN_COVERED:-0.1}"
 STEP=$1; CHR=$2
 LINES=(GM12878 H1ESC HFFC6)
-ARMS=(E C R M)
+read -r -a ARMS <<< "${ARMS:-E C R M}"
+SCORE_MAPS="${SCORE_MAPS:-}"
 export PYTHONPATH="$REPO"
 cd "$ROOT"
 
@@ -67,7 +72,9 @@ expression() {
 
 # The line's deep map, the largest mcool in its directory. A line has a shallow map beside it,
 # and the first by name is the shallow one for GM12878.
-deep_map() { ls -S "$HIC/$1"/*.mcool | head -1; }
+deep_map() {
+  if [ -n "$SCORE_MAPS" ]; then echo "$SCORE_MAPS/$1.mcool"; else ls -S "$HIC/$1"/*.mcool | head -1; fi
+}
 
 structure() {
   mkdir -p "$OUT/structure" "$ROOT/out/links"
