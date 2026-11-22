@@ -189,9 +189,28 @@ with the vector over three beads a side for every arm.
   The term as it is turns the two neighbours and leaves the rest of the stretch. On the uniform chain the term
   as it is reaches 0.111.
 
-The arm `o_st` on the 18 held out rows is building on the workstation as `ornst20`.
+## The rewrite on held out inputs, 2026-11-22
+
+The trial `ornst20`: `o_st`, the locked uniform chain with the form `stretch`, on the 18 rows at twenty
+structures, beside `o_on` and `o_off` of `orn20`. Scores in `design/figures/uniform-2026-11-19/scores-ornst20*`.
+
+| at 25 kb | the rewrite against the term as it is | rows above | p | the rewrite against no term | rows above | p |
+|---|---|---|---|---|---|---|
+| SCC per bead pair, raw | -0.003 ± 0.001 | 4 of 18 | 0.052 | +0.001 ± 0.002 | 10 of 18 | 0.42 |
+| SCC per bead pair, balanced | -0.007 ± 0.001 | 1 of 18 | 0.0005 | +0.001 ± 0.001 | 11 of 18 | 0.54 |
+| Spearman | -0.009 ± 0.001 | 0 of 18 | 0.0002 | -0.000 ± 0.001 | 7 of 18 | 0.46 |
+| balanced Pearson | +0.003 ± 0.001 | 16 of 18 | 0.0004 | -0.000 ± 0.000 | 5 of 18 | 0.33 |
+
+- The rewrite scores as the model without the term on every score, at 25, 10 and 5 kb. It has 1.2 close pairs
+  per thousand beads, as the model without the term, against 1.5 with the term as it is.
+- The 0.007 of balanced SCC and the 0.009 of Spearman of the term as it is on the uniform chain are not kept.
+  They come with what the term as it is does and the rewrite does not: the two neighbours of a site moved at a
+  weight of 50, with the bonds that stretch for it, or a direction held harder than the rewrite holds it. The
+  misfit over three beads a side is 0.111 with the term as it is and 0.185 with the rewrite. The trial does not
+  separate the two.
 
 ## Open
 
-The scores of the rewrite on held out inputs, against the term as it is and against no term. With the rewrite
-adopted, the same form in the JAX kernel and the removal of the form `neighbours` and of the key.
+The choice of the maintainer between the rewrite as it is, the model without the term and a trial of the rewrite
+at a larger weight. With a form adopted, the same form in the JAX kernel and the removal of the other form and
+of the key.
