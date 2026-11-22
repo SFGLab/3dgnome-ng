@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { checkCopy } from '../test/copy'
@@ -20,9 +20,9 @@ describe('Method page', () => {
     expect(headings).toEqual([
       '1. Inputs',
       '2. Blocks and target distances',
-      '3. Anchor phase',
-      '4. Chain phase',
-      '5. One bead per kilobase',
+      '3. The two chains',
+      '4. Anchor phase',
+      '5. Chain phase',
       '6. Ensemble and output',
       '7. Engine',
       '8. Structural variants',
@@ -32,38 +32,45 @@ describe('Method page', () => {
     ])
   })
 
-  it('has a tab for each chain, sections 3 and 4 in one and section 5 in the other', () => {
+  it('states for each phase what the two chains share and where they differ, with the equations of the second chain', () => {
     renderMethod()
-    const shown = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    const tabs = within(screen.getByRole('tablist', { name: 'Chain of the model' })).getAllByRole('tab')
-    expect(tabs.map((t) => [t.textContent, t.getAttribute('aria-selected')])).toEqual([
-      ['Loop anchors and segments', 'true'],
-      ['One bead per kilobase', 'false'],
+    const rows = (name: string) =>
+      within(screen.getByRole('table', { name }))
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => within(r).getAllByRole('cell').map((c) => c.textContent))
+    expect(rows('The two chains').map((r) => r[0])).toEqual([
+      'Beads of a block',
+      'An anchor of 3 kb',
+      'End of a loop',
+      'Two anchors that overlap',
+      'Loops and contact map read',
+      'Beads placed in the anchor phase',
+      'Beads moved in the chain phase',
     ])
-    expect(shown().slice(2, 5)).toEqual(['3. Anchor phase', '4. Chain phase', '6. Ensemble and output'])
-    fireEvent.click(tabs[1])
-    expect(tabs[1]).toHaveAttribute('aria-selected', 'true')
-    expect(shown().slice(2, 4)).toEqual(['5. One bead per kilobase', '6. Ensemble and output'])
-    expect(screen.getByRole('tabpanel', { name: 'One bead per kilobase' })).toContainElement(document.getElementById('uniform'))
-  })
-
-  it('opens the tab of a section named in the address', () => {
-    window.location.hash = '#uniform'
-    try {
-      renderMethod()
-      expect(screen.getByRole('tab', { name: 'One bead per kilobase' })).toHaveAttribute('aria-selected', 'true')
-      window.location.hash = '#chain'
-      fireEvent(window, new HashChangeEvent('hashchange'))
-      expect(screen.getByRole('tab', { name: 'Loop anchors and segments' })).toHaveAttribute('aria-selected', 'true')
-    } finally {
-      window.location.hash = ''
-    }
+    const anchor = rows('The two chains in the anchor phase')
+    // A row of one cell after the rule holds for both chains.
+    expect(anchor.filter((r) => r.length === 2).map((r) => r[0])).toEqual(['Loop spring, background spring under 100 kb, window term', 'Start and fit'])
+    expect(anchor.find((r) => r[0] === 'Loops of a structure')).toEqual(['Loops of a structure', 'every loop', 'a loop is kept with the probability q / (q + 1)'])
+    const chain = rows('The two chains in the chain phase')
+    expect(chain.find((r) => r[0] === 'Constants of the bond')).toEqual(['Constants of the bond', 'k_s = 0.1 and k_q = 0.1', 'k_s = 0.1 and k_q = 1'])
+    const h4 = (id: string) => within(document.getElementById(id)!).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)
+    expect(h4('anchors')).toEqual(['Loops of one structure', 'Radius of a node', 'Reach of the chain between two nodes', 'Cells of the Hi-C map', 'Stretches of 100 kb'])
+    expect(h4('chain')).toEqual(['Move of a node', 'Bond with two constants'])
+    for (const tex of ['p_{\\mathrm{keep}}', 'r_{ij} = r_0', 'E_{\\mathrm{reach}}', 'z = \\frac{O - E}', 'E + 1/2', 's_{ab} \\leq 5', 'E_{\\mathrm{bond}}', '\\mathbf{x}_{i-1}'])
+      expect(screen.getByAltText((alt) => alt.includes(tex))).toBeInTheDocument()
+    // The worked numbers of the test of a cell: 3 deviations of 4 about an expected count of 16.
+    expect(16 + 3 * Math.sqrt(16)).toBe(28)
+    expect(document.getElementById('anchors')).toHaveTextContent('enriched at 29 contacts or more and depleted at 3 or fewer')
   })
 
   it('numbers every figure once, in the order of the page', () => {
     const { container } = renderMethod()
     const labels = [...container.querySelectorAll('figcaption b, p.panel-caption > b')].map((b) => b.textContent).filter((s) => s?.startsWith('Figure'))
     expect(labels).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Figure ${n}`).concat(['Figure 10a', 'Figure 10b']))
+    // The figure of the beads is in the section on the two chains, before the figure of the terms.
+    expect(document.querySelector('#chains figcaption b')?.textContent).toBe('Figure 6')
+    expect([...document.querySelectorAll('#anchors figcaption b')].map((b) => b.textContent)).toEqual(['Figure 7', 'Figure 8'])
     expect(document.getElementById('engine')).toHaveTextContent('figure 10a')
     expect(document.getElementById('engine')).toHaveTextContent('figure 10b')
   })
@@ -87,9 +94,11 @@ describe('Method page', () => {
         '9. Limitations',
         'References',
       ])
-      expect(document.getElementById('uniform')).toBeNull()
-      expect(screen.queryByRole('tablist')).toBeNull()
-      expect(screen.queryByRole('tabpanel')).toBeNull()
+      expect(document.getElementById('chains')).toBeNull()
+      expect(screen.queryByRole('table', { name: /The two chains/ })).toBeNull()
+      expect(container.querySelectorAll('h4')).toHaveLength(0)
+      expect(document.querySelector('#anchors figcaption b')?.textContent).toBe('Figure 6')
+      expect(document.getElementById('targets')).toHaveTextContent('sections 3 and 4, then move the beads')
       expect(container).not.toHaveTextContent('two chains')
       expect(container).not.toHaveTextContent('one bead per kilobase')
       expect(document.getElementById('engine')).toHaveTextContent('figure 8a')
@@ -136,13 +145,13 @@ describe('Method page', () => {
   it('tells the anchor phase and the chain phase by their terms and the additions of this work', () => {
     renderMethod()
     const h3 = (id: string) => within(document.getElementById(id)!).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(h3('anchors')).toEqual(['The four terms', 'The start and the fit'])
-    expect(h3('chain')).toEqual(['The five terms', 'The start and the wall', 'Annealing', 'The last pass'])
+    expect(h3('anchors')).toEqual(['The four terms', 'The start and the fit', 'The two chains in the anchor phase'])
+    expect(h3('chain')).toEqual(['The five terms', 'The start and the wall', 'Annealing', 'The last pass', 'The two chains in the chain phase'])
     const anchors = document.getElementById('anchors')!
     // The three kinds of pair of the figure add up to its pairs.
     expect(46 + 55 + 1277).toBe((53 * 52) / 2)
     expect(anchors).toHaveTextContent('53 anchors and 1,378 pairs of anchors')
-    expect(anchors.querySelector('figure figcaption b')?.textContent).toBe('Figure 6')
+    expect(anchors.querySelector('figure figcaption b')?.textContent).toBe('Figure 7')
     expect(anchors).toHaveTextContent('two are new in this work, the background spring and the window term')
   })
 

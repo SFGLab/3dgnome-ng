@@ -13,5 +13,13 @@
  "t_bond": "w_d k \\left(\\frac{d_{i,i+1} - t_i}{t_i}\\right)^2",
  "t_bending": "w_a \\left(\\frac{1 - \\cos\\theta_i}{2}\\right)^3",
  "t_orientation": "w_m \\left(\\frac{1 - \\mathbf{o}_i \\cdot \\mathbf{o}_j}{2}\\right)^2",
- "t_confinement": "w_c \\left(\\frac{r_i - R}{R}\\right)^2,\\ r_i > R"
+ "t_confinement": "w_c \\left(\\frac{r_i - R}{R}\\right)^2,\\ r_i > R",
+ "loop_kept": "p_{\\mathrm{keep}} = \\frac{q}{q + 1}",
+ "node_radius": "r_{ij} = r_0\\, \\frac{f_i + f_j}{2},\\quad f_i = \\left(\\frac{c_i}{\\bar{c}}\\right)^{1/3}",
+ "reach": "E_{\\mathrm{reach}} = k \\left(\\frac{d_{ij} - n_{ij}}{n_{ij}}\\right)^2\\ \\mathrm{for}\\ d_{ij} > n_{ij},\\quad 0\\ \\mathrm{otherwise}",
+ "cell_test": "z = \\frac{O - E}{\\sqrt{E}},\\quad E = \\bar{E}(s)\\, \\beta_i\\, \\beta_j,\\quad \\mathrm{held\\ when}\\ |z| > 3\\ \\mathrm{and}\\ E > 9",
+ "cell_target": "t = b(s) \\left(\\frac{O + 1/2}{E + 1/2}\\right)^{-1/3},\\quad 1 \\leq t \\leq 2.5\\, b(s)",
+ "stretch_pairs": "t_{ab} = b(s_{ab})\\quad \\mathrm{for}\\ s_{ab} \\leq 5\\ \\mathrm{Mb}\\ \\mathrm{or}\\ |a - b| \\in \\{2^m,\\ 3 \\cdot 2^m\\}",
+ "bond_two": "E_{\\mathrm{bond}} = w_d\\, k \\left(\\frac{d - t}{t}\\right)^2,\\quad k = k_s\\ \\mathrm{for}\\ d > t,\\quad k = k_q\\ \\mathrm{for}\\ d < t",
+ "node_move": "\\mathbf{x}_i \\rightarrow \\mathbf{x}_i + \\Delta,\\quad \\mathbf{x}_{i-1} \\rightarrow \\mathbf{x}_{i-1} - \\frac{\\Delta}{2},\\quad \\mathbf{x}_{i+1} \\rightarrow \\mathbf{x}_{i+1} - \\frac{\\Delta}{2}"
 }
