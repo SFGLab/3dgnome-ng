@@ -91,12 +91,6 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     noised restarts. Returns one `(score, pos)` per problem.
     """
     s = problems[0]["settings"]
-    if s.use_ctcf_motif and s.motif_form == "stretch":
-        raise ValueError(
-            "[motif_orientation] form is stretch and the smooth stage runs on the batch executor,"
-            " whose kernel has the form neighbours alone. Set [simulation_backend]"
-            " mc_executor_smooth to threaded or serial."
-        )
     n_restarts = max(1, int(s.steps_smooth))
 
     expanded: list[Problem] = []

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -11,6 +11,7 @@ from gnome3d import log
 from gnome3d.mc.numba.terms import (
     NO_I32_N1,
     NO_W,
+    ORIENTATION_STRETCH,
     batch_mc_nb,
     calc_orientation_stretch_nb,
     init_affinity_nb,
@@ -23,10 +24,6 @@ LOG = log.get("mc.numba")
 # A round of the smooth stage that ends above this many times the score before it ends the run,
 # in both backends.
 SMOOTH_STOP_RATIO = 2.0
-# The beads to either side of an anchor that give its direction under `[motif_orientation] form
-# = stretch`: the shortest stretch in which a bead moved by one bond turns the vector by under
-# 5 degrees, design/orientation-term.md.
-ORIENTATION_STRETCH = 3
 
 
 def as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
@@ -130,6 +127,19 @@ def init_affinity_scores(pw: F64Array, aff: AffinityParams) -> float:
     return float(c)
 
 
+def orientation_weight(settings: Any) -> float:
+    """Returns the weight of the orientation term: the energy of the bonds of the stretch of a
+    site, `2 * ORIENTATION_STRETCH` of them, each one target too long. A site at its worst
+    misfit has that energy, design/orientation-term.md.
+    """
+    return (
+        2.0
+        * ORIENTATION_STRETCH
+        * float(settings.spring_stretch)
+        * float(settings.smooth_dist_weight)
+    )
+
+
 def loop_shares(nbr_offsets: I32Array, nbr_indices: I32Array, nbr_weights: F64Array) -> F64Array:
     """Returns the weight of each loop over the larger of the sums of the weights at its two
     anchors. The loops of an anchor then sum to one at most and a loop has one weight seen from
@@ -149,7 +159,11 @@ def loop_shares(nbr_offsets: I32Array, nbr_indices: I32Array, nbr_weights: F64Ar
 
 
 def sites_of_moves(
-    n: int, anchor_ar: I32Array, nbr_offsets: I32Array, centre_of: I32Array | None, stretch: int
+    n: int,
+    anchor_ar: I32Array,
+    nbr_offsets: I32Array,
+    centre_of: I32Array | None,
+    stretch: int = ORIENTATION_STRETCH,
 ) -> I32Array:
     """Returns for each bead the sites that its move reads, a row of site indices ended by -1.
 
@@ -181,19 +195,14 @@ def prepare_orientation(
     anchor_neighbor_weights: dict[int, list[float]],
     motif_weight: float,
     motifs_symmetric: bool,
-    stretch: int = 0,
-) -> tuple[I32Array, I32Array, I32Array, F64Array, BoolArray, I32Array, F64Array, float]:
+) -> tuple[I32Array, I32Array, I32Array, F64Array, BoolArray, F64Array, float]:
     """Builds the orientation arrays of the kernel from the Python dicts.
 
-    With `stretch` above zero the vector of an anchor is over that many beads to either side
-    and the weight of a loop is its weight over the larger of the sums of the weights at its
-    two anchors.
+    The vector of an anchor is over `ORIENTATION_STRETCH` beads to either side. The weight of
+    a loop is its weight over the larger of the sums of the weights at its two anchors.
 
-    Returns (anchor_ar, nbr_offsets, nbr_indices, nbr_weights, orn_is_L, bead_to_anchor_k,
-    anchor_orn, score_orn).
+    Returns (anchor_ar, nbr_offsets, nbr_indices, nbr_weights, orn_is_L, anchor_orn, score_orn).
     """
-    from gnome3d.util import calc_orientation as _calc_orn
-
     n = pw.shape[0]
     anchor_ar: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
     n_anchors = len(anchor_ar)
@@ -210,23 +219,14 @@ def prepare_orientation(
             off = nbr_offsets[k] + ki
             nbr_indices[off] = j
             nbr_weights[off] = w
-    if stretch > 0:
-        nbr_weights = loop_shares(nbr_offsets, nbr_indices, nbr_weights)
+    nbr_weights = loop_shares(nbr_offsets, nbr_indices, nbr_weights)
     orn_is_L: BoolArray = np.array([c == "L" for c in char_orientations], dtype=np.bool_)
-    bead_to_anchor_k: I32Array = cast(I32Array, np.full(n, -1, dtype=np.int32))
-    for k in range(n_anchors):
-        ar = int(anchor_ar[k])
-        if ar > 0:
-            bead_to_anchor_k[ar - 1] = k
-        if ar + 1 < n:
-            bead_to_anchor_k[ar + 1] = k
     anchor_orn: F64Array = np.zeros((n_anchors, 3), dtype=np.float64)
     for k in range(n_anchors):
         ar = int(anchor_ar[k])
-        if stretch > 0:
-            anchor_orn[k] = calc_orientation_stretch_nb(pw, ar, n, bool(orn_is_L[ar]), stretch)
-        else:
-            anchor_orn[k] = _calc_orn(pw, ar, n, char_orientations[ar])
+        anchor_orn[k] = calc_orientation_stretch_nb(
+            pw, ar, n, bool(orn_is_L[ar]), ORIENTATION_STRETCH
+        )
     score_orn = float(
         score_orientation_full_nb(
             anchor_orn, nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric
@@ -238,7 +238,6 @@ def prepare_orientation(
         nbr_indices,
         nbr_weights,
         orn_is_L,
-        bead_to_anchor_k,
         anchor_orn,
         score_orn,
     )
@@ -267,7 +266,6 @@ def run_outer_loop(
     nbr_indices: I32Array,
     nbr_weights: F64Array,
     anchor_orn: F64Array,
-    bead_to_anchor_k: I32Array,
     motif_weight: float,
     motifs_symmetric: bool,
     use_excl: bool,
@@ -322,8 +320,6 @@ def run_outer_loop(
     arc_w: F32Array = NO_W,
     use_centre: bool = False,
     centre_of: I32Array = NO_I32,
-    site_of: I32Array = NO_I32,
-    orn_stretch: int = 0,
     move_sites: I32Array = NO_I32_N1,
 ) -> float:
     """Runs the kernel until convergence and returns the final total score."""
@@ -364,7 +360,6 @@ def run_outer_loop(
             nbr_indices,
             nbr_weights,
             anchor_orn,
-            bead_to_anchor_k,
             motif_weight,
             motifs_symmetric,
             use_excl,
@@ -414,8 +409,6 @@ def run_outer_loop(
             arc_w,
             use_centre,
             centre_of,
-            site_of,
-            orn_stretch,
             move_sites,
         )
         score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp

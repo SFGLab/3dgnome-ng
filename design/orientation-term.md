@@ -3,7 +3,10 @@
 The term gives the chain at a CTCF anchor a direction that follows the motifs of its loops. This note has the
 term as it is coded, the trace of 2026-11-22 of the damage it does to the chain and the open design.
 
-## The term as coded
+## The term before 2026-11-22
+
+This section is the term that the reports and the traces below are about. The section "Adopted" has the term as
+it is now.
 
 - A site is an anchor of the block with a CTCF loop to another anchor of the block. A loop of another factor
   gives no site.
@@ -242,11 +245,36 @@ The arm `o_st10` on the 18 held out rows, the trial `ornst10`, scores in
   direction of the chain at an anchor does not move the agreement with Hi-C at 5 to 25 kb. The gain of the term
   as it is comes with the two neighbours of a site that it moves out of the chain.
 
+## Adopted, 2026-11-22
+
+The maintainer chose the rewrite at its derived weight for both chains and both kernels.
+
+- The term is the rewrite: the vector of an anchor over three beads a side, `ORIENTATION_STRETCH`, the loops of
+  a site weighted by `loop_shares`, the weight of the term from the bonds, `orientation_weight`. The term between
+  two neighbours, `[motif_orientation] weight`, `form` and `stretch_weight` are deleted. A config that still holds
+  `weight` loads and the key is not read.
+- Numba: `calc_orientation_stretch_nb`, `rescore_sites_nb` and `restore_sites_nb` in `gnome3d/mc/numba/terms.py`,
+  `sites_of_moves` and `prepare_orientation` in `gnome3d/mc/numba/common.py`. The chains of both production
+  configs are byte identical to those of the form `stretch` of the trial.
+- JAX: `_stretch_vectors`, `_sites_delta` and `_write_sites` in `gnome3d/mc/jax/smooth.py`, for a move of one bead
+  and for a node with its two neighbours. A move reads at most nine sites, `MOVE_SITES`, from a window of fifteen
+  beads, `ORN_WINDOW`. The running score of the JAX kernel is the energy that the numba preparation gives the
+  final chain, `tests/unit/test_centre_move.py`.
+- Unit file `tests/unit/test_orientation.py`.
+
+The default chain with the rewrite on the 18 held out rows, the trial `dst20`, against the default chain of
+production with the term between two neighbours:
+
+| at 25 kb | the rewrite against the term as it was | rows above | p |
+|---|---|---|---|
+| SCC per bead pair, raw | +0.000 ± 0.003 | 9 of 18 | 0.84 |
+| SCC per bead pair, balanced | -0.005 ± 0.004 | 7 of 18 | 0.21 |
+| Spearman | -0.004 ± 0.005 | 7 of 18 | 0.38 |
+| balanced Pearson | +0.006 ± 0.001 | 14 of 18 | 0.001 |
+
+No score of SCC or Spearman moves on the default chain. The close pairs are 10.9 per thousand beads against 11.5.
+
 ## Open
 
-The choice of the maintainer between the rewrite at its weight, the rewrite at ten times it and the model
-without the term. The three score alike. With a form adopted, the same form in the JAX kernel and the removal of
-the other forms and of the keys of the trial.
-
-The term as it is gains 0.007 of balanced SCC on the uniform chain by moving the two neighbours of a loop anchor
-out of the chain. No trial has looked at what in the chain beside a loop anchor that movement mends.
+The term between two neighbours gained 0.007 of balanced SCC on the uniform chain by moving the two neighbours of
+a loop anchor out of the chain. No trial has looked at what in the chain beside a loop anchor that movement mends.

@@ -1863,6 +1863,23 @@ score is the energy of the final chain, a node without the rule stays, the orien
 The medians of the final energy over twelve seeds agree between the kernels within 30 %. The forms with the grid
 are marked slow. The two kernels draw from different streams and their chains differ bead by bead.
 
+One round of the kernel on an RTX 3090, 16 blocks, the prefetch at 32, the cell grid on, no orientation term, in
+microseconds per step of the launch:
+
+| | 16 blocks of 4,096 beads | 16 blocks of 16,384 beads |
+|---|---|---|
+| a move of one bead | 3.8 | 20 |
+| the three bead move, each part scored on a copy of the chain | 16 | 69 |
+| the three bead move, no copy of the chain | 9.6 | 45 |
+
+The three bead move was first scored on a working copy of the positions and of the orientation vectors, one
+copy a proposal under the prefetch. It reads the positions as they are since 2026-11-22: the sums over the other
+beads are corrected for the pairs inside the three beads, the bonds and angles are scored on a window of fifteen
+beads and the orientation sites take their vectors as arguments. A step costs 2.2 to 2.5 times a step of one
+bead. The largest block of chr1 needs 20 million steps, about 15 minutes at 45 microseconds, and every block of
+the launch waits for it. A thread of the numba kernel takes a block of 14,714 beads through 13 million steps in
+60 s.
+
 The reach term and the gyration term of the arcs solve are on the device since 2026-11-22, by the maintainer's
 decision: `DeviceReachEnergy` and `DeviceGyrationEnergy` in `gnome3d/mc/jax/arcs_energy.py`, beside the factory
 term. The radius of gyration of a window is taken about the centroid of the window, which keeps the precision of
@@ -1961,10 +1978,24 @@ The last three columns are the mean distance in beads at that separation. The la
 - The band of contacts from 1 to 2 Mb at 100 kb is 0.08 for `near` and `octave`, 0.13 for `near_octave` and
   0.03 for `segment`, against 0.04 without the rule. Three structures do not carry that band.
 
-`near` and `near_octave` hold every pair of a region of 5 Mb and are the locked config there. The rows of
-`octave` and `segment` on the 18 regions are the trial `loci20`.
+`near` and `near_octave` hold every pair of a region of 5 Mb and are the locked config there. `octave` and
+`segment` on the 18 regions at twenty structures, the trial `loci20`, against every pair, `o_on`:
 
-Open, for the maintainer: the form of the rule, after `loci20`.
+| at 25 kb | `octave` | rows above | p | `segment` | rows above | p |
+|---|---|---|---|---|---|---|
+| SCC per bead pair, balanced | -0.000 ± 0.002 | 10 of 18 | 0.74 | -0.000 ± 0.000 | 0 of 18 | 0.18 |
+| Spearman | -0.033 ± 0.005 | 0 of 18 | 0.0002 | -0.005 ± 0.004 | 0 of 18 | 0.18 |
+| structures with overlapping ends, of 360 | 3 | | | 5 | | |
+
+Every pair has 1 structure of 360 with overlapping ends. `octave` gives up half of the Spearman that the rule
+gains on a region. `segment` is every pair on most rows, a region of 5 Mb being one or two segments.
+
+The effort of the annealing does not fall with the length of the chain. On whole chr1 the smooth stage runs 930
+to 1,400 steps per movable bead on blocks of 600 to 14,700 beads and the relaxation 1,145 steps per movable bead
+on the 162,522 movable beads of the chromosome, in 3,722 rounds and 608 s. A region of 10 Mb has 1,160 to
+1,430. The close pairs of a whole chromosome are those of its density.
+
+Open, for the maintainer: the form of the rule.
 
 ## The config locked on 2026-11-21
 

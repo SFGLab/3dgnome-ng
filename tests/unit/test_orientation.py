@@ -1,5 +1,5 @@
-"""Unit checks for the orientation term with the vector of an anchor over a stretch of chain,
-`[motif_orientation] form = stretch`.
+"""Unit checks for the orientation term: the vector of an anchor over a stretch of chain, the
+weights of its loops and the sites that a move reads.
 """
 
 from __future__ import annotations
@@ -9,27 +9,27 @@ import pytest
 
 from gnome3d.mc import numba as mc_numba
 from gnome3d.mc.numba.common import (
-    ORIENTATION_STRETCH,
     loop_shares,
+    orientation_weight,
     prepare_orientation,
     sites_of_moves,
 )
 from gnome3d.mc.numba.terms import (
+    ORIENTATION_STRETCH,
     calc_orientation_stretch_nb,
     init_smooth_nb,
     score_orientation_full_nb,
 )
-from gnome3d.pipeline.ib.smooth import _batch_run, centre_beads
+from gnome3d.pipeline.ib.smooth import centre_beads
 from gnome3d.settings import Settings
 from gnome3d.types import F64Array
 
 K = ORIENTATION_STRETCH
 
 
-def stretch_settings() -> Settings:
+def term_settings() -> Settings:
     s = Settings()
     s.use_ctcf_motif = True
-    s.motif_form = "stretch"
     s.use_excluded_volume = False
     s.use_confinement = False
     s.mc_smooth_chains = 1
@@ -146,9 +146,10 @@ NBR_W = {0: [1.0, 2.0], 1: [1.5, 0.5], 2: [1.0], 3: [2.0, 1.5], 4: [0.5]}
 
 def full_orientation(pos: F64Array, fixed: np.ndarray, chars: np.ndarray, s: Settings) -> float:
     """The term of a chain from scratch, as the kernel prepares it."""
-    weight = 2.0 * K * float(s.spring_stretch) * float(s.smooth_dist_weight)
-    _ar, offsets, indices, weights, _is_l, _b2a, orn, score = prepare_orientation(
-        pos, fixed, chars, NBRS, NBR_W, weight, bool(s.motifs_symmetric), K
+    weight = orientation_weight(s)
+    assert weight == pytest.approx(2.0 * K * 0.1), "six bonds each one target too long"
+    _ar, offsets, indices, weights, _is_l, orn, score = prepare_orientation(
+        pos, fixed, chars, NBRS, NBR_W, weight, bool(s.motifs_symmetric)
     )
     again = score_orientation_full_nb(
         orn, offsets, indices, weights, weight, bool(s.motifs_symmetric)
@@ -160,7 +161,7 @@ def full_orientation(pos: F64Array, fixed: np.ndarray, chars: np.ndarray, s: Set
 @pytest.mark.parametrize("rule", ["fixed", "centre"])
 def test_running_score_is_the_full_energy_with_sites_two_beads_apart(rule: str) -> None:
     pos, dtn, fixed, chars = chain_with_sites()
-    s = stretch_settings()
+    s = term_settings()
     centre = centre_beads(fixed) if rule == "centre" else None
     start = full_orientation(pos.astype(np.float64), fixed, chars, s)
     mc_numba.seed_numba(4)
@@ -174,34 +175,11 @@ def test_running_score_is_the_full_energy_with_sites_two_beads_apart(rule: str) 
 
 def test_the_term_is_bounded_by_the_bonds_of_the_stretches() -> None:
     pos, _dtn, fixed, chars = chain_with_sites(seed=5)
-    s = stretch_settings()
+    s = term_settings()
     term = full_orientation(pos.astype(np.float64), fixed, chars, s)
     assert term <= 5 * 2.0 * K * 0.1 + 1e-9, "five sites, each at most the weight of the term"
 
 
-def test_the_loader_knows_two_forms_and_the_batch_executor_refuses_stretch() -> None:
-    with pytest.raises(ValueError, match="neighbours or stretch"):
-        Settings.from_dict({"motif_orientation": {"form": "some"}})
-    with pytest.raises(ValueError, match="threaded or serial"):
-        _batch_run([{"settings": stretch_settings()}])
-
-
-def test_the_multiple_under_trial_scales_the_term() -> None:
-    """The same chain and the same moves refused: with no steps the score is that of the start."""
-    scores = []
-    for multiple in (1.0, 10.0):
-        pos, dtn, fixed, chars = chain_with_sites()
-        s = stretch_settings()
-        s.motif_stretch_weight = multiple
-        s.max_temp_smooth = 0.0
-        s.mc_stop_steps_smooth = 1
-        s.mc_stop_successes_smooth = 10
-        start = pos.astype(np.float64).copy()
-        mc_numba.seed_numba(1)
-        total = mc_numba.mc_smooth_numba(pos, dtn, fixed, 1e-9, s, chars, NBRS, NBR_W)
-        bonds = init_smooth_nb(pos.astype(np.float64), np.ones(49), 0.1, 0.1, 0.1, 1.0, 1.0)
-        assert np.allclose(pos, start, atol=1e-6)
-        scores.append(total - bonds)
-    assert scores[1] == pytest.approx(10.0 * scores[0], rel=1e-4)
-    with pytest.raises(ValueError, match="above zero"):
-        Settings.from_dict({"motif_orientation": {"stretch_weight": "0"}})
+def test_the_loader_accepts_the_retired_weight_key() -> None:
+    s = Settings.from_dict({"motif_orientation": {"use_motif_orientation": "yes", "weight": "50"}})
+    assert s.use_ctcf_motif and orientation_weight(s) == pytest.approx(2.0 * K * s.spring_stretch)

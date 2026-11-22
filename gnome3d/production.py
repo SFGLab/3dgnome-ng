@@ -39,7 +39,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "min_subanchors_per_arc": 0,
         "max_subanchors_per_arc": 100,
     },
-    "motif_orientation": {"use_motif_orientation": "yes", "weight": 50.0},
+    "motif_orientation": {"use_motif_orientation": "yes"},
     "anchor_heatmap": {"use_anchor_heatmap": "yes", "heatmap_influence": 0.1},
     "subanchor_heatmap": {
         # Off. It pulls bonds under their target on deep Hi-C and is skipped on shallow Hi-C.

@@ -2,9 +2,10 @@
 
     python playground/orientation_trace.py [--region chr1:11000000-13000000] [-n 4] [--cell GM12878]
 
-Builds the region with the default chain and with the uniform chain, each with the term as it
-is, with `[motif_orientation] form = stretch` and without the term, on the production config of
-the cell line. Every call of the numba smooth kernel is recorded
+Builds the region with the default chain and with the uniform chain, each with the term and
+without it, on the production config of the cell line. The trials of 2026-11-22 in
+`design/orientation-term.md` ran it on the commits that had the term between two neighbours and
+the forms under trial. Every call of the numba smooth kernel is recorded
 with its chain before and after. Printed per arm, over all blocks and structures:
 
 - the bonds within two beads of an anchor with a motif direction and a loop partner, as a multiple
@@ -43,8 +44,8 @@ from gnome3d.data import ContactData
 from gnome3d.io import parse_region
 from gnome3d.production import settings_for_cell
 from gnome3d.simulate import simulate
-from gnome3d.mc.numba.common import ORIENTATION_STRETCH
-from gnome3d.mc.numba.terms import calc_orientation_stretch_nb
+from gnome3d.mc.numba.common import orientation_weight
+from gnome3d.mc.numba.terms import ORIENTATION_STRETCH, calc_orientation_stretch_nb
 from gnome3d.util import calc_orientation
 
 parser = argparse.ArgumentParser()
@@ -52,7 +53,7 @@ parser.add_argument("--region", default="chr1:11000000-13000000")
 parser.add_argument("-n", type=int, default=4)
 parser.add_argument("--cell", default="GM12878")
 parser.add_argument("--chains", default="default,uniform")
-parser.add_argument("--terms", default="on,stretch,off", help="on, stretch, stretchN for N times the weight, off")
+parser.add_argument("--terms", default="on,off")
 args = parser.parse_args()
 
 records: list[dict[str, Any]] = []
@@ -222,8 +223,8 @@ def summarise(tag: str, recs: list[dict[str, Any]], weight: float) -> None:
             f" {wide_after / pairs:.3f} after"
         )
     print(
-        f"TRACE   energy of the final chains: bonds {e_bond:.2f}, orientation at the weight of the"
-        f" form neighbours {e_orn:.2f} ({e_orn_before:.2f} before the stage)"
+        f"TRACE   energy of the final chains: bonds {e_bond:.2f}, orientation between two neighbours"
+        f" at the weight of the term {e_orn:.2f} ({e_orn_before:.2f} before the stage)"
     )
     if beads:
         print(f"TRACE   beads within five beads of an anchor of the term: {100 * reach / beads:.1f} %")
@@ -238,9 +239,6 @@ for chain in args.chains.split(","):
         s = settings_for_cell(args.cell, data_root=data_root, uniform=chain == "uniform")
         if term == "off":
             s.use_ctcf_motif = False
-        if term.startswith("stretch"):
-            s.motif_form = "stretch"
-            s.motif_stretch_weight = float(term[len("stretch") :] or 1.0)
         log.setup(s.output_level)
         records.clear()
         data = ContactData.from_files(s, [bed.chr], bed)
@@ -255,4 +253,4 @@ for chain in args.chains.split(","):
                 twin = sites_of.get(r["fixed"].tobytes())
                 if twin is not None:
                     stage.append({**r, "chars": twin["chars"], "nbrs": twin["nbrs"], "nbr_w": twin["nbr_w"]})
-        summarise(f"{chain} chain, term {term}, {args.cell} {args.region}", stage, float(s.motif_weight))
+        summarise(f"{chain} chain, term {term}, {args.cell} {args.region}", stage, orientation_weight(s))

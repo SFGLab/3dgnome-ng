@@ -21,7 +21,6 @@ from gnome3d.mc.numba.common import (
     NO_I32,
     NO_I32_N1,
     NO_I64_3,
-    ORIENTATION_STRETCH,
     SMOOTH_STOP_RATIO,
     affinity_params,
     as_f64,
@@ -29,6 +28,7 @@ from gnome3d.mc.numba.common import (
     dummy_f64,
     dummy_i32,
     init_affinity_scores,
+    orientation_weight,
     prepare_orientation,
     run_outer_loop,
     sites_of_moves,
@@ -337,13 +337,7 @@ def mc_smooth_numba(
         and anchor_neighbor_weights is not None
         and bool(settings.use_ctcf_motif)
     )
-    motif_weight = float(settings.motif_weight)
-    orn_stretch = 0
-    if use_orn and str(settings.motif_form) == "stretch":
-        # A site at its worst has the energy of the bonds of its stretch each one target too
-        # long, design/orientation-term.md, times the multiple under trial.
-        orn_stretch = ORIENTATION_STRETCH
-        motif_weight = 2.0 * orn_stretch * stretch_k * dist_w * float(settings.motif_stretch_weight)
+    motif_weight = orientation_weight(settings)
     motifs_symmetric = bool(settings.motifs_symmetric)
     heat_weight = float(settings.subanchor_heatmap_dist_weight)
 
@@ -392,7 +386,6 @@ def mc_smooth_numba(
             nbr_indices,
             nbr_weights,
             orn_is_L,
-            bead_to_anchor_k,
             anchor_orn,
             score_orn,
         ) = prepare_orientation(
@@ -403,7 +396,6 @@ def mc_smooth_numba(
             anchor_neighbor_weights,
             motif_weight,
             motifs_symmetric,
-            orn_stretch,
         )
     else:
         anchor_ar = dummy_i32()
@@ -411,7 +403,6 @@ def mc_smooth_numba(
         nbr_indices = dummy_i32()
         nbr_weights = np.zeros(1, dtype=np.float64)
         orn_is_L = np.zeros(1, dtype=np.bool_)
-        bead_to_anchor_k = cast(I32Array, np.full(n, -1, dtype=np.int32))
         anchor_orn = np.zeros((1, 3), dtype=np.float64)
         score_orn = 0.0
 
@@ -464,22 +455,15 @@ def mc_smooth_numba(
 
     use_centre = centre is not None and not use_cap
     centre_of: I32Array = NO_I32
-    site_of: I32Array = NO_I32
     if centre is not None and use_centre:
         owner = cast(I32Array, np.full(n, -1, dtype=np.int32))
         for c in np.flatnonzero(centre):
             owner[c - 1 : c + 2] = c
         centre_of = owner
-        sites = cast(I32Array, np.full(n, -1, dtype=np.int32))
-        if use_orn:
-            sites[anchor_ar] = np.arange(anchor_ar.shape[0], dtype=np.int32)
-        site_of = sites
 
     move_sites: I32Array = NO_I32_N1
-    if orn_stretch > 0:
-        move_sites = sites_of_moves(
-            n, anchor_ar, nbr_offsets, centre_of if use_centre else None, orn_stretch
-        )
+    if use_orn:
+        move_sites = sites_of_moves(n, anchor_ar, nbr_offsets, centre_of if use_centre else None)
 
     score = run_outer_loop(
         pw=pw,
@@ -504,7 +488,6 @@ def mc_smooth_numba(
         nbr_indices=nbr_indices,
         nbr_weights=nbr_weights,
         anchor_orn=anchor_orn,
-        bead_to_anchor_k=bead_to_anchor_k,
         motif_weight=motif_weight,
         motifs_symmetric=motifs_symmetric,
         use_excl=use_excl,
@@ -555,8 +538,6 @@ def mc_smooth_numba(
         on_round=on_round,
         use_centre=use_centre,
         centre_of=centre_of,
-        site_of=site_of,
-        orn_stretch=orn_stretch,
         move_sites=move_sites,
     )
     pos[:] = pw.astype(pos.dtype)

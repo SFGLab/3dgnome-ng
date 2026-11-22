@@ -86,11 +86,10 @@ def test_without_the_rule_a_node_does_not_move() -> None:
     assert np.array_equal(pos[[10, 30, 31]], start[[10, 30, 31]])
 
 
-def test_orientation_score_follows_the_three_bead_move() -> None:
-    """Sites at beads 8 and 12 read beads 9 and 11, which move with the node at bead 10."""
-    from gnome3d.mc.numba.terms import score_orientation_full_nb
-    from gnome3d.util import calc_orientation
-
+def orientation_case() -> tuple[np.ndarray, ...]:
+    """Sites at beads 8, 10, 12 and 30 with loops between them. The node at bead 10 may move with
+    its neighbours, which the sites at beads 8 and 12 read.
+    """
     rng = np.random.default_rng(2)
     n = 40
     pos = np.cumsum(rng.normal(size=(n, 3)) * 0.8, axis=0).astype(np.float32)
@@ -100,23 +99,35 @@ def test_orientation_score_follows_the_three_bead_move() -> None:
     centre[10] = True
     chars = np.array(["N"] * n, dtype="<U1")
     chars[[8, 10, 12, 30]] = ["R", "L", "R", "L"]
-    nbrs = {0: [2, 3], 1: [3], 2: [0], 3: [0, 1]}
-    w = {0: [1.0, 2.0], 1: [1.5], 2: [1.0], 3: [2.0, 1.5]}
+    return pos, np.ones(n - 1, dtype=np.float32), fixed, centre, chars
+
+
+ORN_NBRS = {0: [2, 3], 1: [3], 2: [0], 3: [0, 1]}
+ORN_W = {0: [1.0, 2.0], 1: [1.5], 2: [1.0], 3: [2.0, 1.5]}
+
+
+def orientation_energy(pos: np.ndarray, fixed: np.ndarray, chars: np.ndarray, s: Settings) -> float:
+    """The term of a chain from scratch, as the numba kernel prepares it."""
+    from gnome3d.mc.numba.common import orientation_weight, prepare_orientation
+
+    return float(
+        prepare_orientation(
+            pos.astype(np.float64), fixed, chars, ORN_NBRS, ORN_W, orientation_weight(s),
+            bool(s.motifs_symmetric),
+        )[-1]
+    )  # fmt: skip
+
+
+def test_orientation_score_follows_the_three_bead_move() -> None:
+    pos, dtn, fixed, centre, chars = orientation_case()
     s = settings(wall=False)
     s.use_excluded_volume = False
     s.use_ctcf_motif = True
-    s.motif_weight = 5.0
-    dtn = np.ones(n - 1, dtype=np.float32)
     mc_numba.seed_numba(6)
-    score = mc_numba.mc_smooth_numba(pos, dtn, fixed, 1.0, s, chars, nbrs, w, centre=centre)
+    score = mc_numba.mc_smooth_numba(pos, dtn, fixed, 1.0, s, chars, ORN_NBRS, ORN_W, centre=centre)
     p64 = pos.astype(np.float64)
-    sites = [8, 10, 12, 30]
-    orn = np.array([calc_orientation(p64, b, n, chars[b]) for b in sites])
-    offsets = np.array([0, 2, 3, 4, 6], dtype=np.int32)
-    indices = np.array([2, 3, 3, 0, 0, 1], dtype=np.int32)
-    weights = np.array([1.0, 2.0, 1.5, 1.0, 2.0, 1.5])
-    full = init_smooth_nb(p64, np.ones(n - 1), 0.1, 0.1, 0.1, 1.0, 1.0) + score_orientation_full_nb(
-        orn, offsets, indices, weights, 5.0, bool(s.motifs_symmetric)
+    full = init_smooth_nb(p64, np.ones(39), 0.1, 0.1, 0.1, 1.0, 1.0) + orientation_energy(
+        pos, fixed, chars, s
     )
     assert score == pytest.approx(full, rel=1e-4)
 
@@ -201,41 +212,93 @@ def test_jax_without_the_rule_a_node_does_not_move() -> None:
     assert np.array_equal(pos[[10, 30, 31]], start[[10, 30, 31]])
 
 
+@pytest.mark.parametrize("rule", ["fixed", "centre"])
 @pytest.mark.parametrize("prefetch", [1, 8])
-def test_jax_orientation_score_follows_the_three_bead_move(prefetch: int) -> None:
+def test_jax_orientation_score_follows_the_moves(prefetch: int, rule: str) -> None:
     mc_jax = pytest.importorskip("gnome3d.mc.jax")
-    from gnome3d.mc.numba.terms import score_orientation_full_nb
-    from gnome3d.util import calc_orientation
-
-    rng = np.random.default_rng(2)
-    n = 40
-    pos = np.cumsum(rng.normal(size=(n, 3)) * 0.8, axis=0).astype(np.float32)
+    pos, dtn, fixed, centre, chars = orientation_case()
     start = pos.copy()
-    fixed = np.zeros(n, dtype=np.bool_)
-    fixed[[8, 10, 12, 30]] = True
-    centre = np.zeros(n, dtype=np.bool_)
-    centre[10] = True
-    chars = np.array(["N"] * n, dtype="<U1")
-    chars[[8, 10, 12, 30]] = ["R", "L", "R", "L"]
-    nbrs = {0: [2, 3], 1: [3], 2: [0], 3: [0, 1]}
-    w = {0: [1.0, 2.0], 1: [1.5], 2: [1.0], 3: [2.0, 1.5]}
     s = jax_settings(False, prefetch)
     s.use_excluded_volume = False
     s.use_ctcf_motif = True
-    s.motif_weight = 5.0
-    dtn = np.ones(n - 1, dtype=np.float32)
-    score = mc_jax.mc_smooth_jax(pos, dtn, fixed, 1.0, s, chars, nbrs, w, centre=centre)
+    before = orientation_energy(pos, fixed, chars, s)
+    score = mc_jax.mc_smooth_jax(
+        pos, dtn, fixed, 1.0, s, chars, ORN_NBRS, ORN_W,
+        centre=centre if rule == "centre" else None,
+    )  # fmt: skip
     p64 = pos.astype(np.float64)
-    sites = [8, 10, 12, 30]
-    orn = np.array([calc_orientation(p64, b, n, chars[b]) for b in sites])
-    offsets = np.array([0, 2, 3, 4, 6], dtype=np.int32)
-    indices = np.array([2, 3, 3, 0, 0, 1], dtype=np.int32)
-    weights = np.array([1.0, 2.0, 1.5, 1.0, 2.0, 1.5])
-    full = init_smooth_nb(p64, np.ones(n - 1), 0.1, 0.1, 0.1, 1.0, 1.0) + score_orientation_full_nb(
-        orn, offsets, indices, weights, 5.0, bool(s.motifs_symmetric)
+    term = orientation_energy(pos, fixed, chars, s)
+    full = init_smooth_nb(p64, np.ones(39), 0.1, 0.1, 0.1, 1.0, 1.0) + term
+    assert (np.linalg.norm(pos[10] - start[10]) > 1e-3) == (rule == "centre"), (
+        "the node moves by the rule"
     )
-    assert np.linalg.norm(pos[10] - start[10]) > 1e-3, "the node moved"
-    assert score == pytest.approx(full, rel=2e-3)
+    assert score == pytest.approx(full, rel=2e-3), "the running score is the energy of the chain"
+    assert term < before, f"the term falls: {before:.4f} to {term:.4f}"
+
+
+def test_jax_batch_of_blocks_scores_the_orientation_of_each_block() -> None:
+    """Two blocks of different length in one launch, one with the rule and both with loops."""
+    mc_jax = pytest.importorskip("gnome3d.mc.jax")
+    s = jax_settings(False, 8)
+    s.use_excluded_volume = False
+    s.use_ctcf_motif = True
+    problems = []
+    for seed, cut in ((2, 40), (2, 34)):
+        pos, dtn, fixed, centre, chars = orientation_case()
+        problems.append(
+            {
+                "pos": pos[:cut], "dtn": dtn[: cut - 1], "fixed": fixed[:cut], "step_size": 1.0,
+                "settings": s, "seed": seed + cut, "char_orientations": chars[:cut],
+                "anchor_neighbors": ORN_NBRS, "anchor_neighbor_weights": ORN_W,
+                "heat_dist": None, "compartment": None, "centre": centre[:cut],
+            }
+        )  # fmt: skip
+    out = mc_jax.mc_smooth_jax_batch(problems, s)
+    for prob, (score, final) in zip(problems, out, strict=True):
+        cut = final.shape[0]
+        term = orientation_energy(final, prob["fixed"], prob["char_orientations"], s)
+        full = init_smooth_nb(final.astype(np.float64), np.ones(cut - 1), 0.1, 0.1, 0.1, 1.0, 1.0)
+        assert score == pytest.approx(full + term, rel=2e-3), f"block of {cut} beads"
+        assert term < orientation_energy(prob["pos"], prob["fixed"], prob["char_orientations"], s)
+
+
+@pytest.mark.parametrize("prefetch", [1, 8])
+def test_jax_heat_and_compartment_scores_follow_the_three_bead_move(prefetch: int) -> None:
+    """Two nodes with the rule, a heat target for every pair and a compartment for every bead."""
+    mc_jax = pytest.importorskip("gnome3d.mc.jax")
+    from gnome3d.mc.numba.common import affinity_params, init_affinity_scores
+    from gnome3d.mc.numba.terms import init_heat_nb
+
+    rng = np.random.default_rng(9)
+    n = 48
+    pos = np.cumsum(rng.normal(size=(n, 3)) * 0.8, axis=0).astype(np.float32)
+    start = pos.astype(np.float64).copy()
+    fixed = np.zeros(n, dtype=np.bool_)
+    fixed[[10, 20, 30]] = True
+    centre = np.zeros(n, dtype=np.bool_)
+    centre[[10, 20]] = True
+    dtn = np.ones(n - 1, dtype=np.float32)
+    sep = np.abs(np.arange(n)[:, None] - np.arange(n)[None, :]).astype(np.float64)
+    heat = np.where(sep > 0, np.maximum(sep, 1.0) ** 0.5, 0.0)
+    comp = np.where((np.arange(n) // 6) % 2 == 0, 1, -1).astype(np.int8)
+    s = jax_settings(False, prefetch)
+    s.subanchor_heatmap_dist_weight = 0.05
+    s.use_compartments = True
+    s.compartment_weight = 1.5
+    score = mc_jax.mc_smooth_jax(
+        pos, dtn, fixed, 1.0, s, heat_dist=heat, compartment=comp, centre=centre
+    )
+    p64 = pos.astype(np.float64)
+    aff = affinity_params(s, "smooth", 1.0, comp)
+    full = (
+        full_energy(pos, s, None) + init_heat_nb(p64, heat, 0.05) + init_affinity_scores(p64, aff)
+    )
+    for c in (10, 20):
+        assert np.allclose(
+            p64[c - 1 : c + 2].mean(axis=0), start[c - 1 : c + 2].mean(axis=0), atol=1e-3
+        )
+        assert np.linalg.norm(p64[c] - start[c]) > 1e-3, "the node moved"
+    assert score == pytest.approx(full, rel=2e-3), "the running score is the energy of the chain"
 
 
 def batch_problem(seed: int, s: Settings, n: int = 60) -> dict[str, object]:

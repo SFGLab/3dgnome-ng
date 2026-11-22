@@ -78,6 +78,13 @@ last section are dated records and are not rewritten when production moves on. `
   as `score_orientation_full_nb` does. The update `score_orn += 2 * (curr - prev)` is then exact against the full
   score.
 
+- **Orientation term: the vector of an anchor over a stretch of chain.** Since 2026-11-22 the vector runs from the
+  centroid of the three beads before an anchor to the centroid of the three after it, a loop weighs its share of
+  the larger of the sums at its two anchors and the weight of the term is the energy of the six bonds of the
+  stretch each one target too long. The term between the two neighbours of an anchor at a weight of 50 stretched
+  a quarter to a third of the bonds at its sites and is deleted with its key. `design/orientation-term.md` has
+  the traces and the trials.
+
 - **Singletons are filtered by chromosome.** [io.load_singletons](../gnome3d/io.py) keeps a contact when both of its
   chromosomes are in the run. In a run of one region both ends must also be inside the region.
 

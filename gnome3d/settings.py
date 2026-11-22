@@ -56,9 +56,6 @@ class Settings:
     # ---- motif orientation ----
     use_ctcf_motif: bool
     motifs_symmetric: bool
-    motif_weight: float
-    motif_form: str
-    motif_stretch_weight: float
 
     # ---- anchor heatmap ----
     use_anchor_heatmap: bool
@@ -304,9 +301,6 @@ class Settings:
         # ---- motif orientation ----
         self.use_ctcf_motif = False
         self.motifs_symmetric = True
-        self.motif_weight = 1.0
-        self.motif_form = "neighbours"
-        self.motif_stretch_weight = 1.0
 
         # ---- anchor heatmap ----
         self.use_anchor_heatmap = False
@@ -677,20 +671,9 @@ class Settings:
         self.use_ctcf_motif = getb(
             "motif_orientation", "use_motif_orientation", self.use_ctcf_motif
         )
-        self.motif_weight = getf("motif_orientation", "weight", self.motif_weight)
-        self.motif_form = gets("motif_orientation", "form", self.motif_form)
-        if self.motif_form not in ("neighbours", "stretch"):
-            raise ValueError(
-                f"[motif_orientation] form must be neighbours or stretch, got {self.motif_form!r}"
-            )
-        self.motif_stretch_weight = getf(
-            "motif_orientation", "stretch_weight", self.motif_stretch_weight
-        )
-        if self.motif_stretch_weight <= 0.0:
-            raise ValueError(
-                "[motif_orientation] stretch_weight must be above zero, got"
-                f" {self.motif_stretch_weight}. Turn the term off with use_motif_orientation."
-            )
+        # The weight of the term is derived from the bonds since 2026-11-22. Configs still hold
+        # the key.
+        ignore("motif_orientation", "weight")
         self.motifs_symmetric = getb("motif_orientation", "symmetric_motifs", self.motifs_symmetric)
 
         # [anchor_heatmap]
