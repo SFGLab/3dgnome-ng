@@ -23,6 +23,7 @@ from gnome3d.mc.jax.util import (
     log_kernel_start,
     stable_seed_offset,
 )
+from gnome3d.mc.numba.common import SMOOTH_STOP_RATIO
 from gnome3d.types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
@@ -74,6 +75,7 @@ def _build_smooth_kernel(
     prefetch: int = 1,
     grid_g: int = 0,
     grid_cap: int = 0,
+    use_centre: bool = False,
 ) -> Any:
     """Builds the compiled smooth kernel, or returns the cached one.
 
@@ -90,6 +92,14 @@ def _build_smooth_kernel(
     adds a non neighbour pair under the excluded volume radius or deepens one. The cap rejects a
     move that takes a capped bead further than `cap_r` from `cap_home`. Neither draws a random
     number.
+
+    `use_centre` is the three bead move of the uniform chain. A node keeps the centre of mass of
+    itself, the bead before it and the bead after it. `centre_of` gives that node for each of the
+    three beads, -1 for any other bead. A proposal on the node moves it by the draw and its two
+    neighbours by minus half of it. A proposal on a neighbour moves it by the draw and the other
+    neighbour by minus it. `site_of` gives the orientation site at a bead, -1 for none, and the
+    sites at the node and two beads from it are read again. The wall judges the whole move. The
+    kernel without `use_centre` is the kernel as it was.
 
     Every argument is part of the cache key. `use_aff` is static. The affinity term costs a
     pass per step. The compartment energy is added into the excluded volume score `se`. Both are
@@ -109,6 +119,7 @@ def _build_smooth_kernel(
         int(prefetch),
         int(grid_g),
         int(grid_cap),
+        bool(use_centre),
     )
     if cache_key in _kernel_cache:
         return _kernel_cache[cache_key]
@@ -218,6 +229,8 @@ def _build_smooth_kernel(
     # of place.
     n_cells = int(grid_g) ** 3
     grid_period = max(1, 2048 // max(int(prefetch), 1)) if grid_g > 0 else 1
+    # A three bead move lists up to three beads a step.
+    move_parts = 3 if use_centre else 1
     offs27 = jnp.asarray(
         [[a, b, c] for a in (-1, 0, 1) for b in (-1, 0, 1) for c in (-1, 0, 1)], dtype=jnp.int32
     )
@@ -242,7 +255,7 @@ def _build_smooth_kernel(
         rank_c = jnp.minimum(jnp.arange(n) - first, grid_cap - 1)
         cell_beads = jnp.full((n_cells + 2, grid_cap), -1, dtype=jnp.int32)
         cell_beads = cell_beads.at[sc, rank_c].set(order.astype(jnp.int32))
-        moved = jnp.full((grid_period,), -1, dtype=jnp.int32)
+        moved = jnp.full((grid_period * move_parts,), -1, dtype=jnp.int32)
         flag = jnp.zeros((n,), dtype=jnp.bool_)
         return cell_beads, lo3, w, moved, flag
 
@@ -255,15 +268,46 @@ def _build_smooth_kernel(
         lin = jnp.where(inr, lin, n_cells + 1)
         return cell_beads[lin].reshape(-1), moved
 
-    def _grid_pairs(pos: Any, p_pos: Any, p: Any, n_active: Any, grid: Any) -> tuple[Any, Any]:
-        """Returns the candidate distances from `p_pos` and the mask of those that count."""
+    def _grid_pairs(
+        pos: Any, p_pos: Any, p: Any, n_active: Any, grid: Any, tri: Any = None
+    ) -> tuple[Any, Any]:
+        """Returns the candidate distances from `p_pos` and the mask of those that count.
+
+        `tri` is the beads of a three bead move. A bead of the move that an earlier part carried
+        away is not flagged yet and its cell is stale. The three are left out of the cells and of
+        the list and are candidates of their own.
+        """
         flag = grid[4]
         idx_c, idx_m = _grid_candidates(grid, p_pos)
-        idx = jnp.concatenate([idx_c, idx_m])
-        idx_i = jnp.maximum(idx, 0)
-        listed = jnp.concatenate(
-            [jnp.logical_not(flag[jnp.maximum(idx_c, 0)]), jnp.ones(idx_m.shape, dtype=jnp.bool_)]
-        )
+        if tri is None:
+            idx = jnp.concatenate([idx_c, idx_m])
+            idx_i = jnp.maximum(idx, 0)
+            listed = jnp.concatenate(
+                [
+                    jnp.logical_not(flag[jnp.maximum(idx_c, 0)]),
+                    jnp.ones(idx_m.shape, dtype=jnp.bool_),
+                ]
+            )
+        else:
+            idx = jnp.concatenate([idx_c, idx_m, tri])
+            idx_i = jnp.maximum(idx, 0)
+            in_c = jnp.any(idx_c[:, None] == tri[None, :], axis=1)
+            in_m = jnp.any(idx_m[:, None] == tri[None, :], axis=1)
+            # A plain move gives its bead three times. A bead counts once.
+            once = jnp.stack(
+                [
+                    jnp.bool_(True),
+                    tri[1] != tri[0],
+                    jnp.logical_and(tri[2] != tri[0], tri[2] != tri[1]),
+                ]
+            )
+            listed = jnp.concatenate(
+                [
+                    jnp.logical_and(jnp.logical_not(flag[jnp.maximum(idx_c, 0)]), ~in_c),
+                    ~in_m,
+                    once,
+                ]
+            )
         ok = jnp.logical_and(
             jnp.logical_and(idx >= 0, listed),
             jnp.logical_and(idx < n_active, jnp.abs(idx - p) > excl_skip),
@@ -272,16 +316,23 @@ def _build_smooth_kernel(
         return jnp.sqrt(jnp.sum(diff * diff, axis=1)), ok
 
     def _local_excl_grid(
-        pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any, n_active: Any, grid: Any
+        pos: Any,
+        p_pos: Any,
+        p: Any,
+        r0: Any,
+        weight: Any,
+        n_active: Any,
+        grid: Any,
+        tri: Any = None,
     ) -> Any:
-        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid)
+        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid, tri)
         rel = jnp.maximum(0.0, (r0 - d) / r0)
         return jnp.sum(jnp.where(ok, weight * rel * rel, 0.0))
 
     def _wall_grid(
-        pos: Any, p_pos: Any, p: Any, r0: Any, n_active: Any, grid: Any
+        pos: Any, p_pos: Any, p: Any, r0: Any, n_active: Any, grid: Any, tri: Any = None
     ) -> tuple[Any, Any]:
-        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid)
+        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid, tri)
         under = jnp.logical_and(ok, d < r0)
         return jnp.sum(under.astype(jnp.int32)), jnp.sum(jnp.where(under, r0 - d, 0.0))
 
@@ -464,6 +515,8 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
+        centre_of: Any,
+        site_of: Any,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """Runs one batch of `n_steps_per_batch` MC steps of one chain. Returns (pos_f, ss_f,
         se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok).
@@ -653,6 +706,197 @@ def _build_smooth_kernel(
                 n_ok_next,
             ), grid
 
+        def evaluate_centre(
+            pos: Any,
+            ss: Any,
+            se: Any,
+            sh: Any,
+            so: Any,
+            sc: Any,
+            anchor_orn: Any,
+            T: Any,
+            p: Any,
+            disp: Any,
+            u: Any,
+            grid: Any = None,
+        ) -> tuple[Any, ...]:
+            """Scores one proposal of the kernel with the three bead move.
+
+            A bead of a node that keeps its centre of mass moves with the two other beads of the
+            node. Any other bead moves alone. The move is three parts, one bead each, scored one
+            after another on a copy of the positions that holds the parts before. A part with a
+            factor of zero has a change of zero. Returns whether the move is accepted, the three
+            beads and their new positions, the five scores after it and the three orientation
+            sites with their new vectors.
+            """
+            score = ss + se + sh + so + sc
+            n = pos.shape[0]
+            c = centre_of[p]
+            is_c = c >= 0
+            cs = jnp.clip(c, 1, n - 2)
+            tri = jnp.where(is_c, jnp.stack([cs - 1, cs, cs + 1]), jnp.stack([p, p, p]))
+            # The factors of the draw for the three beads: (-0.5, 1, -0.5) for the node,
+            # (1, 0, -1) for the bead before it, (-1, 0, 1) for the bead after it and (1, 0, 0)
+            # for a bead that moves alone.
+            node = p == cs
+            left = p == cs - 1
+            f = jnp.stack(
+                [
+                    jnp.where(is_c, jnp.where(node, -0.5, jnp.where(left, 1.0, -1.0)), 1.0),
+                    jnp.where(jnp.logical_and(is_c, node), 1.0, 0.0),
+                    jnp.where(is_c, jnp.where(node, -0.5, jnp.where(left, -1.0, 1.0)), 0.0),
+                ]
+            ).astype(pos.dtype)
+            work = pos
+            zero = jnp.float32(0.0)
+            d_s, d_e, d_h, d_c, d_dep = zero, zero, zero, zero, zero
+            d_cnt = jnp.int32(0)
+            new_parts: list[Any] = []
+            for part in range(3):
+                q = tri[part]
+                old_q = work[q]
+                new_q = old_q + f[part] * disp
+                d_s = d_s + (
+                    _local_smooth_at(
+                        work, new_q, q, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w, n_active
+                    )
+                    - _local_smooth_at(
+                        work, old_q, q, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w, n_active
+                    )
+                )
+                if grid_g > 0:
+                    e_prev = _local_excl_grid(work, old_q, q, r0, excl_w, n_active, grid, tri)
+                    e_curr = _local_excl_grid(work, new_q, q, r0, excl_w, n_active, grid, tri)
+                else:
+                    e_prev = _local_excl_at(work, old_q, q, r0, excl_w, n_active)
+                    e_curr = _local_excl_at(work, new_q, q, r0, excl_w, n_active)
+                if use_aff:
+                    e_prev = e_prev + _local_affinity_at(
+                        work, old_q, q, comp_cls, comp_r0, comp_w, comp_ea, comp_eb, n_active
+                    )
+                    e_curr = e_curr + _local_affinity_at(
+                        work, new_q, q, comp_cls, comp_r0, comp_w, comp_ea, comp_eb, n_active
+                    )
+                d_e = d_e + (e_curr - e_prev)
+                if use_heat:
+                    d_h = d_h + (
+                        _local_heat_at(work, new_q, q, heat_dist, heat_weight)
+                        - _local_heat_at(work, old_q, q, heat_dist, heat_weight)
+                    )
+                d_c = d_c + (
+                    _local_confine_at(new_q, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
+                    - _local_confine_at(old_q, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
+                )
+                if use_wall:
+                    if grid_g > 0:
+                        cnt0, dep0 = _wall_grid(work, old_q, q, r0, n_active, grid, tri)
+                        cnt1, dep1 = _wall_grid(work, new_q, q, r0, n_active, grid, tri)
+                    else:
+                        cnt0, dep0 = _wall_at(work, old_q, q, r0, n_active)
+                        cnt1, dep1 = _wall_at(work, new_q, q, r0, n_active)
+                    d_cnt = d_cnt + (cnt1 - cnt0)
+                    d_dep = d_dep + (dep1 - dep0)
+                work = work.at[q].set(new_q)
+                new_parts.append(new_q)
+            new_tri = jnp.stack(new_parts)
+
+            ss_new = ss + d_s
+            se_new = se + 2.0 * d_e
+            sh_new = sh + 2.0 * d_h
+            sc_new = sc + d_c
+            delta = d_s + 2.0 * d_e + 2.0 * d_h + d_c
+
+            if use_orn:
+                # The sites at the node and two beads from it read a moved bead. A bead that
+                # moves alone changes the site of the anchor beside it.
+                beads = jnp.stack([cs - 2, cs, cs + 2])
+                in_chain = jnp.logical_and(beads >= 0, beads < n_active)
+                sites_c = jnp.where(in_chain, site_of[jnp.clip(beads, 0, n - 1)], -1)
+                sites_p = jnp.stack([bead_to_anchor_k[p], jnp.int32(-1), jnp.int32(-1)])
+                sites = jnp.where(is_c, sites_c, sites_p)
+                orn = anchor_orn
+                d_o = zero
+                vecs: list[Any] = []
+                for part in range(3):
+                    k = sites[part]
+                    has = k >= 0
+                    sk = jnp.maximum(k, 0)
+                    before = _local_orientation_at(
+                        orn, sk, nbr_idx, nbr_w, nbr_valid, motif_weight, symmetric
+                    )
+                    ar = anchor_ar[sk]
+                    vec = _calc_orientation_at(work, ar, work[ar], ar, is_L[ar])
+                    after = _local_orientation_at(
+                        orn, sk, nbr_idx, nbr_w, nbr_valid, motif_weight, symmetric, a_vec=vec
+                    )
+                    d_o = d_o + jnp.where(has, after - before, 0.0)
+                    orn = orn.at[sk].set(jnp.where(has, vec, orn[sk]))
+                    vecs.append(vec)
+                site_has = sites >= 0
+                site_k = jnp.maximum(sites, 0)
+                site_vec = jnp.stack(vecs)
+                so_new = so + 2.0 * d_o
+                delta = delta + 2.0 * d_o
+            else:
+                so_new = so
+                site_has = np.zeros(3, dtype=np.bool_)
+                site_k = np.zeros(3, dtype=np.int32)
+                site_vec = np.zeros((3, 3), dtype=np.float32)
+
+            score_new = score + delta
+            ok_unc = delta < 0.0
+            can_jump = jnp.logical_and(T > 0, score > 0)
+            exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30)
+            exponent = jnp.clip(exponent, -80.0, 80.0)
+            p_acc = js * jnp.exp(exponent)
+            ok = jnp.logical_or(ok_unc, jnp.logical_and(can_jump, u < p_acc))
+            if use_wall:
+                # The whole move may not add a pair under the radius or deepen one.
+                worse = jnp.logical_or(d_cnt > 0, jnp.logical_and(d_cnt == 0, d_dep > 0.0))
+                ok = jnp.logical_and(ok, jnp.logical_not(worse))
+            return (
+                ok, tri, new_tri, ss_new, se_new, sh_new, so_new, sc_new, site_has, site_k,
+                site_vec,
+            )  # fmt: skip
+
+        def apply_centre(
+            carry: Any, p: Any, ok: Any, res: tuple[Any, ...], T_next: Any, slot: Any = 0
+        ) -> Any:
+            (pos, ss, se, sh, so, sc, anchor_orn, _T, n_ok), grid = carry
+            (
+                _ok, tri, new_tri, ss_new, se_new, sh_new, so_new, sc_new, site_has, site_k,
+                site_vec,
+            ) = res  # fmt: skip
+            pos_next = pos
+            for part in range(3):
+                q = tri[part]
+                pos_next = pos_next.at[q].set(jnp.where(ok, new_tri[part], pos_next[q]))
+                if grid_g > 0:
+                    grid = _grid_note(grid, q, ok, slot * 3 + part)
+            anchor_orn_next = anchor_orn
+            if use_orn:
+                for part in range(3):
+                    k = site_k[part]
+                    write = jnp.logical_and(ok, site_has[part])
+                    anchor_orn_next = anchor_orn_next.at[k].set(
+                        jnp.where(write, site_vec[part], anchor_orn_next[k])
+                    )
+            return (
+                pos_next,
+                jnp.where(ok, ss_new, ss),
+                jnp.where(ok, se_new, se),
+                jnp.where(ok, sh_new, sh),
+                jnp.where(ok, so_new, so),
+                jnp.where(ok, sc_new, sc),
+                anchor_orn_next,
+                T_next,
+                n_ok + jnp.where(ok, 1, 0),
+            ), grid
+
+        if use_centre:
+            evaluate = evaluate_centre  # noqa: F811
+            apply = apply_centre  # noqa: F811
+
         init = ((pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0)), None)
         if prefetch <= 1:
             k_p, k_d, k_a = jax.random.split(key, 3)
@@ -813,6 +1057,8 @@ def _build_smooth_kernel(
         None,  # n_movable_active (shared)
         None,  # cap_home (shared across restarts)
         None,  # cap_r (shared)
+        None,  # centre_of (shared)
+        None,  # site_of (shared)
     )
     out_axes = (0, 0, 0, 0, 0, 0, 0, 0, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -865,6 +1111,8 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
+        centre_of: Any,
+        site_of: Any,
     ) -> Any:
         return batched(
             pos_k,
@@ -913,6 +1161,8 @@ def _build_smooth_kernel(
             n_movable_active,
             cap_home,
             cap_r,
+            centre_of,
+            site_of,
         )
 
     # The convergence loop runs on the device in one `lax.while_loop`, one MC batch of all K chains
@@ -970,6 +1220,8 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
+        centre_of: Any,
+        site_of: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1028,6 +1280,8 @@ def _build_smooth_kernel(
                 n_movable_active,
                 cap_home,
                 cap_r,
+                centre_of,
+                site_of,
             )
             score_per_chain = ss + se + sh + so + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -1037,7 +1291,8 @@ def _build_smooth_kernel(
                 score > stop_improvement * ms_score, n_ok_best < stop_successes
             )
             eps_done = score < score_eps
-            converged = jnp.logical_or(plateaued, eps_done)
+            rose = jnp.logical_and(ms_score > 0, score > SMOOTH_STOP_RATIO * ms_score)
+            converged = jnp.logical_or(jnp.logical_or(plateaued, eps_done), rose)
             return (pos, ss, se, sh, so, sc, anchor_orn, T, score, iter_i + 1, n_ok_best, converged)
 
         # A very large first `ms_score`. The first batch does not pass the improvement test.
@@ -1314,6 +1569,8 @@ def _build_smooth_kernel(
         0,  # n_movable_active (per-IB)
         0,  # cap_home (per-IB)
         0,  # cap_r (per-IB)
+        0,  # centre_of (per-IB)
+        0,  # site_of (per-IB)
     )
     batched_mp = jax.vmap(chain_batch, in_axes=in_axes_mp, out_axes=out_axes)
 
@@ -1369,6 +1626,8 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
+        centre_of: Any,
+        site_of: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1441,6 +1700,8 @@ def _build_smooth_kernel(
                 n_movable_active,
                 cap_home,
                 cap_r,
+                centre_of,
+                site_of,
             )
             # A converged chain keeps its state while the rest of the launch runs.
             pos = hold(pos, prev[0], conv_prev)
@@ -1457,8 +1718,11 @@ def _build_smooth_kernel(
             # moves in this batch.
             plateaued = jnp.logical_and(score > stop_improvement * ms_score, n_ok < stop_successes)
             eps_done = score < score_eps
+            rose = jnp.logical_and(ms_score > 0, score > SMOOTH_STOP_RATIO * ms_score)
             # Convergence is latched.
-            converged = jnp.logical_or(jnp.logical_or(plateaued, eps_done), conv_prev)
+            converged = jnp.logical_or(
+                jnp.logical_or(jnp.logical_or(plateaued, eps_done), rose), conv_prev
+            )
             return (pos, ss, se, sh, so, sc, anchor_orn, T, score, iter_i + 1, n_ok, converged)
 
         init_state = (
@@ -1522,6 +1786,7 @@ def mc_smooth_jax(
     compartment: np.ndarray[Any, Any] | None = None,
     pos_batch: np.ndarray[Any, Any] | None = None,
     return_all: bool = False,
+    centre: np.ndarray[Any, Any] | None = None,
 ) -> Any:
     """Anneals one chain on JAX and returns the final score of the best chain. Writes its final
     positions into `pos`.
@@ -1529,7 +1794,8 @@ def mc_smooth_jax(
     With `pos_batch` of shape (B, N, 3) the kernel runs B anneals from those starts in one launch
     and shares `dtn`, `fixed`, the heat target and the schedule. The loop stops when the best
     chain converges. With `return_all` it returns `(scores, finals)` of shapes (B,) and (B, N, 3)
-    and does not change `pos`.
+    and does not change `pos`. A fixed bead of `centre` moves with the bead before it and the
+    bead after it and the three keep their centre of mass, as in `mc_smooth_numba`.
     """
     if not jax_is_available():
         raise RuntimeError(
@@ -1547,11 +1813,8 @@ def mc_smooth_jax(
     cap_frac: float = float(getattr(settings, "smooth_anchor_cap", 0.0))
     use_cap: bool = cap_frac > 0.0
     prefetch: int = max(1, int(getattr(settings, "smooth_prefetch", 1)))
-    movable_np: I64Array = (
-        np.arange(n, dtype=np.int64)
-        if use_cap
-        else np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
-    )
+    use_centre: bool = centre is not None and not use_cap
+    movable_np: I64Array = _movable_beads(fixed, centre if use_centre else None, use_cap)
     if len(movable_np) == 0:
         return 0.0
 
@@ -1616,6 +1879,7 @@ def mc_smooth_jax(
         assert anchor_neighbor_weights is not None
         anchor_ar_np: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
         n_anchors = int(len(anchor_ar_np))
+        n_sites = n_anchors
         # Neighbour lists are padded to one width for vmap.
         nbr_lists = [list(anchor_neighbors.get(k, [])) for k in range(n_anchors)]
         nbr_w_lists = [list(anchor_neighbor_weights.get(k, [])) for k in range(n_anchors)]
@@ -1652,6 +1916,7 @@ def mc_smooth_jax(
                 n_anchors, max_nbrs = A, M
     else:
         n_anchors = 1  # placeholder shape
+        n_sites = 0
         max_nbrs = 1
         anchor_ar_np = np.zeros(1, dtype=np.int32)
         nbr_idx_np = np.zeros((1, 1), dtype=np.int32)
@@ -1712,7 +1977,7 @@ def mc_smooth_jax(
         grid_g, grid_cap = _grid_static([(pos_f32, excl_r0)])
     bundle = _build_smooth_kernel(
         n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff, use_wall, use_cap,
-        prefetch, grid_g, grid_cap,
+        prefetch, grid_g, grid_cap, use_centre,
     )  # fmt: skip
     (
         _kernel_one_batch,
@@ -1737,6 +2002,9 @@ def mc_smooth_jax(
         cap_r_np[:n] = np.where(fixed, cap_frac * float(dtn_np[:n].mean()), 0.0)
     cap_home_j = jnp.asarray(pos_k_np[0])
     cap_r_j = jnp.asarray(cap_r_np)
+    centre_of_np, site_of_np = _centre_tables(
+        centre if use_centre else None, anchor_ar_np, n_sites, int(pos_k_np.shape[1])
+    )
     heat_j = jnp.asarray(heat_np)
     anchor_ar_j = jnp.asarray(anchor_ar_np)
     bead_to_anchor_k_j = jnp.asarray(bead_to_anchor_k_np)
@@ -1909,6 +2177,8 @@ def mc_smooth_jax(
         n_movable_active_j,
         cap_home_j,
         cap_r_j,
+        centre_of_np,
+        site_of_np,
     )
 
     score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k + sc_k)
@@ -1961,6 +2231,7 @@ def _prep_smooth_problem_np(
     M: int,
     compartment: np.ndarray[Any, Any] | None = None,
     heat_out: np.ndarray[Any, Any] | None = None,
+    centre: np.ndarray[Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Builds the kernel inputs of one IB as numpy arrays padded to a common bucket of B beads,
     A anchors and M neighbours.
@@ -2005,6 +2276,7 @@ def _prep_smooth_problem_np(
         assert anchor_neighbor_weights is not None
         anchor_ar = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
         n_anchors = int(len(anchor_ar))
+        n_sites = n_anchors
         nbr_lists = [list(anchor_neighbors.get(k, [])) for k in range(n_anchors)]
         nbr_w_lists = [list(anchor_neighbor_weights.get(k, [])) for k in range(n_anchors)]
         nbr_idx = np.zeros((n_anchors, M), dtype=np.int32)
@@ -2031,6 +2303,7 @@ def _prep_smooth_problem_np(
             nbr_w = np.pad(nbr_w, ((0, ap), (0, 0)))
             nbr_valid = np.pad(nbr_valid, ((0, ap), (0, 0)))
     else:
+        n_sites = 0
         anchor_ar = np.zeros(A, dtype=np.int32)
         nbr_idx = np.zeros((A, M), dtype=np.int32)
         nbr_w = np.zeros((A, M), dtype=np.float32)
@@ -2039,11 +2312,10 @@ def _prep_smooth_problem_np(
         is_L = np.zeros(n, dtype=np.bool_)
 
     cap_frac = float(getattr(settings, "smooth_anchor_cap", 0.0))
-    movable = (
-        np.arange(n, dtype=np.int64)
-        if cap_frac > 0.0
-        else np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
-    )
+    if cap_frac > 0.0:
+        centre = None
+    movable = _movable_beads(fixed, centre, cap_frac > 0.0)
+    centre_of, site_of = _centre_tables(centre, anchor_ar, n_sites, B)
     n_movable = int(movable.shape[0])
     pos_pad = pos.astype(np.float32)
     dtn_pad = dtn.astype(np.float32)
@@ -2088,6 +2360,8 @@ def _prep_smooth_problem_np(
         "excl_r0": excl_r0,
         "cap_home": pos_pad.copy(),  # (B, 3)
         "cap_r": _cap_radii(fixed, dtn, cap_frac, B),  # (B,)
+        "centre_of": centre_of,  # (B,)
+        "site_of": site_of,  # (B,)
         # A pad entry is class 0 and adds nothing.
         "comp_cls": _pad_track(compartment, B, np.int8),
         "conf_cx": conf_cx,
@@ -2096,6 +2370,36 @@ def _prep_smooth_problem_np(
         "conf_R": conf_R,
         "conf_w": conf_w,
     }
+
+
+def _centre_tables(
+    centre: np.ndarray[Any, Any] | None,
+    anchor_ar: np.ndarray[Any, Any],
+    n_sites: int,
+    B: int,
+) -> tuple[I32Array, I32Array]:
+    """Returns for each bead of a chain padded to B the node of its three bead move and its
+    orientation site, -1 for none. `anchor_ar` is the beads of the first `n_sites` sites.
+    """
+    owner: I32Array = np.full(B, -1, dtype=np.int32)
+    sites: I32Array = np.full(B, -1, dtype=np.int32)
+    if centre is not None:
+        for c in np.flatnonzero(centre):
+            owner[c - 1 : c + 2] = c
+        sites[anchor_ar[:n_sites]] = np.arange(n_sites, dtype=np.int32)
+    return owner, sites
+
+
+def _movable_beads(
+    fixed: np.ndarray[Any, Any], centre: np.ndarray[Any, Any] | None, use_cap: bool
+) -> I64Array:
+    """Returns the beads that the kernel draws from: every bead under the cap, else the free
+    beads and the nodes of `centre`.
+    """
+    if use_cap:
+        return np.arange(fixed.shape[0], dtype=np.int64)
+    free = ~fixed if centre is None else (~fixed | centre)
+    return np.ascontiguousarray(np.where(free)[0], dtype=np.int64)
 
 
 def _cap_radii(
@@ -2135,6 +2439,7 @@ def _smooth_tensor_bytes(B: int, A: int, M: int, use_heat: bool, use_orn: bool) 
         + f4  # step_size_k
         + 6 * f4  # excl_r0 + conf cx,cy,cz,R,w
         + 2 * i4  # n_active / n_movable
+        + 2 * B * i4  # centre_of, site_of
     )
     out = B * 3 * f4 + 5 * f4 + A_ * 3 * f4 + b1  # pos_f, scores, anchor_orn, converged
     return inp + out
@@ -2175,8 +2480,9 @@ def mc_smooth_jax_batch(
     """Anneals K different IBs in one vmapped kernel.
 
     Each problem is a dict with `pos` (n, 3), `dtn` (n,), `fixed` (n,) and `step_size` and
-    optionally `heat_dist` (n, n), `char_orientations` (n,), `anchor_neighbors` and
-    `anchor_neighbor_weights`. All problems must share the energy term flags.
+    optionally `heat_dist` (n, n), `char_orientations` (n,), `anchor_neighbors`,
+    `anchor_neighbor_weights` and `centre` (n,), the nodes of the three bead move. All problems
+    must share the energy term flags and have `centre` or lack it together.
 
     Returns one `(score, final_pos)` per problem in input order and does not change the inputs.
     IBs beyond the vmap width of `_resolve_smooth_max_k` run as further launches.
@@ -2283,6 +2589,8 @@ def _mc_smooth_jax_batch_chunk(
     use_wall = bool(getattr(settings, "smooth_hard_wall", False))
     use_cap = float(getattr(settings, "smooth_anchor_cap", 0.0)) > 0.0
     prefetch = max(1, int(getattr(settings, "smooth_prefetch", 1)))
+    # The three bead move is on for the whole group, as the settings of the run decide it.
+    use_centre = problems[0].get("centre") is not None and not use_cap
 
     Bs, As, Ms = [], [], []
     for p in problems:
@@ -2323,6 +2631,7 @@ def _mc_smooth_jax_batch_chunk(
             M,
             p.get("compartment"),
             heat_all[i] if use_heat else None,
+            p.get("centre") if use_centre else None,
         )
         for i, p in enumerate(problems)
     ]
@@ -2336,6 +2645,8 @@ def _mc_smooth_jax_batch_chunk(
     movable_k = stack("movable")
     cap_home_k = stack("cap_home")
     cap_r_k = stack("cap_r")
+    centre_of_k = stack("centre_of")
+    site_of_k = stack("site_of")
     heat_k = jnp.asarray(heat_all)  # (K, B, B), written by the prep
     anchor_ar_k = stack("anchor_ar")
     b2a_k = stack("bead_to_anchor_k")
@@ -2395,7 +2706,7 @@ def _mc_smooth_jax_batch_chunk(
         )
     bundle = _build_smooth_kernel(
         n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap, prefetch,
-        grid_g, grid_cap,
+        grid_g, grid_cap, use_centre,
     )  # fmt: skip
     (
         _kb,
@@ -2460,6 +2771,8 @@ def _mc_smooth_jax_batch_chunk(
     _desc = ("" if not use_heat else ", heat") + (
         "" if not use_orn else f", orientation ({A} anchors, <={M} motif-nbrs/anchor)"
     )
+    if use_centre:
+        _desc += ", three bead move of a node"
     log_kernel_start(LOG, "smooth", "mc", K, B, f"sequential single-bead{_desc}{chunk_tag}")
     t0 = time.perf_counter()
     out = kernel_full_mp(
@@ -2513,6 +2826,8 @@ def _mc_smooth_jax_batch_chunk(
         n_movable_k,
         cap_home_k,
         cap_r_k,
+        centre_of_k,
+        site_of_k,
     )
     pos_f, ss_f, se_f, sh_f, so_f, sc_f, _ao_f, _final_score, iter_count, converged = out
     score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)  # syncs the device

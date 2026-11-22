@@ -91,12 +91,6 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     noised restarts. Returns one `(score, pos)` per problem.
     """
     s = problems[0]["settings"]
-    if s.uniform_chain:
-        raise ValueError(
-            "[main] uniform_chain is on and the smooth stage runs on the batch executor, whose"
-            " kernel has no move of three beads for a node. Set [simulation_backend]"
-            " mc_executor_smooth to threaded or serial."
-        )
     n_restarts = max(1, int(s.steps_smooth))
 
     expanded: list[Problem] = []
@@ -169,7 +163,7 @@ def _run(problem: Problem) -> Result:
     heat = problem["heat_dist"]
     comp = problem["compartment"]
 
-    centre = centre_beads(fixed) if s.uniform_chain else None
+    centre = problem["centre"]
 
     seed_rng(seed)
     mc_numba.seed_numba(seed)
@@ -245,6 +239,7 @@ class SmoothStage:
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
             "compartment": st.bead_compartment,
+            "centre": centre_beads(st.fixed) if st.settings.uniform_chain else None,
             "bead_starts": st.bead_starts,
             "bead_ends": st.bead_ends,
             "chrom": st.chrom,

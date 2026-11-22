@@ -18,6 +18,10 @@ from gnome3d.types import BoolArray, F32Array, F64Array, I8Array, I32Array, I64A
 
 LOG = log.get("mc.numba")
 
+# A round of the smooth stage that ends above this many times the score before it ends the run,
+# in both backends.
+SMOOTH_STOP_RATIO = 2.0
+
 
 def as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
     return np.ascontiguousarray(arr, dtype=np.float64)
