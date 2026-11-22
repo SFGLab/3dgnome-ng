@@ -24,13 +24,19 @@ from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
 from gnome3d.pipeline.ib.cells import available_resolution, hold_by_cells, read_cells
-from gnome3d.pipeline.ib.components import hold_by_components, read_components
+from gnome3d.pipeline.ib.components import (
+    LOCUS_BP,
+    ArmComponents,
+    hold_loci,
+    read_components,
+)
 from gnome3d.pipeline.ib.maxent import anchor_draw
 from gnome3d.pipeline.ib.nodes import (
     ContactNodes,
     chain_share,
     contact_nodes,
     draw_ends,
+    locus_beads,
     mean_loop_target,
     node_targets,
     node_weights,
@@ -147,6 +153,30 @@ class ChromNodes(NamedTuple):
     nbr_w: list[list[float]]
 
 
+def locus_extra(
+    edges: list[I64Array],
+    anchor_block: I32Array,
+    ends: I32Array,
+    beads: I64Array,
+    s: Settings,
+) -> I64Array | None:
+    """Returns the locus beads that `[springs] locus_bead` makes nodes, counted along the
+    chromosome, or None for `node`.
+
+    `middle` gives every locus of the chains its locus bead. `fill` gives one to the loci where
+    no loop end of the conformation is.
+    """
+    if s.locus_bead == "node":
+        return None
+    extra, loci = locus_beads(edges, LOCUS_BP)
+    if s.locus_bead == "middle":
+        return extra
+    no_weight: F64Array = np.ones(int(ends.shape[0]), dtype=np.float64)
+    with_node: I64Array = contact_nodes(edges, anchor_block, ends, beads, no_weight).mid // LOCUS_BP
+    keep: I64Array = extra[~np.isin(loci, with_node)]
+    return keep
+
+
 def solve_nodes(
     state: CoarseState, chr_: str, work: list[tuple[str, int, list[int]]], seed: int
 ) -> ChromNodes:
@@ -198,7 +228,9 @@ def solve_nodes(
         ends,
         np.random.default_rng([seed, 11]),
     )
-    nodes = contact_nodes(edges, anchor_block, ends, beads, strength)
+    nodes = contact_nodes(
+        edges, anchor_block, ends, beads, strength, locus_extra(edges, anchor_block, ends, beads, s)
+    )
     m = int(nodes.mid.shape[0])
 
     # The orientation of a node and the nodes its CTCF loops join it to.
@@ -260,13 +292,14 @@ def solve_nodes(
             exp_dist = hold_by_cells(
                 exp_dist, nodes.mid, count, offset, expected, mapped, law, s, finest, node_bias
             )
-    if s.data_components and float(s.background_weight) > 0.0:
-        track = str(s.data_components)
-        if not os.path.isabs(track) and not os.path.isfile(track):
-            track = os.path.join(str(s.data_dir), track)
-        exp_dist = hold_by_components(
-            exp_dist, nodes.mid, read_components(track).get(chr_, []), law, s
-        )
+    if float(s.background_weight) > 0.0:
+        arms: list[ArmComponents] = []
+        if s.data_components:
+            track = str(s.data_components)
+            if not os.path.isabs(track) and not os.path.isfile(track):
+                track = os.path.join(str(s.data_dir), track)
+            arms = read_components(track).get(chr_, [])
+        exp_dist = hold_loci(exp_dist, nodes.mid, arms, law, s)
     exp_dist = cb.repulsion_range(exp_dist, [int(x) for x in nodes.mid], s)
     pos0: F32Array = np.ascontiguousarray(centre, dtype=np.float32)
     if s.arcs_start == "walk":
@@ -327,7 +360,12 @@ def solve_nodes(
             )
             every = int(
                 contact_nodes(
-                    edges, anchor_block, ends_all, beads_all, np.ones(len(arcs_all))
+                    edges,
+                    anchor_block,
+                    ends_all,
+                    beads_all,
+                    np.ones(len(arcs_all)),
+                    locus_extra(edges, anchor_block, ends_all, beads_all, s),
                 ).mid.shape[0]
             )
         share = chain_share(

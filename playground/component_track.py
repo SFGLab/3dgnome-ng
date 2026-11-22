@@ -1,17 +1,21 @@
-"""Gathers a track of components per locus from a Hi-C map, the extension of the A/B compartment track.
+"""Gathers the track of components per locus of a cell line from its Hi-C map, the extension of the A/B
+compartment track. `[data] components` reads it.
 
-    python playground/component_track.py MCOOL CHROM OUT.bed [--k 3] [--res 100000] [--leave-out chr:a-b,...]
+    python playground/component_track.py MCOOL OUT.bed [--chroms chr1,chr2] [--k 5] [--res 100000]
+        [--leave-out chr:a-b,...]
 
-The balanced map of a chromosome at `--res` is split into its arms at the longest run of bins without a
-count. Each arm gives the log of the observed over the expected count at each separation, a symmetric
+Every chromosome of the map is gathered unless `--chroms` names some. The balanced map of a chromosome at
+`--res` is split into its arms at the longest run of bins without a count. Each arm gives the log of the
+count over the mean count of its separation, with the mean of each separation taken off, a symmetric
 matrix whose `--k` eigenvectors of largest absolute eigenvalue are the components. A bin gets
 `x_c = v_c * sqrt(|lambda_c|)` for each. The affinity of two bins of one arm is
 `sum over c of sign_c * x_c(i) * x_c(j)`, an estimate of the log of their observed over expected count
-from 2 k numbers.
+from 2 k numbers, with a mean of zero at every separation.
 
-`--leave-out` names regions whose own block of the matrix is set to no signal before the eigenvectors
-are taken. The components of a locus of such a region then come from its counts with the rest of the arm
-alone, and a score of a model on the counts inside the region is a score on counts the track did not read.
+`--leave-out` is for trials. It names regions whose own block of the matrix is set to no signal before the
+eigenvectors are taken. The components of a locus of such a region then come from its counts with the rest
+of the arm alone, and a score of a model on the counts inside the region is a score on counts the track did
+not read.
 
 The output has a line `# sign CHROM ARM s_1 ... s_k` per arm and a line `CHROM START END ARM x_1 ... x_k`
 per bin with a count.
@@ -82,8 +86,10 @@ def arms_of(valid: np.ndarray, res: int) -> list[tuple[int, int]]:
 
 
 def main() -> None:
+    import cooler  # noqa: PLC0415
+
     args = sys.argv[1:]
-    opts = {"--k": "3", "--res": "100000", "--leave-out": ""}
+    opts = {"--k": "5", "--res": "100000", "--leave-out": "", "--chroms": ""}
     rest: list[str] = []
     while args:
         a = args.pop(0)
@@ -91,39 +97,49 @@ def main() -> None:
             opts[a] = args.pop(0)
         else:
             rest.append(a)
-    mcool, chrom, out = rest
+    mcool, out = rest
     k, res = int(opts["--k"]), int(opts["--res"])
-    m, bins = balanced_map(mcool, chrom, res)
-    log_ratio, valid = log_observed_over_expected(m)
-    for region in filter(None, opts["--leave-out"].split(",")):
-        c, span = region.split(":")
-        if c != chrom:
-            continue
-        lo, hi = (int(x) for x in span.split("-"))
-        i0, i1 = int(np.searchsorted(bins, lo)), int(np.searchsorted(bins, hi))
-        log_ratio[i0:i1, i0:i1] = 0.0
+    groups = cooler.fileops.list_coolers(mcool)
+    first = cooler.Cooler(f"{mcool}::{groups[0]}" if groups and groups[0] != "/" else mcool)
+    chroms = [c for c in opts["--chroms"].split(",") if c] or list(first.chromnames)
     lines: list[str] = []
-    for arm, (a0, a1) in enumerate(arms_of(valid, res)):
-        w, v = np.linalg.eigh(log_ratio[a0:a1, a0:a1])
-        order = np.argsort(-np.abs(w))[:k]
-        x = v[:, order] * np.sqrt(np.abs(w[order]))
-        lines.append(f"# sign {chrom} {arm} " + " ".join(f"{int(np.sign(s)):+d}" for s in w[order]))
-        idx = np.arange(a1 - a0)
-        gap = np.abs(idx[:, None] - idx[None, :]) * res
-        far = (gap >= 1_000_000) & (gap <= 5_000_000) & valid[a0:a1][:, None] & valid[a0:a1][None, :]
-        affinity = (x * np.sign(w[order])) @ x.T
-        print(
-            f"  arm {arm}: {int(valid[a0:a1].sum())} bins, eigenvalues {np.round(w[order], 1)},"
-            f" affinity of pairs 1 to 5 Mb apart mean {affinity[far].mean():+.3f} sd {affinity[far].std():.3f},"
-            f" of the map there sd {log_ratio[a0:a1, a0:a1][far].std():.3f}"
-        )
-        for i in range(a1 - a0):
-            if valid[a0 + i]:
-                start = int(bins[a0 + i])
-                values = " ".join(f"{val:.5f}" for val in x[i])
-                lines.append(f"{chrom}\t{start}\t{start + res}\t{arm}\t{values}")
+    for chrom in chroms:
+        m, bins = balanced_map(mcool, chrom, res)
+        log_ratio, valid = log_observed_over_expected(m)
+        for region in filter(None, opts["--leave-out"].split(",")):
+            c, span = region.split(":")
+            if c != chrom:
+                continue
+            lo, hi = (int(x) for x in span.split("-"))
+            i0, i1 = int(np.searchsorted(bins, lo)), int(np.searchsorted(bins, hi))
+            log_ratio[i0:i1, i0:i1] = 0.0
+        held = 0
+        for arm, (a0, a1) in enumerate(arms_of(valid, res)):
+            if int(valid[a0:a1].sum()) <= k:
+                continue
+            w, v = np.linalg.eigh(log_ratio[a0:a1, a0:a1])
+            order = np.argsort(-np.abs(w))[:k]
+            x = v[:, order] * np.sqrt(np.abs(w[order]))
+            lines.append(f"# sign {chrom} {arm} " + " ".join(f"{int(np.sign(s)):+d}" for s in w[order]))
+            idx = np.arange(a1 - a0)
+            gap = np.abs(idx[:, None] - idx[None, :]) * res
+            far = (gap >= 1_000_000) & (gap <= 5_000_000) & valid[a0:a1][:, None] & valid[a0:a1][None, :]
+            affinity = (x * np.sign(w[order])) @ x.T
+            if far.any():
+                print(
+                    f"  {chrom} arm {arm}: {int(valid[a0:a1].sum())} bins, eigenvalues {np.round(w[order], 1)},"
+                    f" affinity of pairs 1 to 5 Mb apart mean {affinity[far].mean():+.3f} sd {affinity[far].std():.3f},"
+                    f" of the map there sd {log_ratio[a0:a1, a0:a1][far].std():.3f}"
+                )
+            for i in range(a1 - a0):
+                if valid[a0 + i]:
+                    start = int(bins[a0 + i])
+                    values = " ".join(f"{val:.5f}" for val in x[i])
+                    lines.append(f"{chrom}\t{start}\t{start + res}\t{arm}\t{values}")
+                    held += 1
+        print(f"  {chrom}: {held} bins")
     Path(out).write_text("\n".join(lines) + "\n")
-    print(f"{out}: {sum(1 for ln in lines if not ln.startswith('#'))} bins of {chrom}, {k} components")
+    print(f"{out}: {sum(1 for ln in lines if not ln.startswith('#'))} bins of {len(chroms)} chromosomes, {k} components")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,13 @@
-"""The components per locus of `[data] components` in the node solve of a uniform chain,
-`design/uniform-chain.md`.
+"""The loci of a uniform chain in its node solve, `design/uniform-chain.md`.
 
-The track holds a few numbers per bin of a chromosome arm, gathered from the Hi-C map of the cell
-line by `playground/component_track.py`. The affinity of two bins of one arm is
-`sum over c of sign_c * x_c(i) * x_c(j)`, an estimate of the log of their observed over expected
-count. Each locus is stood for by one node. A pair of those nodes without a loop, without a cell
-and beyond `background_range_bp` is held at the background times `exp(-affinity / 3)`.
+A locus is a stretch of `LOCUS_BP` of a chromosome on a grid from its start. One node stands for
+a locus. A pair of those nodes without a loop, without a cell and beyond `background_range_bp` is
+held at the background of the law.
+
+`[data] components` is a track of a few numbers per locus of a chromosome arm, gathered from the
+Hi-C map of the cell line by `playground/component_track.py`. The affinity of two loci of one arm
+is `sum over c of sign_c * x_c(i) * x_c(j)`, an estimate of the log of their observed over
+expected count. With the track the pair is held at the background times `exp(-affinity / 3)`.
 """
 
 from __future__ import annotations
@@ -23,6 +25,9 @@ if TYPE_CHECKING:
     from gnome3d.types import F64Array, I64Array
 
 LOG = log.get("components")
+# The two halves of a Hi-C map agree at 0.8 to 0.9 beyond 1 Mb at this bin, and the component
+# track is gathered at it, design/uniform-chain.md.
+LOCUS_BP = 100_000
 
 
 class ArmComponents(NamedTuple):
@@ -104,56 +109,52 @@ def node_affinity(arms: list[ArmComponents], mids: I64Array) -> tuple[F64Array, 
     return affinity, arm_of, bin_of
 
 
-def locus_nodes(
-    arms: list[ArmComponents], mids: I64Array, arm_of: I64Array, bin_of: I64Array
-) -> I64Array:
-    """Returns one node per locus of the track that holds a node, the node nearest to the middle
-    of the bin. The track states the affinity of two loci once, and one pair of nodes carries it.
+def locus_nodes(mids: I64Array) -> I64Array:
+    """Returns the node that stands for each locus with a node, the node nearest to the middle of
+    the locus.
     """
-    chosen: list[int] = []
-    for a, arm in enumerate(arms):
-        sel = np.flatnonzero(arm_of == a)
-        if sel.size == 0:
-            continue
-        bins = bin_of[sel]
-        off = np.abs(mids[sel] - 0.5 * (arm.start[bins] + arm.end[bins]))
-        order = np.lexsort((off, bins))
-        first = np.ones(sel.size, dtype=np.bool_)
-        first[1:] = bins[order][1:] != bins[order][:-1]
-        chosen.extend(int(k) for k in sel[order][first])
-    out: I64Array = np.array(sorted(chosen), dtype=np.int64)
+    locus = mids // LOCUS_BP
+    off = np.abs(mids - (locus * LOCUS_BP + LOCUS_BP // 2))
+    order = np.lexsort((off, locus))
+    first = np.ones(order.shape[0], dtype=np.bool_)
+    first[1:] = locus[order][1:] != locus[order][:-1]
+    out: I64Array = np.sort(order[first]).astype(np.int64)
     return out
 
 
-def hold_by_components(
+def hold_loci(
     mat: F64Array,
     mids: I64Array,
     arms: list[ArmComponents],
     law: PolymerLaw,
     s: Settings,
 ) -> F64Array:
-    """Returns the target matrix with the pairs that the components of their two loci hold.
+    """Returns the target matrix with the pairs of loci held at the law.
 
-    Each locus of the track with a node is stood for by one node, the one nearest to the middle
-    of its bin. A pair of those nodes of one arm that holds -0.5, which is a pair without a loop,
-    without a cell and beyond `background_range_bp`, is held at the background times
-    `exp(-affinity / 3)`, clipped to one bead and to `distance_heatmap_stretching` backgrounds. It
-    is entered as minus its distance, which the kernels score with the background spring. Every
-    other pair is left as it is. The affinity of two loci is in the energy once.
+    One node stands for each locus with a node, `locus_nodes`. A pair of those nodes that holds
+    -0.5, which is a pair without a loop, without a cell and beyond `background_range_bp`, is
+    held at the background times `exp(-affinity / 3)`, clipped to one bead and to
+    `distance_heatmap_stretching` backgrounds. The affinity comes from `arms`, the component
+    track, and is zero without a track, for two loci of different arms and for a locus that the
+    track does not hold. The pair is entered as minus its distance, which the kernels score with
+    the background spring. Every other pair is left as it is.
     """
-    affinity, arm_of, bin_of = node_affinity(arms, mids)
+    m = int(mids.shape[0])
+    affinity: F64Array = np.zeros((m, m), dtype=np.float64)
+    if arms:
+        width = int(arms[0].end[0] - arms[0].start[0])
+        if width != LOCUS_BP:
+            raise ValueError(
+                f"[data] components has bins of {width} bp and a locus is {LOCUS_BP} bp. Write"
+                f" the track with playground/component_track.py --res {LOCUS_BP}."
+            )
+        affinity, _arm_of, _bin_of = node_affinity(arms, mids)
     pos = mids.astype(np.float64)
     sep = np.abs(pos[:, None] - pos[None, :])
-    stands: I64Array = locus_nodes(arms, mids, arm_of, bin_of)
-    is_locus = np.zeros(int(mids.shape[0]), dtype=np.bool_)
+    stands = locus_nodes(mids)
+    is_locus = np.zeros(m, dtype=np.bool_)
     is_locus[stands] = True
-    free = (
-        (mat == -0.5)
-        & is_locus[:, None]
-        & is_locus[None, :]
-        & (arm_of[:, None] == arm_of[None, :])
-        & (bin_of[:, None] != bin_of[None, :])
-    )
+    free = (mat == -0.5) & is_locus[:, None] & is_locus[None, :]
     np.fill_diagonal(free, False)
     bg = np.maximum(1.0, (np.maximum(sep, 1.0) / max(int(law.s0_bp), 1)) ** law.nu)
     stretch = float(s.heatmap_distance_stretching)
@@ -161,15 +162,15 @@ def hold_by_components(
     out: F64Array = np.where(free, -target, mat)
     held = int(free.sum()) // 2
     closer = int((free & (affinity > 0.0)).sum()) // 2
-    spread = float(np.abs(affinity[free]).mean()) if held else 0.0
+    further = int((free & (affinity < 0.0)).sum()) // 2
     log.status(
         LOG,
-        "components: %s pairs of loci held over %d loci with a node, %s closer than the"
-        " background and %s further, mean absolute affinity %.2f",
-        f"{held:,}",
+        "loci: %d nodes stand for the loci of %d nodes, %s pairs held, %s closer than the"
+        " background by the track and %s further",
         int(stands.shape[0]),
+        m,
+        f"{held:,}",
         f"{closer:,}",
-        f"{held - closer:,}",
-        spread,
+        f"{further:,}",
     )
     return out
