@@ -22,11 +22,12 @@ describe('Method page', () => {
       '2. Blocks and target distances',
       '3. Anchor phase',
       '4. Chain phase',
-      '5. Ensemble and output',
-      '6. Engine',
-      '7. Structural variants',
-      '8. Validation',
-      '9. Limitations',
+      '5. One bead per kilobase',
+      '6. Ensemble and output',
+      '7. Engine',
+      '8. Structural variants',
+      '9. Validation',
+      '10. Limitations',
       'References',
     ])
   })

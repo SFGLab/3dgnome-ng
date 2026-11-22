@@ -26,5 +26,15 @@
   "none": 1277,
   "windows": 64,
   "range_bp": 100000
+ },
+ "uniform_pairs": {
+  "nodes": 31,
+  "pairs": 465,
+  "none": 291,
+  "loop": 22,
+  "background": 17,
+  "enriched": 0,
+  "depleted": 0,
+  "stretches": 135
  }
 }

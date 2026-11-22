@@ -15,6 +15,9 @@ import methodEnsemble from '../assets/method_ensemble.png'
 import methodExponent from '../assets/method_exponent.png'
 import methodHic from '../assets/method_hic.png'
 import methodLoops from '../assets/method_loops.png'
+import methodUniformAnchor from '../assets/method_uniform_anchor.png'
+import methodUniformLoops from '../assets/method_uniform_loops.png'
+import methodUniformTargets from '../assets/method_uniform_targets.png'
 import { METHOD_REFERENCES } from '../content/methodReferences'
 
 const SECTIONS = [
@@ -22,11 +25,12 @@ const SECTIONS = [
   ['targets', '2. Blocks and target distances'],
   ['anchors', '3. Anchor phase'],
   ['chain', '4. Chain phase'],
-  ['ensemble', '5. Ensemble and output'],
-  ['engine', '6. Engine'],
-  ['variants', '7. Structural variants'],
-  ['validation', '8. Validation'],
-  ['limitations', '9. Limitations'],
+  ['uniform', '5. One bead per kilobase'],
+  ['ensemble', '6. Ensemble and output'],
+  ['engine', '7. Engine'],
+  ['variants', '8. Structural variants'],
+  ['validation', '9. Validation'],
+  ['limitations', '10. Limitations'],
   ['references', 'References'],
 ] as const
 
@@ -126,7 +130,7 @@ export function Method() {
       lead={
         <>
           <CitedText>
-            {'3D-GNOMEᴺᴳ turns chromatin loops and a contact map into an ensemble of 3D structures. It follows the multiscale approach of 3D-GNOME [1, 2]. The loop anchors are placed first and the chromatin between them second. This page follows one job from its inputs to its output.'}
+            {'3D-GNOMEᴺᴳ turns chromatin loops and a contact map into an ensemble of 3D structures. It follows the multiscale approach of 3D-GNOME [1, 2]. The loop anchors are placed first and the chromatin between them second. The form offers two chains. Sections 3 and 4 describe the chain of loop anchors and section 5 the chain of one bead per kilobase. This page follows one job from its inputs to its output.'}
           </CitedText>
         </>
       }
@@ -237,7 +241,7 @@ export function Method() {
         </div>
 
         <h3>The five terms</h3>
-        <P>{"The bond term keeps consecutive beads at the bond target and the bending term straightens sharp turns, both as in 3D-GNOME [1]. The orientation term acts on the two anchors of a CTCF loop. It turns the chain at each anchor until the two motifs point the same way in space, which gives a hairpin for motifs that face each other along the genome [1]. The excluded volume term pushes apart two beads that are closer than the radius r_0 and the confinement term pulls back a bead that leaves a sphere around the centre of its block [5, 14, 15]."}</P>
+        <P>{"The bond term keeps consecutive beads at the bond target and the bending term straightens sharp turns, both as in 3D-GNOME [1]. The orientation term acts on the two anchors of a CTCF loop. It turns the chain at each anchor until the two motifs point the same way in space, which gives a hairpin for motifs that face each other along the genome [1]. The direction of the chain at an anchor is taken over three beads to either side, from the centre of the three beads before the anchor to the centre of the three after it. A single bead therefore cannot set the direction and the stretch of seven beads turns as a whole. The weight of the term is the energy of the six bonds of that stretch when each is one bond target too long. The excluded volume term pushes apart two beads that are closer than the radius r_0 and the confinement term pulls back a bead that leaves a sphere around the centre of its block [5, 14, 15]."}</P>
         <Terms label="Chain energy terms" terms={CHAIN_TERMS} phase="chain" />
         <p className="panel-caption">Each drawing shows a short chain, before the term acts and after. Dark beads are anchors. The drawing of the orientation term follows 3D-GNOME [1] and shows two loops. On top are the directions of the two CTCF motifs along the genome and below is the loop that brings the two motifs side by side pointing the same way. Motifs that face each other give a hairpin and motifs of one direction give a loop of a full turn.</p>
 
@@ -271,6 +275,42 @@ export function Method() {
         <p className="panel-caption">
           <b>Figure 7</b>a, anchor positions after the anchor phase, TNFRSF8 locus, GM12878, CTCF and RNAPII loops. b, the full chain of the same structure, black dots are anchors. c, three structures of the ensemble superposed on the first.
         </p>
+      </Section>
+
+      <Section id="uniform">
+        <P>{"The chain of sections 3 and 4 is built in two layers, the anchors first and the chromatin between them second. An anchor is one bead of that chain while it covers several kilobases of the genome. Every loop of an anchor therefore ends at the same point and the beads between two anchors are added after the loops are fitted. The second chain of the form has no layers. Every kilobase of the region is one bead from the start and a loop ends on a bead inside its anchor. This section follows the steps that differ from sections 3 and 4, in the order of a job."}</P>
+
+        <h3>The ends of a loop</h3>
+        <P>{"The chain has one bead for each kilobase of a block. An anchor covers the beads inside its coordinates, three beads for an anchor of 3 kb. A loop joins two anchors and ends on one bead of each, which is drawn at random among the beads of the anchor for every structure. A bead with the end of a loop is called a node. Two loops of one anchor can end on different nodes, while the nodes of one loop differ between two structures, figure 8a."}</P>
+        <P>{"Two anchors of the data can overlap. On the chain of loop anchors each of them is a bead of its own and the two beads then cover the same DNA. On the chain of one bead per kilobase the two anchors share the beads of their overlap, figure 8b. A loop of either anchor can end on a shared bead and two loop ends on one bead make one node."}</P>
+        <Figure n="8" src={methodUniformAnchor} alt="One anchor of 3 kb with three loops and two overlapping anchors, each drawn as the data give them, as beads of the chain of loop anchors and as beads of the chain of one bead per kilobase in two structures, with the bead of every loop end">
+          An example of an anchor on the two chains, chromosome 1 of GM12878. a, one anchor of 3 kb with three loops, near 237.85 Mb. The chain of loop anchors has one bead for the anchor and every loop ends on it. The chain of one bead per kilobase has three beads under the anchor, marked by the line under them. Each loop ends on one of the three, drawn anew in every structure. A dot is a node. b, two anchors that overlap near 238.23 Mb, the smaller one inside the larger. The chain of loop anchors has one bead for each and the two beads cover the same DNA. On the chain of one bead per kilobase the two anchors share two beads. Grey beads belong to another anchor. The loops are those of the anchors in the data.
+        </Figure>
+
+        <h3>The loops of one structure</h3>
+        <P>{"A loop is present in a share of the cells of the experiment and that share is larger for a strong loop. A structure represents one conformation and therefore keeps a loop with a probability that grows with its strength. The probability is q / (q + 1), where q is the strength of the loop, its PET count over the typical count at its span, section 2. A loop of typical strength has q of 1 and is in half of the structures, while a loop four times as strong is in four of five, figure 9."}</P>
+        <Figure n="9" src={methodUniformLoops} alt="The share of the structures that keep a loop against the strength of the loop, a curve from 0.05 at a strength of 0.05 to 0.97 at 30 with the 46 loops of the example region as points on it">
+          An example of the loops that a structure keeps, the 46 loops of the region of figure 1. Each point is a loop at its strength q and the line is the share of the structures that keep it. The dashed lines mark a loop of typical strength, which is in half of the structures.
+        </Figure>
+
+        <h3>The nodes in the anchor phase</h3>
+        <P>{"The anchor phase of section 3 places the nodes in place of the anchors, with the same four terms and all nodes of a chromosome together. The beads between two nodes have no position yet. A node therefore represents the chain up to the middle of the way to each neighbouring node. The radius of its excluded volume grows with the cube root of the length of that chain: a node that represents 8 kb has twice the radius of a node that represents 1 kb."}</P>
+        <P>{"One term is added for two neighbouring nodes. A pair with n beads of chain between them has no energy up to a distance of n bead units and the energy of a loop spring beyond it, which keeps every pair within the length of its chain."}</P>
+
+        <h3>Contacts from the Hi-C map</h3>
+        <P>{"Section 2 reads the Hi-C map for pairs of anchors. This chain reads it in cells of 5 kb, where a cell is the count of contacts between two stretches of 5 kb. A pair of nodes reads the cell that holds its two beads. The count of a cell is compared with its expected count, the mean count at the same genomic separation multiplied by the coverage of its two stretches. The coverage of a stretch is its share of contacts relative to an average stretch and comes from the balancing weights of the map."}</P>
+        <P>{"A count of rare events varies by about the square root of its expected value. A cell therefore counts as enriched when it is more than three such deviations above its expected count and as depleted when it is as far below. A cell with an expected count of 16 is enriched at 28 contacts or more and depleted at 4 or fewer. The two nodes of an enriched cell get a target under the background distance and those of a depleted cell a target over it, both by the rule of section 2 for the Hi-C map. Such cells are rare and the example of figure 10 has none."}</P>
+        <P>{"The cells are read with the Hi-C background of the cell type. A job with structural variants, with your own contacts, with a predicted background or with no background has no cells."}</P>
+
+        <h3>Distance of two distant parts</h3>
+        <P>{"The background spring of section 3 acts on pairs closer than 100 kb. A chain of single kilobases needs a second hold beyond that distance, since no other term keeps two parts of a region that are megabases apart from folding onto each other. The region is therefore divided into stretches of 100 kb and each stretch is represented by one node, the node closest to its middle. Two of these nodes are held at the background distance b(s) of section 2 when no loop and no cell gives them a target, figure 10."}</P>
+        <P>{"Every pair up to 5 Mb apart is held. Beyond 5 Mb a node is paired with two others for each doubling of the separation. The number of springs of a node then grows with the logarithm of the length of the chromosome, while a number that grew with the length itself would outweigh the excluded volume on a whole chromosome."}</P>
+        <Figure n="10" src={methodUniformTargets} alt="A matrix of the pairs of the 31 nodes of one structure of a 6 Mb region coloured by the kind of target, with loops and background pairs under 100 kb near the diagonal and the background between two stretches of 100 kb across the blocks">
+          An example of the targets of the nodes, one structure of the region of figure 1 with 31 nodes. Every pair of nodes is coloured by its target. The pairs of two stretches of 100 kb reach across the blocks, where the chain of loop anchors has no target in figure 6a.
+        </Figure>
+
+        <h3>The chain between the nodes</h3>
+        <P>{"The chain phase of section 4 moves the beads between the nodes with the same five terms, yet two of its rules differ. A node is not fixed in this chain and moves together with the bead before it and the bead after it, while the centre of mass of the three stays in place. Each neighbour moves by minus half of the step of the node, which lets the node turn among its neighbours at the position the anchor phase gave it. The second rule is the bond, which resists compression ten times as strongly as stretching and keeps two neighbouring beads from overlapping."}</P>
       </Section>
 
       <Section id="ensemble">
@@ -321,7 +361,7 @@ export function Method() {
           {[
             ['Population average', 'Loops and contacts are measured over millions of cells. A structure fits that average and is not the conformation of a single cell. Statistics over the ensemble are more reliable than any one structure.'],
             ['Bead units', 'Distances are in bead units. One unit is the target distance between beads 1 kb apart. Bead units are not nanometres.'],
-            ['No loops, no beads', 'Stretches without loops have no beads. Genes there are missing from the distance table.'],
+            ['No loops, no beads', 'The chain of loop anchors has no beads on a stretch without loops and genes there are missing from the distance table. The chain of one bead per kilobase has a bead on every kilobase of a block.'],
           ].map(([title, text]) => (
             <div key={title} className="card">
               <h3>{title}</h3>
