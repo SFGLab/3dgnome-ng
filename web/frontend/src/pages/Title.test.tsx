@@ -63,26 +63,26 @@ describe('Title page', () => {
     expect(screen.getByRole('link', { name: /Open enhancer3D/ })).toHaveAttribute('href', 'https://3dgnome.mini.pw.edu.pl/old/enhancer3D/')
   })
 
-  it('shows the TNFRSF8 comparison and the contact map as examples', () => {
+  it('shows the GCSAM comparison and the contact map as examples', () => {
     renderTitle()
-    for (const t of ['TNFRSF8 with and without its RNAPII loop', 'Contacts against Hi-C', 'Deletion at GSTM1', 'VPS13D in GM12878 and H1ESC, distance beside expression']) {
+    for (const t of ['GCSAM with and without its RNAPII loop', 'Contacts against Hi-C', 'Deletion at GSTM1', 'VPS13D in GM12878 and H1ESC, distance beside expression']) {
       expect(screen.getByText(t)).toBeInTheDocument()
     }
   })
 
   it('draws the locus with and without the RNAPII loop in one card, each with its distance', () => {
     renderTitle()
-    const card = screen.getByRole('button', { name: /TNFRSF8 with and without its RNAPII loop/ })
-    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*8\.4 ± 1\.9 bead units apart/ })).toBeInTheDocument()
-    expect(within(card).getByRole('img', { name: /CTCF loops alone.*10\.9 ± 2\.2 bead units apart/ })).toBeInTheDocument()
-    expect(card).toHaveTextContent('8.4 ± 1.9 bead units with the loop and 10.9 ± 2.2 with CTCF loops alone')
+    const card = screen.getByRole('button', { name: /GCSAM with and without its RNAPII loop/ })
+    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*3\.5 ± 0\.5 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /CTCF loops alone.*5\.8 ± 0\.8 bead units apart/ })).toBeInTheDocument()
+    expect(card).toHaveTextContent('3.5 ± 0.5 bead units with the loop and 5.8 ± 0.8 with CTCF loops alone')
   })
 
   it('marks A, B and the distance on the picture at the top', () => {
     renderTitle()
-    const art = screen.getByRole('img', { name: /A 3D structure of the TNFRSF8 locus/ })
-    expect(art).toHaveTextContent('8.4 ± 1.9')
-    expect(screen.getByText('A to B 8.4 ± 1.9 bead units')).toBeInTheDocument()
+    const art = screen.getByRole('img', { name: /A 3D structure of the GCSAM locus/ })
+    expect(art).toHaveTextContent('3.5 ± 0.5')
+    expect(screen.getByText('A to B 3.5 ± 0.5 bead units')).toBeInTheDocument()
     expect(screen.queryByText(/stay private/)).toBeNull()
   })
 
@@ -97,17 +97,17 @@ describe('Title page', () => {
     vi.unstubAllGlobals()
   })
 
-  it('opens the TNFRSF8 example compared with CTCF loops alone', async () => {
+  it('opens the GCSAM example compared with CTCF loops alone', async () => {
     let n = 0
     const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: n++ === 0 ? '/jobs/aaaa1111bbbb2222' : '/jobs/cccc3333dddd4444' }]]])
     renderTitle()
-    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 with and without its RNAPII loop/ }))
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=TNFRSF8'))
+    fireEvent.click(screen.getByRole('button', { name: /GCSAM with and without its RNAPII loop/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=GCSAM'))
     const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))
     expect(posted).toEqual(['CTCF+RNAPII', 'CTCF'])
     expect(JSON.parse(localStorage.getItem('gnome3d.recentJobs') ?? '[]').map((j: { label: string }) => j.label)).toEqual([
-      'GM12878 TNFRSF8, CTCF loops',
-      'GM12878 TNFRSF8, CTCF and RNAPII loops',
+      'GM12878 GCSAM, CTCF loops',
+      'GM12878 GCSAM, CTCF and RNAPII loops',
     ])
     localStorage.clear()
     vi.unstubAllGlobals()

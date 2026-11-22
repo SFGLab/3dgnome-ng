@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Database, ExternalLink, History, Play } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import contacts from '../assets/contacts.png'
+import hero from '../assets/hero.json'
 import previews from '../assets/previews.json'
 import deletion from '../assets/previews_deletion.json'
 import expression from '../assets/previews_expression.json'
@@ -16,18 +17,18 @@ import sheet from './title.module.css'
 
 const cn = scoped(sheet)
 
-/** The drawings of the TNFRSF8 locus with and without RNAPII loops. A is the promoter and B the
- * enhancer 385 kb away. web/scripts/make_previews.py writes them from the two example jobs. */
+/** The drawings of the GCSAM locus with and without RNAPII loops. A is the promoter and B the
+ * enhancer 364 kb away. web/scripts/make_previews.py writes them from the two example jobs. */
 const WITH = previews.rnapii as PreviewData
 const WITHOUT = previews.ctcf as PreviewData
 const spread = (d: PreviewData) => `${d.mean.toFixed(1)} ± ${d.sd.toFixed(1)}`
 /** Returns the distance of A and B in words. On the chain of one bead per kilobase two positions under 1 kb apart can be one bead. */
 const apart = (d: PreviewData) => (d.a === d.b ? 'on one bead' : `${spread(d)} bead units apart`)
 /**
- * The picture of the hero in its own pixels, with a point on the promoter and one on the enhancer,
- * the letter beside each on an empty part of the picture and the middle of the box of the distance.
+ * The places on the picture of the hero in its own pixels: the promoter and the enhancer, the letter beside
+ * each and the middle of the box of the distance. web/design/render_mock.py hero writes them with the picture.
  */
-const HERO = { a: [354, 397], b: [705, 196], letterA: [350, 452], letterB: [668, 150], box: [525, 232] } as const
+const HERO = hero as { a: [number, number]; b: [number, number]; letterA: [number, number]; letterB: [number, number]; box: [number, number] }
 
 /** Returns the part of the drawing units that holds the points given, with a margin. */
 const viewOf = (points: number[][], margin = 50): [number, number, number, number] => {
@@ -103,15 +104,15 @@ export function Title() {
             <Link className="button primary" to={ROUTES.model}>
               Model a region <ArrowRight size={16} aria-hidden />
             </Link>
-            <Link className="button secondary" to={`${ROUTES.model}?example=TNFRSF8`}>
-              <Play size={14} aria-hidden /> Open the TNFRSF8 example
+            <Link className="button secondary" to={`${ROUTES.model}?example=GCSAM`}>
+              <Play size={14} aria-hidden /> Open the GCSAM example
             </Link>
           </div>
         </div>
         <figure className={cn('hero-image')}>
           {/* The rendered structure with its marks drawn over it. The picture is 1238 by 768 and
               A and B are at the middle of its promoter and its enhancer. */}
-          <svg className={cn('hero-art')} viewBox="0 0 1238 768" role="img" aria-label="A 3D structure of the TNFRSF8 locus with its promoter, A, its enhancer, B and the distance between them">
+          <svg className={cn('hero-art')} viewBox="0 0 1238 768" role="img" aria-label="A 3D structure of the GCSAM locus with its promoter, A, its enhancer, B and the distance between them">
             <image href={structure} width="1238" height="768" />
             <line className={cn('hero-ab')} x1={HERO.a[0]} y1={HERO.a[1]} x2={HERO.b[0]} y2={HERO.b[1]} />
             <rect className={cn('hero-box')} x={HERO.box[0] - 62} y={HERO.box[1] - 23} width="124" height="46" rx="9" />
@@ -135,10 +136,10 @@ export function Title() {
           </svg>
           <figcaption>
             <span className={cn('key')}>
-              <span className={cn('dot promoter')} /> A, the TNFRSF8 promoter
+              <span className={cn('dot promoter')} /> A, the GCSAM promoter
             </span>
             <span className={cn('key')}>
-              <span className={cn('dot enhancer')} /> B, its enhancer 385 kb away
+              <span className={cn('dot enhancer')} /> B, its enhancer 364 kb away
             </span>
             <span className={cn('key')}>{`A to B ${spread(WITH)} bead units`}</span>
           </figcaption>
@@ -176,18 +177,18 @@ export function Title() {
           </p>
         )}
         <div className={cn('example-row')}>
-          <button type="button" className={cn('example story')} disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'TNFRSF8')!)}>
+          <button type="button" className={cn('example story')} disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'GCSAM')!)}>
             <span className={cn('story-panels')}>
               {STORY.map((p) => (
                 <span key={p.tag} className={cn('story-panel')}>
-                  <StructurePreview data={p.data} view={STORY_VIEW} label={`A structure of the TNFRSF8 locus, ${p.tag}, with the promoter A and the enhancer B ${spread(p.data)} bead units apart`} />
+                  <StructurePreview data={p.data} view={STORY_VIEW} label={`A structure of the GCSAM locus, ${p.tag}, with the promoter A and the enhancer B ${spread(p.data)} bead units apart`} />
                   <span className={cn('story-tag')}>{p.tag}</span>
                 </span>
               ))}
             </span>
-            <span className={cn('example-title')}>TNFRSF8 with and without its RNAPII loop</span>
+            <span className={cn('example-title')}>GCSAM with and without its RNAPII loop</span>
             <span className={cn('example-detail')}>
-              {busy === 'TNFRSF8'
+              {busy === 'GCSAM'
                 ? 'Opening the job'
                 : `GM12878. From the promoter A to the enhancer B ${spread(WITH)} bead units with the loop and ${spread(WITHOUT)} with CTCF loops alone`}
             </span>

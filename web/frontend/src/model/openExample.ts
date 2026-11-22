@@ -18,7 +18,7 @@ const request = (e: Example, factors: Factors, cell = e.cell) => toFormData({ ..
 export async function openExample(e: Example): Promise<string> {
   // The two jobs of a compare example have the names of their loop sets,
   // not the title of the example.
-  const named = (f: Factors) => `${e.cellLabel} ${e.region}, ${f === 'CTCF+RNAPII' ? 'CTCF and RNAPII' : f} loops`
+  const named = (f: Factors) => `${e.cellLabel} ${e.title}, ${f === 'CTCF+RNAPII' ? 'CTCF and RNAPII' : f} loops`
   if (e.compareCell) {
     // Two cell types on one region. Each job has the name of its cell type.
     const of = (cell: string) => `${cell} ${e.region}`

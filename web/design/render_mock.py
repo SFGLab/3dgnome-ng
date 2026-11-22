@@ -6,6 +6,12 @@ r"""Renders the images of the design mock, `web/design/site.pen`.
 Writes `structure.png` and `structure_ctcf.png`, the TNFRSF8 locus with and without RNAPII
 loops, `contacts.png`, the Hi-C map of chr1:20-25 Mb over the model map, with the
 `method_*.png` panels of the Method page.
+
+    python web/design/render_mock.py hero BEADS.tsv TSS ENHANCER_START ENHANCER_END OUT.png OUT.json
+
+`hero` draws the picture at the top of the title page from one structure of a job, the bead table
+of the job, with the promoter and the enhancer of the example coloured. OUT.json has the places of
+the two on the picture and of their letters and of the box of the distance, in its pixels.
 """
 
 from __future__ import annotations
@@ -44,6 +50,91 @@ def structure(maps: np.lib.npyio.NpzFile, out: Path, arm: str = "R") -> None:
     ax.set_aspect("equal")
     ax.axis("off")
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.15, facecolor="white")
+
+
+HERO_PX = (1238, 768)
+
+
+def hero(beads: Path, tss: int, enhancer: tuple[int, int], out: Path, places: Path) -> None:
+    """Draws the locus of one structure from 75 kb before the first of the promoter and the enhancer
+    to 75 kb after the second, and writes the places of the two on the picture."""
+    import json
+
+    import pandas as pd
+
+    from playground.figures.tube import project
+
+    t = pd.read_csv(beads, sep="\t")
+    mid = ((t["start"] + t["end"]) / 2).to_numpy()
+    xyz = t[["x", "y", "z"]].to_numpy(dtype=float)
+    e_mid = (enhancer[0] + enhancer[1]) / 2
+    keep = (mid > min(tss, e_mid) - 75_000) & (mid < max(tss, e_mid) + 75_000)
+    xyz, mid = xyz[keep][::2], mid[keep][::2]
+    cols = np.tile(matplotlib.colors.to_rgba(GREY), (len(mid), 1))
+    cols[np.abs(mid - tss) < 6_000] = matplotlib.colors.to_rgba(PROMOTER)
+    cols[(mid > enhancer[0] - 6_000) & (mid < enhancer[1] + 6_000)] = matplotlib.colors.to_rgba(ENH)
+    centre = xyz.mean(0)
+    ia, ib = int(np.argmin(np.abs(mid - tss))), int(np.argmin(np.abs(mid - e_mid)))
+    # The view has the line from the promoter to the enhancer left to right. The turn about that
+    # line is the one with the fewest beads in front of the two.
+    e1 = (xyz[ib] - xyz[ia]) / np.linalg.norm(xyz[ib] - xyz[ia])
+    u = np.cross(e1, [0.3, 0.5, 0.8])
+    u /= np.linalg.norm(u)
+    v = np.cross(e1, u)
+    far = np.minimum(np.abs(np.arange(len(mid)) - ia), np.abs(np.arange(len(mid)) - ib)) > 4
+    best = (np.inf, np.eye(3))
+    for step in range(72):
+        e2 = np.cos(np.radians(5 * step)) * u + np.sin(np.radians(5 * step)) * v
+        e3 = np.cross(e1, e2)
+        hidden = 0
+        for k in (ia, ib):
+            d = xyz[far] - xyz[k]
+            hidden += int(((d @ e3 > 0.3) & (np.hypot(d @ e1, d @ e2) < 1.6)).sum())
+        if hidden < best[0]:
+            best = (hidden, np.array([e1, e2, e3]))
+    vt = best[1]
+    w, h = HERO_PX
+    fig = plt.figure(figsize=(w / 200, h / 200))
+    ax = fig.add_axes((0.0, 0.0, 1.0, 1.0))
+    draw(ax, [tube_pieces(xyz, cols, vt, centre, 4.5)], background="white")
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.margins(0.1)
+    ax.axis("off")
+    fig.canvas.draw()
+    ends = np.array([xyz[ia], xyz[ib]])
+    flat, _ = project(ends, vt, centre)
+    px = ax.transData.transform(flat) * (w / fig.bbox.width)
+    a, b = (np.array([q[0], h - q[1]]) for q in px)
+    along = (b - a) / np.linalg.norm(b - a)
+    across = np.array([along[1], -along[0]])
+    # The box of the distance is beside the line, at the place with the fewest coloured beads under it.
+    marked = np.any(cols != matplotlib.colors.to_rgba(GREY), axis=1)
+    strands = ax.transData.transform(project(xyz[marked], vt, centre)[0]) * (w / fig.bbox.width)
+    strands = np.column_stack([strands[:, 0], h - strands[:, 1]])
+
+    def covered(centre_px: np.ndarray) -> int:
+        """Returns the count of coloured beads under a box of the distance at a place."""
+        d = np.abs(strands - centre_px)
+        return int(((d[:, 0] < 75) & (d[:, 1] < 36)).sum())
+
+    spots = [(a + b) / 2 + side * off * across for off in (48, 72, 96) for side in (1, -1)]
+    box = min(spots, key=covered)
+    inside = lambda q: [int(np.clip(q[0], 30, w - 30)), int(np.clip(q[1], 30, h - 30))]  # noqa: E731
+    fig.savefig(out, dpi=200, facecolor="white")
+    plt.close(fig)
+    places.write_text(
+        json.dumps(
+            {
+                "a": inside(a),
+                "b": inside(b),
+                "letterA": inside(a - 52 * along),
+                "letterB": inside(b + 52 * along),
+                "box": inside(box),
+            }
+        )
+        + "\n"
+    )
+    print(out, places.read_text().strip())
 
 
 def _scaled(m: np.ndarray, held: np.ndarray | None = None) -> np.ndarray:
@@ -146,6 +237,9 @@ def distance_law(out: Path, nu: float = 0.34) -> None:
 
 
 def main() -> None:
+    if sys.argv[1] == "hero":
+        hero(Path(sys.argv[2]), int(sys.argv[3]), (int(sys.argv[4]), int(sys.argv[5])), Path(sys.argv[6]), Path(sys.argv[7]))
+        return
     maps, out = np.load(sys.argv[1]), Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
     structure(maps, out / "structure.png")

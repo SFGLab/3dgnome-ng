@@ -27,15 +27,15 @@ export type Example = {
 
 export const EXAMPLES: Example[] = [
   {
-    id: 'TNFRSF8',
-    title: 'TNFRSF8',
+    id: 'GCSAM',
+    title: 'GCSAM',
     cell: 'GM12878',
     cellLabel: 'GM12878',
-    description: 'An enhancer 385 kb away joined by an RNAPII loop, compared with CTCF loops alone',
-    region: 'TNFRSF8',
+    description: 'An enhancer 364 kb away joined by an RNAPII loop, compared with CTCF loops alone',
+    region: 'chr3:111,800,000-112,800,000',
     factors: 'CTCF+RNAPII',
     compareFactors: 'CTCF',
-    gene: 'TNFRSF8',
+    gene: 'GCSAM',
   },
   {
     id: 'MYC',
@@ -59,12 +59,12 @@ export const EXAMPLES: Example[] = [
     sample: 'HG00512',
   },
   {
-    id: 'TNFRSF8-CTCF',
-    title: 'TNFRSF8, CTCF loops alone',
+    id: 'GCSAM-CTCF',
+    title: 'GCSAM, CTCF loops alone',
     cell: 'GM12878',
     cellLabel: 'GM12878',
     description: 'The same locus without the RNAPII loop that joins the enhancer',
-    region: 'TNFRSF8',
+    region: 'chr3:111,800,000-112,800,000',
     factors: 'CTCF',
   },
   {
@@ -88,5 +88,16 @@ export const EXAMPLES: Example[] = [
     region: 'chr1:20,000,000-25,000,000',
     factors: 'CTCF+RNAPII',
     tab: 'contacts',
+  },
+  {
+    id: 'TNFRSF8',
+    title: 'TNFRSF8',
+    cell: 'GM12878',
+    cellLabel: 'GM12878',
+    description: 'The example of the tutorial on the Help page, an enhancer 385 kb away joined by an RNAPII loop, compared with CTCF loops alone',
+    region: 'TNFRSF8',
+    factors: 'CTCF+RNAPII',
+    compareFactors: 'CTCF',
+    gene: 'TNFRSF8',
   },
 ]
