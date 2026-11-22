@@ -69,8 +69,34 @@ mean of `((1 - v_i . v_j) / 2)^2` over the loops. Two random vectors have 0.333.
   ends at 0.007 with 1.4 %.
 - A quarter to a third of the beads of a model are within five beads of a site.
 
+## The model without the term, 2026-11-22
+
+The trial `orn20` on the workstation: 18 rows of three cell lines and six regions of 5 Mb of chr1, twenty
+structures an arm, the inputs of production with the contact cells of one half of the deep map and the score
+against the other half. `o_on` is the locked uniform chain, `o_off` the same without the term, `d_off` the default
+chain without the term, `prod` the default chain. Differences are over the rows with their standard error,
+`playground/arm_stats.py`. Scores in `design/figures/uniform-2026-11-19/scores-orn20*`.
+
+| without the term, against with it | uniform chain | rows above | p | default chain | rows above | p |
+|---|---|---|---|---|---|---|
+| SCC per bead pair at 25 kb, raw | -0.005 ± 0.002 | 5 of 18 | 0.032 | +0.002 ± 0.003 | 10 of 18 | 0.45 |
+| SCC per bead pair at 25 kb, balanced | -0.007 ± 0.002 | 3 of 18 | 0.0007 | -0.003 ± 0.003 | 9 of 18 | 0.47 |
+| Spearman at 25 kb | -0.009 ± 0.001 | 0 of 18 | 0.0002 | -0.005 ± 0.005 | 7 of 18 | 0.29 |
+| balanced Pearson at 25 kb | +0.004 ± 0.001 | 17 of 18 | 0.0003 | +0.005 ± 0.001 | 15 of 18 | 0.002 |
+| SCC balanced at 10 kb | -0.008 ± 0.002 | 1 of 18 | 0.001 | | | |
+| SCC balanced at 5 kb | -0.005 ± 0.001 | 1 of 18 | 0.003 | | | |
+
+- On the uniform chain the term is worth 0.005 to 0.008 of balanced SCC and 0.007 to 0.009 of Spearman at
+  every resolution. The raw SCC is not consistent: lower without the term at 25 kb, equal at 10 kb and higher
+  at 5 kb.
+- On the default chain no score of SCC or Spearman moves without the term.
+- The close pairs are 1.5 per thousand beads with the term and 1.2 without it on the uniform chain, and 11.5
+  and 10.6 on the default chain. The radius of gyration is 1 to 2 % larger without the term.
+- The locked uniform chain at the commit of this trial repeats the arm `L_node` of 1a1b93d on every score, the
+  largest difference 0.001. The commits between them, with the terms of the arcs solve on the device, did not
+  move the scores.
+
 ## Open
 
-The ablation on inputs the run did not read, 18 rows of twenty structures, the uniform chain with the term and
-without it and the default chain without it, is queued on the workstation as `orn20`. The design of the term
-follows that result and the maintainer's choice.
+The term stretches a quarter to a third of the bonds at its sites and is worth 0.007 of balanced SCC on the
+uniform chain. The design of the term is the maintainer's choice.
