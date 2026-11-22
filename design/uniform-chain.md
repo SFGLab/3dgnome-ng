@@ -1995,7 +1995,11 @@ to 1,400 steps per movable bead on blocks of 600 to 14,700 beads and the relaxat
 on the 162,522 movable beads of the chromosome, in 3,722 rounds and 608 s. A region of 10 Mb has 1,160 to
 1,430. The close pairs of a whole chromosome are those of its density.
 
-Open, for the maintainer: the form of the rule.
+The maintainer chose `near_octave` on 2026-11-22. It is the rule since: `loci_pairs` in
+`gnome3d/pipeline/ib/components.py` holds every pair of loci up to `NEAR_BP`, 5 Mb, and beyond it the pairs whose
+offset in the order of the loci is on the ladder of `octave_offsets`. `[springs] loci_pairs` and the other forms
+are deleted. A region of 5 Mb is the locked config, byte for byte on the gate. On chr1 a locus has about 110
+springs against 1,322.
 
 ## The config locked on 2026-11-21
 
@@ -2009,7 +2013,7 @@ Open, for the maintainer: the form of the rule.
 | the threshold of a cell | 3 Poisson deviations | `[springs] contact_background_z` 3 |
 | the loops of a conformation | each kept by its strength | `[springs] loop_dropout` |
 | the excluded volume of the arcs stage | the derived radius, from every loop of the chromosome, times the mean of the factors of the two nodes from the chain each stands for | `[excluded_volume] arcs_chain_radius` sum |
-| the long range, since 2026-11-22 | one node stands for each locus of 100 kb, and a pair of those nodes without a loop, without a cell and beyond `background_range_bp` holds the background of the law | no key |
+| the long range, since 2026-11-22 | one node stands for each locus of 100 kb, and a pair of those nodes without a loop, without a cell and beyond `background_range_bp` holds the background of the law: every pair up to 5 Mb apart and two offsets to a doubling beyond | no key |
 
 On 18 rows of twenty structures, on counts the run did not read, against the default chain, with the law
 between the loci: 0.330 and 0.357 of raw and balanced SCC per bead pair at 25 kb against 0.204 and 0.268.
@@ -2029,9 +2033,8 @@ orientation term. Each has its trial above.
 
 Open: a locus without a loop end takes no part in the law between the loci or in the track, section "The loci of
 the uniform chain". The pooled contacts beyond 1 Mb reach 0.15 to 0.19 where the two halves of a map share 0.8 to
-0.9. On a whole chromosome the law between the loci packs the chain a third denser and leaves 236 close pairs per
-thousand beads against 50 without it, section "The whole chromosome: chr1 of GM12878". The site has no control
-for the chain.
+0.9. The site has no control for the chain. Whole chromosomes of other cell lines and other chromosomes are not
+built.
 
 ## Settings
 

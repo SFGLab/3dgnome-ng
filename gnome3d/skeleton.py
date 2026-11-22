@@ -267,10 +267,7 @@ def solve_nodes(
             if not os.path.isabs(track) and not os.path.isfile(track):
                 track = os.path.join(str(s.data_dir), track)
             arms = read_components(track).get(chr_, [])
-        segment: I64Array = np.array(
-            [clusters[work[int(b)][1]].parent for b in nodes.block], dtype=np.int64
-        )
-        exp_dist = hold_loci(exp_dist, nodes.mid, arms, law, s, segment)
+        exp_dist = hold_loci(exp_dist, nodes.mid, arms, law, s)
     exp_dist = cb.repulsion_range(exp_dist, [int(x) for x in nodes.mid], s)
     pos0: F32Array = np.ascontiguousarray(centre, dtype=np.float32)
     if s.arcs_start == "walk":

@@ -91,7 +91,6 @@ class Settings:
     background_weight: float
     loop_dropout: bool
     loop_dropout_scale: float
-    loci_pairs: str
     loop_contact: bool
     factory_weight: float
     gyration_weight: float
@@ -333,7 +332,6 @@ class Settings:
         self.arc_weight_exponent = 0.0
         self.loop_dropout = False
         self.loop_dropout_scale = 1.0
-        self.loci_pairs = "all"
         self.loop_contact = False
         self.factory_weight = 0.0
         self.gyration_weight = 0.0
@@ -636,12 +634,6 @@ class Settings:
         self.arc_weight_exponent = getf("springs", "arc_weight_exponent", self.arc_weight_exponent)
         self.loop_dropout = getb("springs", "loop_dropout", self.loop_dropout)
         self.loop_dropout_scale = getf("springs", "loop_dropout_scale", self.loop_dropout_scale)
-        self.loci_pairs = gets("springs", "loci_pairs", self.loci_pairs)
-        if self.loci_pairs not in ("all", "near", "octave", "near_octave", "segment"):
-            raise ValueError(
-                "[springs] loci_pairs must be all, near, octave, near_octave or segment, got"
-                f" {self.loci_pairs!r}"
-            )
         self.loop_contact = getb("springs", "loop_contact", self.loop_contact)
         self.factory_weight = getf("factories", "weight", self.factory_weight)
         self.factory_radius = getf("factories", "radius", self.factory_radius)
@@ -993,12 +985,6 @@ class Settings:
                 " A node of the uniform chain moves with its two neighbours, which is one rule"
                 " for the fixed beads of the smooth stage, and anchor_cap is another. Set"
                 " anchor_cap to 0."
-            )
-        if self.loci_pairs != "all" and not self.uniform_chain:
-            raise ValueError(
-                "[springs] loci_pairs is set and [main] uniform_chain is off. The law between"
-                " the loci is a rule of the uniform chain. Set loci_pairs to all or"
-                " uniform_chain to yes."
             )
         if self.exclusion_arcs_chain_radius != "none" and not self.uniform_chain:
             raise ValueError(

@@ -136,50 +136,26 @@ def loci_grid(count: int) -> tuple[np.ndarray, np.ndarray]:
     return mids, mat
 
 
-def held_offsets(form: str, count: int, segment: np.ndarray | None = None) -> list[int]:
-    """The offsets from the first locus that the form holds."""
-    mids, mat = loci_grid(count)
-    s = settings()
-    s.loci_pairs = form
-    out = hold_loci(mat, mids, [], LAW, s, segment)
-    return np.flatnonzero(out[0] != mat[0]).tolist()
-
-
-def test_near_holds_the_pairs_up_to_5_mb() -> None:
-    assert held_offsets("near", 80) == list(range(1, 51)), "50 loci of 100 kb are 5 Mb"
-
-
-def test_octave_holds_two_offsets_to_a_doubling() -> None:
-    assert held_offsets("octave", 80) == [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64]
-
-
-def test_near_octave_holds_both() -> None:
-    assert held_offsets("near_octave", 80) == [*range(1, 51), 64]
-
-
-def test_segment_holds_the_pairs_of_one_segment() -> None:
-    segment = np.array([7] * 30 + [9] * 50, dtype=np.int64)
-    assert held_offsets("segment", 80, segment) == list(range(1, 30))
-
-
-def test_all_holds_every_pair_and_a_held_pair_is_at_the_law() -> None:
-    assert held_offsets("all", 80) == list(range(1, 80))
-    mids, mat = loci_grid(80)
-    s = settings()
-    s.loci_pairs = "octave"
-    out = hold_loci(mat, mids, [], LAW, s)
+def test_every_pair_up_to_5_mb_is_held_and_two_offsets_to_a_doubling_beyond() -> None:
+    mids, mat = loci_grid(200)
+    out = hold_loci(mat, mids, [], LAW, settings())
+    held = np.flatnonzero(out[0] != mat[0]).tolist()
+    assert held == [*range(1, 51), 64, 96, 128, 192], "50 loci of 100 kb are 5 Mb"
     assert out[0, 64] == pytest.approx(-((6_400_000 / 1000) ** 0.5)), "the background at 6.4 Mb"
-    assert out[0, 65] == -0.5, "a pair off the ladder keeps what it had"
+    assert out[0, 65] == -0.5, "a pair beyond 5 Mb and off the ladder keeps what it had"
     assert np.array_equal(out, out.T), "the matrix stays symmetric"
 
 
-def test_segment_needs_the_segments_and_the_loader_refuses_an_unknown_form() -> None:
-    mids, mat = loci_grid(10)
-    s = settings()
-    s.loci_pairs = "segment"
-    with pytest.raises(ValueError, match="segment of each node"):
-        hold_loci(mat, mids, [], LAW, s)
-    with pytest.raises(ValueError, match="loci_pairs must be"):
-        Settings.from_dict({"main": {"uniform_chain": "yes"}, "springs": {"loci_pairs": "some"}})
-    with pytest.raises(ValueError, match="uniform_chain is off"):
-        Settings.from_dict({"springs": {"loci_pairs": "near"}})
+def test_a_region_of_5_mb_holds_every_pair() -> None:
+    mids, mat = loci_grid(50)
+    out = hold_loci(mat, mids, [], LAW, settings())
+    assert int((np.triu(out != mat, 1)).sum()) == 50 * 49 // 2
+
+
+def test_the_springs_of_a_locus_grow_with_the_log_of_the_chromosome() -> None:
+    counts = []
+    for loci in (500, 2000):
+        mids, mat = loci_grid(loci)
+        out = hold_loci(mat, mids, [], LAW, settings())
+        counts.append(int((out[loci // 2] != mat[loci // 2]).sum()))
+    assert counts[0] < 120 and counts[1] - counts[0] <= 8, f"springs of a middle locus: {counts}"
