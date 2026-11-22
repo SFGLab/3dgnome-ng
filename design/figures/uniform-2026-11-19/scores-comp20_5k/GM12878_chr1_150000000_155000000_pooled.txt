@@ -1,0 +1,6 @@
+chr1:150000000-155000000, pooled ensemble against Hi-C at 5000 bp, 3 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman   per bead pair: raw SCC  bal SCC
+         GM12878_chr1_150000000_155000000_prod  20   0.576   0.413   0.221   0.648   0.414   0.127                     0.219    0.122    0.169                  0.157    0.117
+    GM12878_chr1_150000000_155000000_p_5k_both  20   0.636   0.466   0.315   0.695   0.468   0.239                     0.315    0.239    0.230                  0.314    0.238
+  GM12878_chr1_150000000_155000000_k_prod_comp  20   0.612   0.454   0.215   0.659   0.455   0.137                     0.212    0.133    0.175                  0.140    0.117
+  GM12878_chr1_150000000_155000000_k_lock_comp  20   0.649   0.481   0.314   0.697   0.483   0.244                     0.314    0.245    0.234                  0.313    0.244

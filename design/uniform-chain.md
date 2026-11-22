@@ -1618,6 +1618,28 @@ quantity per locus, a domain boundary or a compartment value, of which a region 
 target per pair of loci, of which it has 1,225. A model cannot store a map of pairs in a track per locus, and the
 score on the pairs stays a test.
 
+### The compartment term the model has, on the bands
+
+`design/figures/uniform-2026-11-19/comp20/` and `scores-comp20/`, `TAG=comp20`, commit 6cea514.
+`[compartments] use_compartments` with the track `<cell>_compartments.bedGraph` of each cell line, on the default
+chain and on the locked config. The term acts in the heatmap stages, in the placement of the blocks and in the
+smooth stage, as an attraction of two beads of one class. Eighteen rows of twenty structures. The smooth stage
+takes 120 s a structure with the term against 3.5 s.
+
+| arm | SCC | Spearman | ends overlap | exponent over Hi-C | contacts at 100 kb: 1 to 2 Mb | over 2 Mb | distance at 100 kb: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 12 of 360 | 1.044 | 0.07 | 0.00 | 0.32 | 0.17 |
+| default chain with the term | 0.148, 0.265 | 0.552 | 6 of 360 | 1.102 | 0.08 | 0.01 | 0.34 | 0.17 |
+| locked config | 0.335, 0.360 | 0.564 | 18 of 360 | 1.064 | 0.12 | 0.02 | 0.33 | 0.15 |
+| locked config with the term | 0.329, 0.362 | 0.573 | 12 of 360 | 1.079 | 0.14 | 0.03 | 0.34 | 0.14 |
+
+- The term does not move the bands beyond 1 Mb on either chain.
+- On the default chain it costs 0.056 ± 0.014 of raw SCC and raises Spearman by 0.020. On the locked config it
+  changes SCC by 0.006 or less and raises Spearman by 0.009 ± 0.003, on 15 rows of 18.
+
+An attraction between the beads of one class in the smooth stage does not place a megabase. The nodes are placed
+by the node solve, and the smooth stage moves the chain between them.
+
 ### Components per locus: the gathering and the term under trial
 
 The maintainer on 2026-11-22: extend the gathering of the A/B compartments to a few numbers per locus and see
