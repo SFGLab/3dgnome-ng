@@ -56,6 +56,7 @@ class RequestStated(TypedDict):
     n_models: int
     hicdiffusion: NotRequired[bool]
     background: NotRequired[str]
+    chain: NotRequired[str]
     overrides: NotRequired[dict[str, str]]
     expression: NotRequired[str]
     own: NotRequired[OwnStated]

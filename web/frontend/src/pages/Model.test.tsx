@@ -263,11 +263,55 @@ describe('Model a region page', () => {
     expect(body.get('region')).toBe('TNFRSF8')
     expect(body.get('factors')).toBe('CTCF+RNAPII')
     expect(body.get('background')).toBe('hic')
+    // An example is a job the site holds, on the chain of loop anchors.
+    expect(body.get('chain')).toBe('anchors')
     expect(body.get('n_models')).toBe('100')
     // The form asks for a job of its own. The same request twice gives two jobs.
     expect(body.get('fresh')).toBe('1')
     expect(JSON.parse(String(body.get('overrides')))).toEqual({ 'distance.polymer_exponent': '0.3' })
     expect(recentJobs()[0]).toMatchObject({ url: '/jobs/abcdef0123456789', name: 'my run' })
+  })
+
+  it('opens on the chain of one bead per kilobase and posts the chain chosen', async () => {
+    const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: '/jobs/abcdef0123456789' }]]])
+    renderModel('/model')
+    const chain = await screen.findByRole('radiogroup', { name: 'Chain' })
+    expect(within(chain).getByRole('radio', { name: /One bead per kilobase/ })).toHaveAttribute('aria-checked', 'true')
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/api/settings?') && String(u).includes('chain=uniform'))).toBe(true))
+    fireEvent.click(within(chain).getByRole('radio', { name: /Loop anchors and segments/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('chain=anchors'))).toBe(true))
+    fireEvent.click(within(chain).getByRole('radio', { name: /One bead per kilobase/ }))
+    const field = screen.getByLabelText('Region, chr:start-end or a gene name')
+    fireEvent.change(field, { target: { value: 'TNFRSF8' } })
+    fireEvent.blur(field)
+    await screen.findByText('chr1:11,500,000-12,600,000, 1.1 Mb')
+    fireEvent.click(screen.getByRole('button', { name: /Build 100 structures/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/jobs')).toBe(true))
+    const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
+    expect(body.get('chain')).toBe('uniform')
+  })
+
+  it('shows no choice of the chain where the site turns it off and posts loop anchors', async () => {
+    const meta = document.createElement('meta')
+    meta.name = 'site-hide'
+    meta.content = 'uniform_chain'
+    document.head.appendChild(meta)
+    try {
+      const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: '/jobs/abcdef0123456789' }]]])
+      renderModel('/model')
+      await screen.findByRole('radio', { name: /GM12878/ })
+      expect(screen.queryByRole('radiogroup', { name: 'Chain' })).toBeNull()
+      const field = screen.getByLabelText('Region, chr:start-end or a gene name')
+      fireEvent.change(field, { target: { value: 'TNFRSF8' } })
+      fireEvent.blur(field)
+      await screen.findByText('chr1:11,500,000-12,600,000, 1.1 Mb')
+      fireEvent.click(screen.getByRole('button', { name: /Build 100 structures/ }))
+      await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/jobs')).toBe(true))
+      const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
+      expect(body.get('chain')).toBe('anchors')
+    } finally {
+      meta.remove()
+    }
   })
 
   it('shows a refusal at the step of its field', async () => {

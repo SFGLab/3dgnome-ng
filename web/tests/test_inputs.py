@@ -83,6 +83,31 @@ def test_an_rnapii_run_reads_the_rnapii_loops_alone(shared: SimpleNamespace) -> 
     assert cfg["motif_orientation"]["use_motif_orientation"] == "no", "the CTCF orientation term is off"
 
 
+def test_the_uniform_chain_gets_its_keys_and_reads_the_map_under_hic_alone(shared: SimpleNamespace) -> None:
+    import dataclasses
+
+    ct, region, d = shared.ct, shared.region, shared.d
+    mapped = dataclasses.replace(ct, contact_map="/maps/gmx.mcool::/resolutions/1000")
+
+    def config(name: str, **kw: str) -> configparser.ConfigParser:
+        cfg = configparser.ConfigParser()
+        cfg.read(build_inputs(mapped, region, "CTCF", [], Path(d) / name, **kw).config)  # type: ignore[arg-type]
+        return cfg
+
+    cfg = config("uniform", chain="uniform")
+    assert cfg["main"]["uniform_chain"] == "yes", "the chain of one bead per kilobase is on"
+    assert (cfg["springs"]["squeeze_constant"], cfg["springs"]["contact_background_z"], cfg["springs"]["loop_dropout"]) == ("1.0", "3", "yes"), (
+        "the keys are those of the production config of the engine"
+    )
+    assert cfg["excluded_volume"]["arcs_chain_radius"] == "sum" and cfg["holes"]["use_hole_beads"] == "no", "no beads for stretches without loops"
+    assert cfg["data"]["contact_map"].startswith("/maps/gmx.mcool"), "under the Hi-C background the contact cells are read from the map of the cell type"
+    for background in ("none", "hicdiffusion"):
+        cfg = config("uniform_" + background, chain="uniform", background=background)
+        assert "contact_map" not in cfg["data"], f"under the background {background} the chain reads no contact cells"
+    cfg = config("anchors_none", background="none")
+    assert "contact_map" in cfg["data"] and not cfg.has_option("main", "uniform_chain"), "the chain of loop anchors is as it was"
+
+
 def test_background_none_turns_both_contact_terms_off(shared: SimpleNamespace) -> None:
     ct, region, d = shared.ct, shared.region, shared.d
     inp = build_inputs(ct, region, "CTCF", [], Path(d) / "none", background="none")

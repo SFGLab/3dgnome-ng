@@ -8,9 +8,9 @@ import shutil
 from pathlib import Path
 
 from .. import expression
-from ..catalog.model import BACKGROUNDS, FACTOR_CHOICES
+from ..catalog.model import BACKGROUNDS, CHAINS, FACTOR_CHOICES
 from ..engine import hicdiffusion
-from ..engine.settings import OverrideError, validate_overrides
+from ..engine.settings import OverrideError, uniform_clash, validate_overrides
 from ..errors import Refused
 from ..regions import RegionError, parse_region
 from ..context import Site
@@ -59,6 +59,11 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         raise Refused(f"unknown factor choice {factors!r}", "factors")
     if background not in BACKGROUNDS:
         raise Refused(f"unknown contact background {background!r}", "background")
+    chain = fields.get("chain", "anchors")
+    if chain not in CHAINS:
+        raise Refused(f"unknown chain {chain!r}. It is {' or '.join(CHAINS)}.", "chain")
+    if chain == "uniform" and not site.config.get().features["uniform_chain"]:
+        raise Refused("The chain of one bead per kilobase is not turned on on this server. Ask for the chain anchors.", "chain")
     try:
         r = parse_region(fields.get("region", ""), catalog.cell_types[base].genes(), site.max_span())
     except RegionError as e:
@@ -79,6 +84,10 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         overrides = validate_overrides(json.loads(fields.get("overrides") or "{}"))
     except (OverrideError, json.JSONDecodeError, AttributeError) as e:
         raise Refused(str(e), "overrides") from e
+    if chain == "uniform":
+        clash = uniform_clash(overrides)
+        if clash:
+            raise Refused(clash, "overrides")
     try:
         n_models = int(fields.get("n_models", "10"))
     except ValueError as e:
@@ -86,7 +95,7 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
     req = JobRequest(
         cell_type=cell_type, region=fields["region"], factors=factors, sv_set=sv_set, sample=sample,
         haplotype=1 if str(fields.get("haplotype", "0")) == "1" else 0, n_models=max(1, min(s.max_structures, n_models)),
-        background=background, overrides=overrides,
+        background=background, overrides=overrides, chain=chain,
     )  # fmt: skip
     wanted = fields.get("expression", "")
     own_table = None

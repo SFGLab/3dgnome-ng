@@ -4,8 +4,10 @@ import { ArrowRight, Info } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { served } from '../base'
+import { hidden } from '../flags'
 import { Unanswered } from '../components/Unanswered'
 import { Background } from '../model/Background'
+import { Chain } from '../model/Chain'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES } from '../model/examples'
 import { Expression } from '../model/Expression'
@@ -37,7 +39,8 @@ function goTo(url: string) {
 export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => void }) {
   const [params] = useSearchParams()
   const catalog = useQuery(asked.catalog())
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  // The form opens on the chain of one bead per kilobase where the site offers the choice.
+  const [form, setForm] = useState<FormState>(() => ({ ...EMPTY_FORM, chain: hidden('uniform_chain') ? 'anchors' : 'uniform' }))
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
   const [dialog, setDialog] = useState<{ tab: OwnTab; cell: boolean } | null>(null)
   const [svDialog, setSvDialog] = useState<{
@@ -59,7 +62,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const shownRegion = region.data ?? tooLong ?? (region.isError || !form.region.trim() ? undefined : lastRegion.current)
   const hasSampleTable = Boolean(catalog.data?.sv_sets[form.svSet]?.sample_table)
   const sampleTable = useQuery({ ...asked.sampleTable(form.svSet), enabled: hasSampleTable, staleTime: Infinity })
-  const schema = useQuery(asked.settings(lookup))
+  const schema = useQuery(asked.settings(lookup, form.chain))
 
   useEffect(() => {
     const e = EXAMPLES.find((x) => x.id === params.get('example'))
@@ -84,7 +87,8 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   useEffect(() => {
     if (!source || !sourceJob.data || !catalog.data || filledFrom.current === source[0]) return
     filledFrom.current = source[0]
-    setForm(fromRequest(sourceJob.data.request, cellNames.split(',').filter(Boolean)))
+    const filled = fromRequest(sourceJob.data.request, cellNames.split(',').filter(Boolean))
+    setForm(hidden('uniform_chain') ? { ...filled, chain: 'anchors' } : filled)
   }, [source, sourceJob.data, catalog.data, cellNames])
 
   // My jobs shows a job by its name, or by its cell type and region when it has none. Two jobs
@@ -215,6 +219,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           {stepError(5)}
         </Step>
         <Step n={6} title="Ensemble and simulation settings">
+          {!hidden('uniform_chain') && <Chain value={form.chain} onChange={(chain) => set({ chain })} />}
           <EnsembleFields structures={form.structures} name={form.name} max={catalog.data?.max_structures ?? 100} onChange={set} />
           {sameName && (
             <p className={cn('notice')} role="status">

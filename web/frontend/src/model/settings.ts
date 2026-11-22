@@ -8,7 +8,8 @@ export function changedSettings(schema: SettingGroup[], values: Record<string, s
   const out: Record<string, string> = {}
   for (const s of schema.flatMap((g) => g.settings)) {
     const v = values[settingName(s)]
-    if (v !== undefined && v !== s.server) out[settingName(s)] = v
+    // A value that the chain of the form does not offer is not sent.
+    if (v !== undefined && v !== s.server && (!s.choices || s.choices.includes(v))) out[settingName(s)] = v
   }
   return out
 }

@@ -23,6 +23,7 @@ export const FIELD_STEP: Record<string, number> = {
   expression: 5,
   n_models: 6,
   overrides: 6,
+  chain: 6,
 }
 
 /**
@@ -38,6 +39,7 @@ export function toFormData(form: FormState, overrides: Record<string, string>, f
   d.append('region', form.region)
   d.append('factors', form.factors)
   d.append('background', form.background)
+  d.append('chain', form.chain)
   if (form.expression) d.append('expression', form.expression)
   const table = form.own.expression
   if (form.expression === 'own' && table) {
@@ -90,6 +92,7 @@ export function fromRequest(r: Summary['request'], cells: string[]): FormState {
     sample: r.sv_set ? r.sample : '',
     haplotype: r.sv_set && r.haplotype === 1 ? 1 : 0,
     background,
+    chain: r.chain === 'uniform' ? 'uniform' : 'anchors',
     expression: r.expression === 'upload' ? '' : (r.expression ?? ''),
     structures: r.n_models,
     settings: { ...(r.overrides ?? {}) },

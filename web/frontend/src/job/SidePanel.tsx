@@ -1,3 +1,4 @@
+import { hidden } from '../flags'
 import { parseRegion, regionText } from '../lib/region'
 import { Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CopyPlus, FileText, Folder, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -124,6 +125,12 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
         <dd>{variants(summary)}</dd>
         <dt>Contact background</dt>
         <dd>{background(summary)}</dd>
+        {(!hidden('uniform_chain') || summary.request.chain === 'uniform') && (
+          <>
+            <dt>Chain</dt>
+            <dd>{summary.request.chain === 'uniform' ? 'One bead per kilobase' : 'Loop anchors and segments'}</dd>
+          </>
+        )}
         {summary.expression && (
           <>
             <dt>Expression</dt>

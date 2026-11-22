@@ -1286,6 +1286,8 @@ export interface components {
             background?: string;
             /** Cell Type */
             cell_type: string;
+            /** Chain */
+            chain?: string;
             /** Expression */
             expression?: string;
             /** Factors */
@@ -3236,6 +3238,7 @@ export interface operations {
         parameters: {
             query: {
                 cell: string;
+                chain?: string;
             };
             header?: never;
             path?: never;
