@@ -22,6 +22,8 @@ echo "$(date +%H:%M) tools queue done"
 for round in $(seq 1 "$ROUNDS"); do
   left=$(ws "ssh -o BatchMode=yes ${EDEN%%:*} 'sacct -j $JOB -n -X -o State | grep -c -E \"PENDING|RUNNING\"'" | tail -1)
   echo "$(date +%H:%M) round $round: ${left:-?} tasks of the array waiting or running"
+  # The pull leaves out a chromosome with a file of the last ten minutes. The last round waits them out.
+  [ "${left:-1}" = "0" ] && sleep 720
   ws "EDEN=$EDEN/out/xu ROOT=\$HOME/xu bash ~/xu/repo/playground/rnapii/redo_pull.sh" | tail -1
   ws "screen -S 3dgnome -X screen -t readouts bash -c 'ROOT=\$HOME/xu bash ~/xu/repo/playground/rnapii/redo_readouts.sh > ~/xu/logs/readouts.$round.log 2>&1; echo round done >> ~/xu/logs/readouts.$round.log'"
   until ws "grep -q '^round done' ~/xu/logs/readouts.$round.log"; do sleep 300; done
