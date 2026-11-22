@@ -71,6 +71,10 @@ three compare routes. Each plot has a title and ticks on its two axes and a key 
 volcano plot has every gene of the test in the background, on a grid of 0.2 by 0.5 with each
 cell once.
 
+The Method page has a tab for each chain of the form where the site offers the uniform chain: sections 3 and
+4 under Loop anchors and segments, section 5 under One bead per kilobase. A link to a section of the other tab
+opens that tab. Without the feature the page has no tabs and no section 5.
+
 The title page has two rows of examples. The first is the TNFRSF8 comparison over two columns
 with the contact map. The second is the GSTM1 deletion with the comparison of VPS13D in GM12878
 and H1ESC over two columns. `web/scripts/make_previews.py` draws each from its finished job, the

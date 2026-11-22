@@ -263,8 +263,8 @@ describe('Model a region page', () => {
     expect(body.get('region')).toBe('TNFRSF8')
     expect(body.get('factors')).toBe('CTCF+RNAPII')
     expect(body.get('background')).toBe('hic')
-    // An example is a job the site holds, on the chain of loop anchors.
-    expect(body.get('chain')).toBe('anchors')
+    // An example is on the chain of one bead per kilobase where the site offers the chain.
+    expect(body.get('chain')).toBe('uniform')
     expect(body.get('n_models')).toBe('100')
     // The form asks for a job of its own. The same request twice gives two jobs.
     expect(body.get('fresh')).toBe('1')

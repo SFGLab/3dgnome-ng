@@ -110,3 +110,5 @@ per kilobase, the config `CANONICAL_UNIFORM` of the engine.
   reason, `uniform_clash`.
 - The site offers the chain when `features.uniform_chain` of `config.json` is on,
   `design/website/settings.md`.
+- An example asks for the uniform chain on a site that offers it and for loop anchors on a site that does
+  not, `model/request.ts::fromExample`. The drawings of the title page are made from the jobs of the examples.

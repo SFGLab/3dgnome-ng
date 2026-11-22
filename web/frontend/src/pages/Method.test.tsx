@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { checkCopy } from '../test/copy'
@@ -15,8 +15,8 @@ function renderMethod() {
 
 describe('Method page', () => {
   it('tells the story in the design order', () => {
-    renderMethod()
-    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    const { container } = renderMethod()
+    const headings = [...container.querySelectorAll('h2')].map((h) => h.textContent)
     expect(headings).toEqual([
       '1. Inputs',
       '2. Blocks and target distances',
@@ -30,6 +30,34 @@ describe('Method page', () => {
       '10. Limitations',
       'References',
     ])
+  })
+
+  it('has a tab for each chain, sections 3 and 4 in one and section 5 in the other', () => {
+    renderMethod()
+    const shown = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    const tabs = within(screen.getByRole('tablist', { name: 'Chain of the model' })).getAllByRole('tab')
+    expect(tabs.map((t) => [t.textContent, t.getAttribute('aria-selected')])).toEqual([
+      ['Loop anchors and segments', 'true'],
+      ['One bead per kilobase', 'false'],
+    ])
+    expect(shown().slice(2, 5)).toEqual(['3. Anchor phase', '4. Chain phase', '6. Ensemble and output'])
+    fireEvent.click(tabs[1])
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true')
+    expect(shown().slice(2, 4)).toEqual(['5. One bead per kilobase', '6. Ensemble and output'])
+    expect(screen.getByRole('tabpanel', { name: 'One bead per kilobase' })).toContainElement(document.getElementById('uniform'))
+  })
+
+  it('opens the tab of a section named in the address', () => {
+    window.location.hash = '#uniform'
+    try {
+      renderMethod()
+      expect(screen.getByRole('tab', { name: 'One bead per kilobase' })).toHaveAttribute('aria-selected', 'true')
+      window.location.hash = '#chain'
+      fireEvent(window, new HashChangeEvent('hashchange'))
+      expect(screen.getByRole('tab', { name: 'Loop anchors and segments' })).toHaveAttribute('aria-selected', 'true')
+    } finally {
+      window.location.hash = ''
+    }
   })
 
   it('numbers every figure once, in the order of the page', () => {
@@ -60,6 +88,8 @@ describe('Method page', () => {
         'References',
       ])
       expect(document.getElementById('uniform')).toBeNull()
+      expect(screen.queryByRole('tablist')).toBeNull()
+      expect(screen.queryByRole('tabpanel')).toBeNull()
       expect(container).not.toHaveTextContent('two chains')
       expect(container).not.toHaveTextContent('one bead per kilobase')
       expect(document.getElementById('engine')).toHaveTextContent('figure 8a')

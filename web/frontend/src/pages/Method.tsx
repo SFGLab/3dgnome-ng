@@ -1,5 +1,5 @@
 import { DocPage } from '../components/DocPage'
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { CitedText } from '../components/CitedText'
 import { Equation, type EquationName } from '../components/Equation'
 import { TermSketch } from '../components/TermSketch'
@@ -99,6 +99,40 @@ function Terms({ label, terms, phase }: { label: string; terms: Term[]; phase: '
   )
 }
 
+/** The two chains of the form. Each is a tab of the page. */
+type ChainTab = 'anchors' | 'uniform'
+
+const TABS: [ChainTab, string][] = [
+  ['anchors', 'Loop anchors and segments'],
+  ['uniform', 'One bead per kilobase'],
+]
+
+/** Returns the tab that holds the section of an address, or nothing for a section outside the tabs. */
+function tabOf(hash: string): ChainTab | undefined {
+  const id = hash.replace(/^#/, '')
+  return id === 'uniform' ? 'uniform' : id === 'anchors' || id === 'chain' ? 'anchors' : undefined
+}
+
+/**
+ * Returns the open tab and its setter. A link to a section of the other tab opens that tab and
+ * moves the page to the section, which the browser cannot reach while the section is hidden.
+ */
+function useChainTab(): [ChainTab, (tab: ChainTab) => void] {
+  const [tab, setTab] = useState<ChainTab>(() => tabOf(window.location.hash) ?? 'anchors')
+  useEffect(() => {
+    const open = () => {
+      const of = tabOf(window.location.hash)
+      if (!of) return
+      setTab(of)
+      requestAnimationFrame(() => document.getElementById(window.location.hash.slice(1))?.scrollIntoView?.())
+    }
+    open()
+    window.addEventListener('hashchange', open)
+    return () => window.removeEventListener('hashchange', open)
+  }, [])
+  return [tab, setTab]
+}
+
 function Section({ id, children }: { id: SectionId; children: ReactNode }) {
   const title = numbered().find(([s]) => s === id)![1]
   return (
@@ -133,6 +167,7 @@ function P({ children }: { children: string }) {
 export function Method() {
   const uniform = !hidden('uniform_chain')
   const engineFigure = uniform ? 10 : 8
+  const [tab, setTab] = useChainTab()
   return (
     <DocPage
       title="Method"
@@ -140,7 +175,7 @@ export function Method() {
       lead={
         <>
           <CitedText>
-            {`3D-GNOMEᴺᴳ turns chromatin loops and a contact map into an ensemble of 3D structures. It follows the multiscale approach of 3D-GNOME [1, 2]. The loop anchors are placed first and the chromatin between them second.${uniform ? ' The form offers two chains. Sections 3 and 4 describe the chain of loop anchors and section 5 the chain of one bead per kilobase.' : ''} This page follows one job from its inputs to its output.`}
+            {`3D-GNOMEᴺᴳ turns chromatin loops and a contact map into an ensemble of 3D structures. It follows the multiscale approach of 3D-GNOME [1, 2]. The loop anchors are placed first and the chromatin between them second.${uniform ? ' The form offers two chains and each has a tab on this page. Sections 3 and 4 describe the chain of loop anchors and section 5 the chain of one bead per kilobase.' : ''} This page follows one job from its inputs to its output.`}
           </CitedText>
         </>
       }
@@ -220,6 +255,16 @@ export function Method() {
         </Figure>
       </Section>
 
+      {uniform && (
+        <div className="segmented doc-tabs" role="tablist" aria-label="Chain of the model">
+          {TABS.map(([id, label]) => (
+            <button key={id} type="button" role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls={`panel-${id}`} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="doc-panel" id="panel-anchors" role={uniform ? 'tabpanel' : undefined} aria-labelledby={uniform ? 'tab-anchors' : undefined} hidden={uniform && tab !== 'anchors'}>
       <Section id="anchors">
         <P>{"The anchor phase places the loop anchors, the points of the chromosome on which the data are most informative. The targets of section 2 cover only a small share of the anchor pairs, however. The example region of figure 1, 6 Mb of chromosome 1 in GM12878, has 53 anchors and 1,378 pairs of anchors. Of these, 46 are joined by a loop and 55 are closer than 100 kb and get the background distance, while the other 1,277 have no target of their own, figure 6a. A structure built from the targets alone would hold its loops and leave nearly everything else to chance."}</P>
         <P>{"The anchor energy therefore combines four terms. Two come from earlier models and two are new in this work, the background spring and the window term. In the energy below L is the set of anchor pairs joined by a loop, B the pairs held at the background and W a set of genomic windows."}</P>
@@ -286,8 +331,10 @@ export function Method() {
           <b>Figure 7</b>a, anchor positions after the anchor phase, TNFRSF8 locus, GM12878, CTCF and RNAPII loops. b, the full chain of the same structure, black dots are anchors. c, three structures of the ensemble superposed on the first.
         </p>
       </Section>
+      </div>
 
       {uniform && (
+      <div className="doc-panel" id="panel-uniform" role="tabpanel" aria-labelledby="tab-uniform" hidden={tab !== 'uniform'}>
       <Section id="uniform">
         <P>{"The chain of sections 3 and 4 is built in two layers, the anchors first and the chromatin between them second. An anchor is one bead of that chain while it covers several kilobases of the genome. Every loop of an anchor therefore ends at the same point and the beads between two anchors are added after the loops are fitted. The second chain of the form has no layers. Every kilobase of the region is one bead from the start and a loop ends on a bead inside its anchor. This section follows the steps that differ from sections 3 and 4, in the order of a job."}</P>
 
@@ -320,6 +367,7 @@ export function Method() {
         <h3>The chain between the nodes</h3>
         <P>{"The chain phase of section 4 moves the beads between the nodes with the same five terms, yet two of its rules differ. A node is not fixed in this chain and moves together with the bead before it and the bead after it, while the centre of mass of the three stays in place. Each neighbour moves by minus half of the step of the node, which lets the node turn among its neighbours at the position the anchor phase gave it. The second rule is the bond, which resists compression ten times as strongly as stretching and keeps two neighbouring beads from overlapping."}</P>
       </Section>
+      </div>
       )}
 
       <Section id="ensemble">

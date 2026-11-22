@@ -387,3 +387,34 @@ img.equation {
   background: #FFFFFF;
   border-radius: 4px;
 }
+
+/* The tabs of the two chains on the Method page and the sections of each. */
+.doc-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.doc-tabs [role='tab'] {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.doc-tabs [role='tab'][aria-selected='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+.doc-panel:not([hidden]) {
+  display: contents;
+}

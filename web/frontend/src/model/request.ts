@@ -5,6 +5,7 @@
  */
 import type { Summary } from '../api'
 import type { Example } from './examples'
+import { hidden } from '../flags'
 import { type Background, EMPTY_FORM, type Factors, type FormState } from './form'
 import { ownField } from './upload'
 
@@ -59,10 +60,11 @@ export function toFormData(form: FormState, overrides: Record<string, string>, f
   return d
 }
 
-/** Returns the form filled with an example. */
+/** Returns the form filled with an example, on the chain of one bead per kilobase where the site offers it. */
 export function fromExample(e: Example): FormState {
   return {
     ...EMPTY_FORM,
+    chain: hidden('uniform_chain') ? 'anchors' : 'uniform',
     cell: e.cell,
     region: e.region,
     factors: e.factors,
