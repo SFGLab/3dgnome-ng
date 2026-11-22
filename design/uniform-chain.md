@@ -1887,9 +1887,21 @@ line. No held out half exists at this scale: the contact cells and the track rea
 | `u_pre` | 0.371, 0.339 | 0.169 | 0.040 | 0.014 |
 | `u_loci` | 0.364, 0.336 | 0.223 | 0.119 | 0.054 |
 | `u_loci_k5` | 0.376, 0.345 | 0.222 | 0.233 | 0.171 |
+| `u_dev`, the locked config again at 4bd9f11 | 0.366, 0.336 | 0.222 | 0.036 | 0.024 |
 
 The scores repeat the regions: the uniform chain is 0.10 to 0.12 of SCC over the default chain, the law between
-the loci adds 0.05 of Spearman and the bands beyond 1 Mb, the track adds more of those bands.
+the loci adds 0.05 of Spearman and the track adds the bands beyond 1 Mb. The locked config built twice has 0.119
+and 0.036 in the band from 1 to 2 Mb: three structures do not carry a difference of that size in a band beyond
+1 Mb, and the law alone adds nothing there, as on the regions.
+
+`u_dev` is the locked config at the commit with the gyration and reach terms on the device. Its SCC, Spearman,
+distances by separation and close pairs are those of `u_loci`: 10.5 beads at 1 Mb and 70.4 at 200 Mb, 246 close
+pairs per thousand beads. A structure of whole chr1 took 8 min 17 s of wall time at a peak of 15.1 GB.
+
+The arm with the smooth stage on the batch executor, `u_batch`, was stopped by the maintainer's choice after 40
+minutes in the smooth stage of its first structure. The launch pads the 89 blocks to 16,384 beads each. The
+threaded smooth stage of the same chromosome takes 25 s. The JAX smooth kernel runs the uniform chain and is not
+the executor for a chromosome, as `SETTINGS.md` states for the default chain.
 
 The chain itself does not repeat the regions. Mean distance in beads by separation, the first structure for the
 counts:
