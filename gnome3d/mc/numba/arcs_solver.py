@@ -305,7 +305,8 @@ def solve_arcs(
 ) -> tuple[float, F32Array]:
     """Minimises the arcs energy from `pos`. Returns `(energy, positions)`.
 
-    `backend` is the place of the energy evaluation, `numba` on the CPU or `jax` on the device.
+    `backend` is the place of the evaluation of the energy and of every term added to it,
+    `numba` on the CPU or `jax` on the device.
     The minimiser runs on the host. `arc_w` is the spring weight of each arc pair, None for one.
     `activity` is the activity of each anchor for the factory term, None for no term. `mids` are
     the genomic midpoints of the anchors, which the gyration term needs. `reach` is the pairs of
@@ -420,12 +421,20 @@ def solve_arcs(
         )
         member, count, target = gyration_windows(mids, s.polymer_law(), smallest)
         base_g, base_g_args = fun, fun_args
+        gyr_dev: Any = None
+        if backend == "jax" and member.shape[0] > 0:
+            from gnome3d.mc.jax.arcs_energy import DeviceGyrationEnergy  # noqa: PLC0415
+
+            gyr_dev = DeviceGyrationEnergy(member, count, target, gyr_w)
 
         def with_gyration(x: Any) -> tuple[float, F64Array]:
             e1, g1 = base_g(x, *base_g_args)
-            e2, g2 = gyration_energy_grad(
-                np.asarray(x, dtype=np.float64), member, count, target, gyr_w
-            )
+            if gyr_dev is not None:
+                e2, g2 = gyr_dev(x)
+            else:
+                e2, g2 = gyration_energy_grad(
+                    np.asarray(x, dtype=np.float64), member, count, target, gyr_w
+                )
             return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
 
         fun = with_gyration
@@ -436,12 +445,20 @@ def solve_arcs(
         reach_len = np.ascontiguousarray(reach[2], dtype=np.float64)
         reach_w = float(s.spring_stretch_arcs)
         base_r, base_r_args = fun, fun_args
+        reach_dev: Any = None
+        if backend == "jax":
+            from gnome3d.mc.jax.arcs_energy import DeviceReachEnergy  # noqa: PLC0415
+
+            reach_dev = DeviceReachEnergy(n, reach_i, reach_j, reach_len, reach_w)
 
         def with_reach(x: Any) -> tuple[float, F64Array]:
             e1, g1 = base_r(x, *base_r_args)
-            e2, g2 = reach_energy_grad(
-                np.asarray(x, dtype=np.float64), reach_i, reach_j, reach_len, reach_w
-            )
+            if reach_dev is not None:
+                e2, g2 = reach_dev(x)
+            else:
+                e2, g2 = reach_energy_grad(
+                    np.asarray(x, dtype=np.float64), reach_i, reach_j, reach_len, reach_w
+                )
             return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
 
         fun = with_reach

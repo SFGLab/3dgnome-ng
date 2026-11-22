@@ -62,7 +62,7 @@ Every row is the maintainer's decision, after the trials of the night.
 | The resolution of the contact cells | 5 kb alone, with both sides. The ladder is deleted, in its first form and as rewritten: the first expands the region and the second scores under the cells at 5 kb. Locked on 2026-11-21 |
 | `loop_dropout` | On, with the radius of a node from its chain |
 | `contact_background_z` | 3 |
-| The three bead move in the JAX kernel | Not yet |
+| The three bead move in the JAX kernel | Built on 2026-11-22, section "The three bead move in the JAX kernel" |
 
 The draw at the midpoint and `bond_limit` were removed on 2026-11-20, and `uniform_chain` implies the centre of
 mass rule since the same day. The byte exactness gate on GM12878 chr1 18.29 to 20.31 Mb is identical for the
@@ -244,7 +244,7 @@ volume at the radius of a bead and the contact cells of `gnome3d/pipeline/ib/cel
 beads of the smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first
 numbers. Stage 2 is built: bounded drift is `anchor_cap`, which the uniform chain runs as it is, and the centre of
 mass rule is a move of three beads of the numba kernel, `step_delta_nb` and `batch_mc_nb` in
-`gnome3d/mc/numba/terms.py`. The JAX kernel does not have it. Stage 3 was the third arm of the orientation
+`gnome3d/mc/numba/terms.py`. The JAX kernel has it since 2026-11-22. Stage 3 was the third arm of the orientation
 term, `[motif_orientation] bond_limit`, measured and removed.
 
 ### Trial of stage 1 without the contact cells
@@ -1840,6 +1840,39 @@ and a locus without a node takes no part. A locus without a loop end would need 
 make it a node. That is open.
 
 
+### The three bead move in the JAX kernel
+
+The JAX kernel of the smooth stage, `gnome3d/mc/jax/smooth.py`, has the centre of mass rule since 2026-11-22, in
+every form of the kernel: one chain, a batch of blocks, the prefetch of proposals and the cell grid. The batch
+executor runs the smooth stage of the uniform chain.
+
+- A proposal is three parts on a copy of the positions: the bead before the node, the node and the bead after it,
+  with the factors of the draw that the numba kernel has. A bead outside a node moves alone as the first part.
+  The changes of the bonds, the excluded volume, the compartment term, the heat term and the confinement are
+  summed over the parts. The hard wall rejects on the summed count and the summed depth. The orientation sites
+  at the node and two beads from it are scored one after another.
+- With the cell grid the three beads of a move are left out of the cells and of the list of moved beads and are
+  candidates of their own. A bead that an earlier part carried away is not in the list yet.
+- The numba loop ends a run when one round ends above twice the score before it. The JAX loop did not have that
+  stop and has it now, `SMOOTH_STOP_RATIO`. On GM12878 chr1 10 to 20 Mb and 18.3 to 20.3 Mb the stop ended none
+  of 20 runs of the numba kernel under the two production configs. On the chain of 60 beads of the unit test,
+  whose schedule starts hot, it ended one run of 48 after its first round, at twice the score of its start.
+
+`tests/unit/test_centre_move.py` holds for both kernels: the centre of mass of the three beads stays, the running
+score is the energy of the final chain, a node without the rule stays, the orientation score follows the move.
+The medians of the final energy over twelve seeds agree between the kernels within 30 %. The forms with the grid
+are marked slow. The two kernels draw from different streams and their chains differ bead by bead.
+
+The reach term and the gyration term of the arcs solve are on the device since 2026-11-22, by the maintainer's
+decision: `DeviceReachEnergy` and `DeviceGyrationEnergy` in `gnome3d/mc/jax/arcs_energy.py`, beside the factory
+term. The radius of gyration of a window is taken about the centroid of the window, which keeps the precision of
+float32 on a chromosome. On positions 300 to 400 beads from the origin the two terms agree with the CPU functions
+within 1e-4 of the energy and of the largest gradient entry. On GM12878 chr1 18.3 to 20.3 Mb the two node solves
+of the uniform chain end at 8.7475 and 7.0771 with the terms on the device against 8.7468 and 7.0771 with them on
+the host, in 394 and 532 iterations against 422 and 535. The beads of the two structures differ after the smooth
+stage, with a correlation of the bead distances of 0.77 and 0.86 between the two builds. The annealer of the arcs
+stage refuses the three terms on both backends.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
@@ -1872,8 +1905,7 @@ orientation term. Each has its trial above.
 
 Open: a locus without a loop end takes no part in the law between the loci or in the track, section "The loci of
 the uniform chain". The pooled contacts beyond 1 Mb reach 0.15 to 0.19 where the two halves of a map share 0.8 to
-0.9. The three bead move is not in the JAX kernel and the batch executor refuses the smooth stage of the uniform
-chain. The site has no control for the chain.
+0.9. The site has no control for the chain.
 
 ## Settings
 
@@ -1885,7 +1917,7 @@ A setting is added when a run reads it.
 - Bounded drift is `[simulation_arcs_smooth] anchor_cap`, which exists.
 - The centre of mass rule is the rule of the uniform chain. `[simulation_arcs_smooth] anchor_centre` selected it
   against the fixed node, which lost the trial of the rules and step 3 of `uniform_night4.sh`, and was removed on
-  2026-11-20. The batch executor refuses the smooth stage of the uniform chain until its kernel has the move.
+  2026-11-20. Both kernels of the smooth stage have the move and the uniform chain runs on every executor.
 
 ## The first build
 

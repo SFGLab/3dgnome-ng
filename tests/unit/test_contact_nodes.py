@@ -172,6 +172,54 @@ def test_reach_gradient_matches_a_finite_difference() -> None:
         assert grad[k] == pytest.approx((up - down) / 2e-6, abs=1e-5)
 
 
+def test_the_device_reach_term_is_the_cpu_term() -> None:
+    pytest.importorskip("jax")
+    from gnome3d.mc.jax.arcs_energy import DeviceReachEnergy
+    from gnome3d.mc.numba.arcs_solver import reach_energy_grad
+
+    rng = np.random.default_rng(5)
+    n = 200
+    x = (np.cumsum(rng.normal(size=(n, 3)), axis=0) * 2.0 + 300.0).reshape(-1)
+    pi = np.arange(n - 1, dtype=np.int32)
+    pj = pi + 1
+    length = rng.uniform(1.0, 5.0, size=n - 1)
+    want, want_grad = reach_energy_grad(x, pi, pj, length, 1.3)
+    got, got_grad = DeviceReachEnergy(n, pi, pj, length, 1.3)(x)
+    assert want > 0.0, "some pairs are beyond their reach"
+    assert got == pytest.approx(want, rel=1e-4), "energy"
+    scale = float(np.abs(want_grad).max())
+    assert float(np.abs(got_grad - want_grad).max()) < 1e-4 * scale, "gradient"
+
+
+def test_solver_on_the_device_ends_at_the_energy_of_the_cpu_solve() -> None:
+    """A walk of 120 nodes with the reach term and the gyration term on."""
+    pytest.importorskip("jax")
+    from gnome3d.mc.numba.arcs_solver import solve_arcs
+
+    rng = np.random.default_rng(6)
+    n = 120
+    pos = (np.cumsum(rng.normal(size=(n, 3)), axis=0) * 3.0).astype(np.float32)
+    mids = (np.arange(n, dtype=np.int64) * 20_000) + 10_000
+    exp = np.full((n, n), -0.5)
+    np.fill_diagonal(exp, 0.0)
+    pi = np.arange(n - 1, dtype=np.int32)
+    reach = (pi, pi + 1, np.full(n - 1, 2.0))
+    s = Settings()
+    s.use_excluded_volume = False
+    s.use_confinement = False
+    s.gyration_weight = 0.5
+    s.background_weight = 0.0
+    s.spring_stretch_arcs = 1.0
+    s.arcs_solver_iters = 400
+    start, _ = solve_arcs(pos, exp, s, iters=0, mids=mids, reach=reach)
+    cpu, _ = solve_arcs(pos, exp, s, mids=mids, reach=reach)
+    dev, held = solve_arcs(pos, exp, s, backend="jax", mids=mids, reach=reach)
+    assert cpu < 0.5 * start, f"the solve descends: {start:.3f} to {cpu:.3f}"
+    assert dev == pytest.approx(cpu, rel=0.05, abs=1e-3), "the two backends reach one energy"
+    bonds = np.linalg.norm(np.diff(held, axis=0), axis=1)
+    assert float(bonds.max()) < 2.5, "every pair is inside its reach or close to it"
+
+
 def test_solver_brings_a_pair_inside_its_reach() -> None:
     """Two nodes with one bond of chain between them and no other term start 6 beads apart."""
     from gnome3d.mc.numba.arcs_solver import solve_arcs
