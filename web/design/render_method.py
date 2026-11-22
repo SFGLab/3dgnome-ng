@@ -3,7 +3,7 @@ r"""Renders the figures of section 2 of the Method page, blocks and target dista
     python web/design/render_method.py tables data playground/derived/ps_curve.csv web/design/method_data
     python web/design/render_method.py figures web/design/method_data web/design/images
 
-    python web/design/render_method.py uniform-tables data web/design/method_data
+    python web/design/render_method.py uniform-tables data web/design/method_data [CONTACT_MAP]
 
 `tables` reads the GM12878 inputs of production and the contact probability table of three cell
 lines from `playground/ps_curve.py`. It writes the small tables the figures plot. `figures`
@@ -176,9 +176,10 @@ OVERLAP = (1, [7, 8])
 FLANK = 4_000
 
 
-def uniform_tables(data_root: str, out: Path) -> None:
-    """Writes the tables of section 5 as a job on the region with the chain of one bead per
-    kilobase builds them."""
+def uniform_tables(data_root: str, out: Path, contact_map: str = "") -> None:
+    """Writes the tables of the chain of one bead per kilobase as a job on the region builds them.
+    `contact_map` is the map of the contact cells, the deep map of the cell line or its cut to the
+    region. Without it the job reads the largest map under `data_root`."""
     import gnome3d.skeleton as skeleton
     from gnome3d.data import ContactData
     from gnome3d.hierarchy import Level
@@ -194,6 +195,8 @@ def uniform_tables(data_root: str, out: Path) -> None:
     region = parse_region(f"{CHROM}:{REGION[0]}-{REGION[1]}")
     plain = settings_for_cell(CELL, root)
     s = settings_for_cell(CELL, root, uniform=True)
+    if contact_map:
+        s.data_contact_map = f"{Path(contact_map).resolve()}::/resolutions/5000"
     data = ContactData.from_files(s, [CHROM], region)
     state = cb.build_state(s, data, [CHROM], region)
     cl = state.clusters
@@ -772,7 +775,7 @@ def uniform_nodes(tab: Path, out: Path) -> None:
     nodes = pd.read_csv(tab / "uniform_nodes.csv")
     n_of = json.loads((tab / "fits.json").read_text())["uniform_pairs"]
     n = len(nodes)
-    fig, (left, right) = plt.subplots(1, 2, figsize=(WIDTH, 4.4), gridspec_kw={"width_ratios": [1.0, 1.0]})
+    fig, (left, right) = plt.subplots(1, 2, figsize=(WIDTH, 4.9), gridspec_kw={"width_ratios": [1.0, 1.0]})
 
     q = np.geomspace(0.05, 30, 200)
     left.plot(q, q / (q + 1), color=INK, lw=1.4, label="q / (q + 1)")
@@ -834,7 +837,7 @@ def main() -> None:
         tables(sys.argv[2], sys.argv[3], Path(sys.argv[4]))
         return
     if sys.argv[1] == "uniform-tables":
-        uniform_tables(sys.argv[2], Path(sys.argv[3]))
+        uniform_tables(sys.argv[2], Path(sys.argv[3]), sys.argv[4] if len(sys.argv) > 4 else "")
         return
     tab, out = Path(sys.argv[2]), Path(sys.argv[3])
     out.mkdir(parents=True, exist_ok=True)

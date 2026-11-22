@@ -30,11 +30,11 @@
  "uniform_pairs": {
   "nodes": 31,
   "pairs": 465,
-  "none": 291,
+  "none": 285,
   "loop": 22,
-  "background": 17,
-  "enriched": 0,
-  "depleted": 0,
-  "stretches": 135
+  "background": 13,
+  "enriched": 11,
+  "depleted": 3,
+  "stretches": 131
  }
 }
