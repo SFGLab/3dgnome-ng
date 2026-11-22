@@ -209,6 +209,26 @@ structures, beside `o_on` and `o_off` of `orn20`. Scores in `design/figures/unif
   misfit over three beads a side is 0.111 with the term as it is and 0.185 with the rewrite. The trial does not
   separate the two.
 
+## The rewrite at a larger weight, 2026-11-22
+
+The maintainer chose one more arm, the rewrite at ten times its weight, `[motif_orientation] stretch_weight`, a
+key of the trial. The trace on GM12878 chr1 11 to 13 Mb, 4 structures an arm:
+
+| | default: 1 | 10 | 100 | uniform: 1 | 10 | 100 |
+|---|---|---|---|---|---|---|
+| bonds within two beads of a site over 2 targets | 0.8 % | 3.3 % | 12.5 % | 4.3 % | 6.7 % | 15.4 % |
+| bends sharper than 120 degrees within two beads of a site | 5.8 % | 12.8 % | 19.6 % | 7.0 % | 11.8 % | 18.7 % |
+| longest bond, in targets | 2.7 | 3.6 | 6.5 | 3.4 | 3.6 | 4.9 |
+| bond energy of the final chains | 21 | 33 | 89 | 38 | 47 | 77 |
+| misfit over three beads a side, after the stage | 0.147 | 0.035 | 0.010 | 0.185 | 0.045 | 0.005 |
+
+- At 10 the direction is held harder than by the term as it is, 0.035 and 0.045 against 0.183 and 0.111, with
+  2 points more of bonds over twice their target than the model without the term.
+- At 100 an eighth of the bonds at the sites are over twice their target. The stretch of a site is pulled out
+  along its direction.
+
+The arm `o_st10` on the 18 held out rows is building on the workstation as `ornst10`.
+
 ## Open
 
 The choice of the maintainer between the rewrite as it is, the model without the term and a trial of the rewrite
