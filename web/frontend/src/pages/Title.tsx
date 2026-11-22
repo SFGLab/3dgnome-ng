@@ -21,14 +21,28 @@ const cn = scoped(sheet)
 const WITH = previews.rnapii as PreviewData
 const WITHOUT = previews.ctcf as PreviewData
 const spread = (d: PreviewData) => `${d.mean.toFixed(1)} ± ${d.sd.toFixed(1)}`
+/** Returns the distance of A and B in words. On the chain of one bead per kilobase two positions under 1 kb apart can be one bead. */
+const apart = (d: PreviewData) => (d.a === d.b ? 'on one bead' : `${spread(d)} bead units apart`)
 /**
  * The picture of the hero in its own pixels, with a point on the promoter and one on the enhancer,
  * the letter beside each on an empty part of the picture and the middle of the box of the distance.
  */
 const HERO = { a: [354, 397], b: [705, 196], letterA: [350, 452], letterB: [668, 150], box: [525, 232] } as const
 
-/** The part of each drawing the example shows. Both have one view and the two lines can be compared. */
-const STORY_VIEW: [number, number, number, number] = [-170, -372, 770, 764]
+/** Returns the part of the drawing units that holds the points given, with a margin. */
+const viewOf = (points: number[][], margin = 50): [number, number, number, number] => {
+  const xs = points.map((p) => p[0])
+  const ys = points.map((p) => p[1])
+  return [Math.min(...xs) - margin, Math.min(...ys) - margin, Math.max(...xs) - Math.min(...xs) + 2 * margin, Math.max(...ys) - Math.min(...ys) + 2 * margin]
+}
+/** Returns the chain of a drawing from A to B. */
+const fromAToB = (d: PreviewData) => d.points.slice(Math.min(d.a, d.b), Math.max(d.a, d.b) + 1)
+
+/**
+ * The part of each drawing the example shows, the chain from A to B of both with room around it. Both
+ * have one view and the two lines can be compared. The chain beyond it runs out of the panel.
+ */
+const STORY_VIEW = viewOf([...fromAToB(WITH), ...fromAToB(WITHOUT)], 170)
 
 /** The two drawings of the first example, the tag over each and the words a screen reader gets. */
 const STORY = [
@@ -41,7 +55,7 @@ const STORY = [
  * and GSTM5, the genes either side of the deleted GSTM1.
  */
 const DELETION = deletion.deletion as PreviewData
-const DELETION_VIEW: [number, number, number, number] = [-240, -362, 600, 704]
+const DELETION_VIEW = viewOf(DELETION.points)
 
 /**
  * The drawings of the expression example, VPS13D in two cell types, each with the enhancer nearest to it in
@@ -201,7 +215,7 @@ export function Title() {
             <span className={cn('story-panels')}>
               {CELLS.map((p) => (
                 <span key={p.tag} className={cn('story-panel')}>
-                  <StructurePreview data={p.data} view={centred(p.data)} label={`A structure of the VPS13D locus in ${p.tag}, with the promoter A and its nearest enhancer B ${spread(p.data)} bead units apart`} />
+                  <StructurePreview data={p.data} view={centred(p.data)} label={`A structure of the VPS13D locus in ${p.tag}, with the promoter A and its nearest enhancer B ${apart(p.data)}`} />
                   <span className={cn('story-tag')}>{p.tag}</span>
                 </span>
               ))}
@@ -210,7 +224,7 @@ export function Title() {
             <span className={cn('example-detail')}>
               {busy === 'VPS13D'
                 ? 'Opening the jobs'
-                : `From the promoter A to the nearest enhancer B of each cell type ${spread(CELLS[0].data)} and ${spread(CELLS[1].data)} bead units, expression ${VPS13D_FOLD} times higher in H1ESC`}
+                : `The promoter A and its nearest enhancer B are ${apart(CELLS[0].data)} in GM12878 and ${apart(CELLS[1].data)} in H1ESC, expression ${VPS13D_FOLD} times higher in H1ESC`}
             </span>
           </button>
         </div>

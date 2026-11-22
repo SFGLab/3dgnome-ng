@@ -51,11 +51,23 @@ HIDES = 1.6
 REACH = 5
 
 
+def longest_axis(points: list[V]) -> V:
+    """Returns the direction along which the beads are spread widest, by power iteration on their covariance."""
+    n = len(points)
+    mean = tuple(sum(p[k] for p in points) / n for k in range(3))
+    cov = [[sum((p[i] - mean[i]) * (p[j] - mean[j]) for p in points) / n for j in range(3)] for i in range(3)]
+    v: V = (1.0, 0.7, 0.4)
+    for _ in range(60):
+        v = unit((dot(cov[0], v), dot(cov[1], v), dot(cov[2], v)))  # type: ignore[arg-type]
+    return v
+
+
 def view(points: list[V], ia: int, ib: int) -> tuple[V, V, V]:
     """Returns the axes of the drawing, which are right, down and toward the viewer. The first runs
     from a to b. The turn about it is the one that leaves the fewest beads in front of the two marked
     beads and among equals the one that spreads the chain between them widest on the drawing."""
-    e1 = unit(sub(points[ib], points[ia]))
+    # Two positions on one bead have no line between them. The first axis is then the longest axis of the chain.
+    e1 = unit(sub(points[ib], points[ia])) if ia != ib else longest_axis(points)
     u = unit(cross(e1, (0.3, 0.5, 0.8)))
     v = cross(e1, u)
     between = points[min(ia, ib) : max(ia, ib) + 1]

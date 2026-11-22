@@ -73,16 +73,16 @@ describe('Title page', () => {
   it('draws the locus with and without the RNAPII loop in one card, each with its distance', () => {
     renderTitle()
     const card = screen.getByRole('button', { name: /TNFRSF8 with and without its RNAPII loop/ })
-    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*6\.0 ± 1\.6 bead units apart/ })).toBeInTheDocument()
-    expect(within(card).getByRole('img', { name: /CTCF loops alone.*9\.9 ± 2\.9 bead units apart/ })).toBeInTheDocument()
-    expect(card).toHaveTextContent('6.0 ± 1.6 bead units with the loop and 9.9 ± 2.9 with CTCF loops alone')
+    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*8\.4 ± 1\.9 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /CTCF loops alone.*10\.9 ± 2\.2 bead units apart/ })).toBeInTheDocument()
+    expect(card).toHaveTextContent('8.4 ± 1.9 bead units with the loop and 10.9 ± 2.2 with CTCF loops alone')
   })
 
   it('marks A, B and the distance on the picture at the top', () => {
     renderTitle()
     const art = screen.getByRole('img', { name: /A 3D structure of the TNFRSF8 locus/ })
-    expect(art).toHaveTextContent('6.0 ± 1.6')
-    expect(screen.getByText('A to B 6.0 ± 1.6 bead units')).toBeInTheDocument()
+    expect(art).toHaveTextContent('8.4 ± 1.9')
+    expect(screen.getByText('A to B 8.4 ± 1.9 bead units')).toBeInTheDocument()
     expect(screen.queryByText(/stay private/)).toBeNull()
   })
 
@@ -125,9 +125,15 @@ describe('Title page', () => {
   it('draws VPS13D in the two cell types, each with its own nearest enhancer, and says the enhancers differ', () => {
     renderTitle()
     const card = screen.getByRole('button', { name: /VPS13D in GM12878 and H1ESC/ })
-    expect(within(card).getByRole('img', { name: /VPS13D locus in GM12878.*2\.5 ± 0\.7 bead units apart/ })).toBeInTheDocument()
-    expect(within(card).getByRole('img', { name: /VPS13D locus in H1ESC.*1\.0 ± 0\.1 bead units apart/ })).toBeInTheDocument()
-    expect(card).toHaveTextContent('From the promoter A to the nearest enhancer B of each cell type 2.5 ± 0.7 and 1.0 ± 0.1 bead units, expression 1.7 times higher in H1ESC')
+    expect(within(card).getByRole('img', { name: /VPS13D locus in GM12878.*3\.3 ± 1\.3 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /VPS13D locus in H1ESC.*nearest enhancer B on one bead/ })).toBeInTheDocument()
+    // The enhancer of H1ESC is 849 bp from the promoter, one bead of the chain of one bead per kilobase.
+    expect(card).toHaveTextContent('The promoter A and its nearest enhancer B are 3.3 ± 1.3 bead units apart in GM12878 and on one bead in H1ESC, expression 1.7 times higher in H1ESC')
+    // A and B on one bead are drawn side by side at it, with no line between them.
+    const h1 = within(card).getByRole('img', { name: /VPS13D locus in H1ESC/ })
+    expect(h1).toHaveTextContent('one bead')
+    expect(h1.querySelector('line')).toBeNull()
+    expect(within(card).getByRole('img', { name: /VPS13D locus in GM12878/ }).querySelector('line')).not.toBeNull()
     // The two drawings have one size of view, each about the middle of its own structure.
     const views = [...card.querySelectorAll('svg.structure-preview')].map((s) => s.getAttribute('viewBox')!.split(' ').map(Number))
     expect(views[0].slice(2)).toEqual(views[1].slice(2))
