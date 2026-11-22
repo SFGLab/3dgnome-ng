@@ -15,7 +15,7 @@ import numpy as np
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
-from gnome3d.mc.numba.terms import NO_W, njit
+from gnome3d.mc.numba.terms import NO_F64, NO_W, njit
 from gnome3d.types import F32Array, F64Array, I32Array, I64Array
 from gnome3d.util import blas_threads
 
@@ -44,10 +44,14 @@ def arcs_energy_grad(
     excl_skip: int,
     use_w: bool = False,
     arc_w: F32Array = NO_W,
+    use_f: bool = False,
+    node_f: F64Array = NO_F64,
 ) -> tuple[float, F64Array]:
     """Returns the arcs energy of a structure and its gradient, for a flattened `(3N,)` vector.
 
-    With `use_w` the constant of each arc spring is scaled by `arc_w[j, i]`.
+    With `use_w` the constant of each arc spring is scaled by `arc_w[j, i]`. With `use_f` the
+    excluded volume of a pair acts at `excl_r0 * (node_f[i] + node_f[j]) / 2`, the radius of a
+    pair of nodes from the chain the two stand for.
 
     The arc term sums unordered pairs. Each pair is visited from both ends with half its energy
     and its whole gradient. The excluded volume sums ordered pairs, with a whole energy and a
@@ -105,14 +109,17 @@ def arcs_energy_grad(
                 gi0 += w * dx
                 gi1 += w * dy
                 gi2 += w * dz
-            if excl_w > 0.0 and d < excl_r0:
+            r0 = excl_r0
+            if use_f:
+                r0 = excl_r0 * 0.5 * (node_f[i] + node_f[j])
+            if excl_w > 0.0 and d < r0:
                 sep = i - j
                 if sep < 0:
                     sep = -sep
                 if sep > excl_skip:
-                    u = (excl_r0 - d) / excl_r0
+                    u = (r0 - d) / r0
                     ei += excl_w * u * u
-                    w = -4.0 * excl_w * u / (excl_r0 * dd)
+                    w = -4.0 * excl_w * u / (r0 * dd)
                     gi0 += w * dx
                     gi1 += w * dy
                     gi2 += w * dz
@@ -284,72 +291,6 @@ def reach_energy_grad(
     return energy, g.reshape(-1)
 
 
-@njit(cache=True, fastmath=True, nogil=True)
-def pair_radius_energy_grad(
-    x: F64Array, pair_i: I32Array, pair_j: I32Array, radius: F64Array, full: float, weight: float
-) -> tuple[float, F64Array]:
-    """Returns the change of the excluded volume energy for the pairs with a radius of their own,
-    and its gradient.
-
-    `arcs_energy_grad` scores every pair at the radius `full` of the stage. Pair k is to be scored
-    at `radius[k]`. The change is the energy at `radius[k]` minus the energy at `full`, in the
-    form of `arcs_energy_grad`, `2 * weight * ((r - d) / r)^2` per pair closer than r. The sum of
-    the two is the excluded volume at the radius of each pair and is not negative.
-    """
-    n = x.shape[0] // 3
-    pos = x.reshape(n, 3)
-    g = np.zeros((n, 3))
-    energy = 0.0
-    for k in range(pair_i.shape[0]):
-        i = pair_i[k]
-        j = pair_j[k]
-        dx = pos[i, 0] - pos[j, 0]
-        dy = pos[i, 1] - pos[j, 1]
-        dz = pos[i, 2] - pos[j, 2]
-        d = np.sqrt(dx * dx + dy * dy + dz * dz)
-        r = radius[k]
-        if d >= full and d >= r:
-            continue
-        dd = d if d > 1e-10 else 1e-10
-        e = 0.0
-        w = 0.0
-        if d < full:
-            u = (full - d) / full
-            e = -2.0 * weight * u * u
-            w = 4.0 * weight * u / (full * dd)
-        if d < r:
-            u = (r - d) / r
-            e += 2.0 * weight * u * u
-            w -= 4.0 * weight * u / (r * dd)
-        energy += e
-        g[i, 0] += w * dx
-        g[i, 1] += w * dy
-        g[i, 2] += w * dz
-        g[j, 0] -= w * dx
-        g[j, 1] -= w * dy
-        g[j, 2] -= w * dz
-    return energy, g.reshape(-1)
-
-
-def pair_radii(share: F64Array, full: float, skip: int) -> tuple[I32Array, I32Array, F64Array]:
-    """Returns the pairs whose excluded volume radius is not the radius `full` of the stage, and
-    the radius of each, for `[excluded_volume] arcs_chain_radius = sum`.
-
-    The radius of a pair grows with the chain its two nodes stand for. `share` is that chain per
-    node over the mean chain of a node. With `f = share ^ (1/3)` the radius of a pair is
-    `full * (f_i + f_j) / 2`, the distance of two blobs of chain. Pairs within `skip` of each
-    other in the order of the matrix are left out, as in `arcs_energy_grad`.
-    """
-    f = np.cbrt(np.asarray(share, dtype=np.float64))
-    n = int(f.shape[0])
-    radius: F64Array = full * 0.5 * (f[:, None] + f[None, :])
-    idx = np.arange(n)
-    apart = (idx[None, :] - idx[:, None]) > skip
-    ci, cj = np.nonzero(apart & (radius != full) & (radius > 0.0))
-    own: F64Array = np.ascontiguousarray(radius[ci, cj], dtype=np.float64)
-    return ci.astype(np.int32), cj.astype(np.int32), own
-
-
 def solve_arcs(
     pos: F32Array,
     exp_dist: F64Array,
@@ -370,8 +311,9 @@ def solve_arcs(
     the genomic midpoints of the anchors, which the gyration term needs. `reach` is the pairs of
     nodes of a uniform chain and the length of chain between each, for the reach term at the
     weight of a loop spring. `share` is the chain each node stands for over the mean chain of a
-    node, for `[excluded_volume] arcs_chain_radius`. Under that key the excluded volume of a pair
-    acts at the radius of `pair_radii`.
+    node. Under `[excluded_volume] arcs_chain_radius = sum`, with `f = share ^ (1/3)`, the
+    excluded volume of a pair acts at the radius of the stage times `(f_i + f_j) / 2`, the
+    distance of two blobs of chain.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -418,6 +360,14 @@ def solve_arcs(
         excl_w,
         excl_skip,
     )
+    node_f: F64Array | None = None
+    if excl_w > 0.0 and s.exclusion_arcs_chain_radius != "none":
+        if share is None:
+            raise ValueError(
+                "[excluded_volume] arcs_chain_radius needs the chain of each node, which the"
+                " node solve of [main] uniform_chain gives. Set arcs_chain_radius to none."
+            )
+        node_f = np.ascontiguousarray(np.cbrt(np.asarray(share, dtype=np.float64)))
     n_it = int(s.arcs_solver_iters if iters is None else iters)
     if backend not in ("numba", "jax"):
         raise ValueError(f"solver backend must be numba or jax, got {backend!r}")
@@ -431,7 +381,7 @@ def solve_arcs(
             DeviceFactoryEnergy,
         )
 
-        base_dev: Any = DeviceArcsEnergy(exp64, args[1:], arc_w)
+        base_dev: Any = DeviceArcsEnergy(exp64, args[1:], arc_w, node_f)
         fun: Any = base_dev
         fun_args: tuple[Any, ...] = ()
         if act64 is not None:
@@ -448,6 +398,9 @@ def solve_arcs(
         fun_args = (
             args if arc_w is None else (*args, True, np.ascontiguousarray(arc_w, dtype=np.float32))
         )
+        if node_f is not None:
+            weights = NO_W if arc_w is None else np.ascontiguousarray(arc_w, dtype=np.float32)
+            fun_args = (*args, arc_w is not None, weights, True, node_f)
         if act64 is not None:
             base_cpu, base_args = fun, fun_args
 
@@ -493,25 +446,6 @@ def solve_arcs(
 
         fun = with_reach
         fun_args = ()
-    if excl_w > 0.0 and s.exclusion_arcs_chain_radius != "none":
-        if share is None:
-            raise ValueError(
-                "[excluded_volume] arcs_chain_radius needs the chain of each node, which the"
-                " node solve of [main] uniform_chain gives. Set arcs_chain_radius to none."
-            )
-        own_i, own_j, own_r = pair_radii(share, excl_r0, excl_skip)
-        if own_i.shape[0] > 0:
-            base_c, base_c_args = fun, fun_args
-
-            def with_pair_radius(x: Any) -> tuple[float, F64Array]:
-                e1, g1 = base_c(x, *base_c_args)
-                e2, g2 = pair_radius_energy_grad(
-                    np.asarray(x, dtype=np.float64), own_i, own_j, own_r, excl_r0, excl_w
-                )
-                return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
-
-            fun = with_pair_radius
-            fun_args = ()
     if n_it <= 0:
         # No descent. The start is returned as it is.
         e0, _ = fun(pw.reshape(-1), *fun_args)

@@ -26,9 +26,20 @@ class DeviceArcsEnergy:
         The target matrix. `exp[j, i]` is the entry the CPU kernel reads for the pair (i, j).
     args
         The scalar parameters of `arcs_energy_grad` after `exp`, in its order.
+    w
+        The weight of each arc spring, None for one.
+    node_f
+        The factor of each anchor for the excluded volume radius of a pair,
+        `excl_r0 * (node_f[i] + node_f[j]) / 2`. None scores every pair at `excl_r0`.
     """
 
-    def __init__(self, exp: F64Array, args: tuple[Any, ...], w: F32Array | None = None) -> None:
+    def __init__(
+        self,
+        exp: F64Array,
+        args: tuple[Any, ...],
+        w: F32Array | None = None,
+        node_f: F64Array | None = None,
+    ) -> None:
         import jax
 
         from gnome3d.mc.jax.util import jax_is_available
@@ -52,6 +63,11 @@ class DeviceArcsEnergy:
             else jnp.zeros((1, 1), dtype=jnp.float32)
         )
         idx_all = jnp.arange(n, dtype=jnp.int32)
+        use_f = node_f is not None
+        f_host: F32Array = np.ascontiguousarray(
+            node_f if node_f is not None else np.ones(1), dtype=np.float32
+        )
+        f_all: Any = jnp.asarray(f_host)  # pyright: ignore[reportUnknownMemberType]
         centre = jnp.asarray(np.array([cx, cy, cz], dtype=np.float32))
         use_excl = excl_w > 0.0
 
@@ -93,10 +109,11 @@ class DeviceArcsEnergy:
             w = jnp.where(is_bg, w_bg, jnp.where(rep_on, w_rep, jnp.where(is_spr, w_spr, 0.0)))
             if use_excl:
                 sep = jnp.abs(idx_all - i)
-                ex_on = jnp.logical_and(d < excl_r0, sep > excl_skip)
-                u = (excl_r0 - d) / excl_r0
+                r0: Any = excl_r0 * 0.5 * (f_all[i] + f_all) if use_f else excl_r0
+                ex_on = jnp.logical_and(d < r0, sep > excl_skip)
+                u = (r0 - d) / r0
                 ener = ener + jnp.where(ex_on, excl_w * u * u, 0.0)
-                w = w + jnp.where(ex_on, -4.0 * excl_w * u / (excl_r0 * dd), 0.0)
+                w = w + jnp.where(ex_on, -4.0 * excl_w * u / (r0 * dd), 0.0)
             other = idx_all != i
             ener = jnp.where(other, ener, 0.0)
             w = jnp.where(other, w, 0.0)

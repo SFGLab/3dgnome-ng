@@ -140,7 +140,10 @@ def hold_loci(
     the background spring. Every other pair is left as it is.
     """
     m = int(mids.shape[0])
-    affinity: F64Array = np.zeros((m, m), dtype=np.float64)
+    stands = locus_nodes(mids)
+    at = mids[stands]
+    count = int(stands.shape[0])
+    affinity: F64Array = np.zeros((count, count), dtype=np.float64)
     if arms:
         width = int(arms[0].end[0] - arms[0].start[0])
         if width != LOCUS_BP:
@@ -148,18 +151,18 @@ def hold_loci(
                 f"[data] components has bins of {width} bp and a locus is {LOCUS_BP} bp. Write"
                 f" the track with playground/component_track.py --res {LOCUS_BP}."
             )
-        affinity, _arm_of, _bin_of = node_affinity(arms, mids)
-    pos = mids.astype(np.float64)
+        affinity, _arm_of, _bin_of = node_affinity(arms, at)
+    # The matrices below are over the nodes that stand for a locus, a few thousand a chromosome.
+    pos = at.astype(np.float64)
     sep = np.abs(pos[:, None] - pos[None, :])
-    stands = locus_nodes(mids)
-    is_locus = np.zeros(m, dtype=np.bool_)
-    is_locus[stands] = True
-    free = (mat == -0.5) & is_locus[:, None] & is_locus[None, :]
+    block = mat[np.ix_(stands, stands)]
+    free = block == -0.5
     np.fill_diagonal(free, False)
     bg = np.maximum(1.0, (np.maximum(sep, 1.0) / max(int(law.s0_bp), 1)) ** law.nu)
     stretch = float(s.heatmap_distance_stretching)
     target = np.clip(bg * np.exp(-affinity / 3.0), 1.0, stretch * bg)
-    out: F64Array = np.where(free, -target, mat)
+    out: F64Array = np.array(mat, dtype=np.float64, copy=True)
+    out[np.ix_(stands, stands)] = np.where(free, -target, block)
     held = int(free.sum()) // 2
     closer = int((free & (affinity > 0.0)).sum()) // 2
     further = int((free & (affinity < 0.0)).sum()) // 2

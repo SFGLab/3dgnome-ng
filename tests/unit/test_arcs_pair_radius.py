@@ -5,12 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from gnome3d.mc.numba.arcs_solver import (
-    arcs_energy_grad,
-    pair_radii,
-    pair_radius_energy_grad,
-    solve_arcs,
-)
+from gnome3d.mc.numba.arcs_solver import arcs_energy_grad, solve_arcs
+from gnome3d.mc.numba.terms import NO_W
 from gnome3d.pipeline.ib.nodes import chain_share, mean_loop_target
 from gnome3d.polymer import PolymerLaw
 from gnome3d.settings import Settings
@@ -36,10 +32,15 @@ def settings(**kw: object) -> Settings:
     return s
 
 
-def stage_energy(x: F64Array, n: int) -> tuple[float, F64Array]:
-    """The energy of `arcs_energy_grad` with no spring, the excluded volume at the radius of the stage."""
+ARGS = (1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, FULL, WEIGHT, 1)
+
+
+def energy(x: F64Array, n: int, node_f: F64Array | None = None) -> tuple[float, F64Array]:
+    """The energy of `arcs_energy_grad` with no spring: the excluded volume alone."""
     exp = np.zeros((n, n))
-    return arcs_energy_grad(x, exp, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, FULL, WEIGHT, 1)
+    if node_f is None:
+        return arcs_energy_grad(x, exp, *ARGS)
+    return arcs_energy_grad(x, exp, *ARGS, False, NO_W, True, node_f)
 
 
 def by_hand(pos: F64Array, radius: F64Array) -> float:
@@ -59,47 +60,17 @@ def cloud() -> F64Array:
     return np.random.default_rng(3).normal(scale=1.5, size=(12, 3))
 
 
-def test_change_of_one_pair_in_closed_form() -> None:
-    x = np.array([0.0, 0, 0, 9.0, 0, 0, 1.0, 0, 0])
-    pair_i, pair_j = np.array([0], dtype=np.int32), np.array([2], dtype=np.int32)
-    energy, grad = pair_radius_energy_grad(x, pair_i, pair_j, np.array([2.0]), FULL, WEIGHT)
-    want = 2.0 * WEIGHT * (0.5**2 - (2.0 / 3.0) ** 2)
-    assert energy == pytest.approx(want), (
-        "at d of 1: the energy at radius 2 minus the energy at radius 3"
-    )
-    assert grad[3:6] == pytest.approx(0.0), "a bead outside the pair has no gradient"
-    assert grad[0] == pytest.approx(-grad[6]), "the two beads of the pair have opposite gradients"
-
-
-def test_gradient_of_the_change_matches_a_finite_difference(cloud: F64Array) -> None:
-    pair_i = np.array([0, 2, 1], dtype=np.int32)
-    pair_j = np.array([5, 9, 7], dtype=np.int32)
-    radius = np.array([1.2, 2.0, 2.5])
-    x = cloud.reshape(-1).copy()
-    _, grad = pair_radius_energy_grad(x, pair_i, pair_j, radius, FULL, WEIGHT)
-    eps = 1e-6
-    for k in (0, 1, 7, 15, 17, 21, 29):
-        up, down = x.copy(), x.copy()
-        up[k] += eps
-        down[k] -= eps
-        e_up, _ = pair_radius_energy_grad(up, pair_i, pair_j, radius, FULL, WEIGHT)
-        e_down, _ = pair_radius_energy_grad(down, pair_i, pair_j, radius, FULL, WEIGHT)
-        assert grad[k] == pytest.approx((e_up - e_down) / (2 * eps), abs=1e-6), f"coordinate {k}"
-
-
-def test_change_of_one_pair_with_a_radius_above_the_stage() -> None:
-    pair_i, pair_j = np.array([0], dtype=np.int32), np.array([1], dtype=np.int32)
-    for d, want in (
-        (4.0, 2.0 * WEIGHT * (2.0 / 6.0) ** 2),
-        (1.5, 2.0 * WEIGHT * ((4.5 / 6.0) ** 2 - 0.5**2)),
-        (7.0, 0.0),
-    ):
-        x = np.array([0.0, 0, 0, d, 0, 0])
-        energy, grad = pair_radius_energy_grad(x, pair_i, pair_j, np.array([6.0]), FULL, WEIGHT)
-        assert energy == pytest.approx(want), f"at d of {d} with a radius of 6 and a stage of 3"
-        assert grad[0] == pytest.approx(-grad[3]), "the two beads have opposite gradients"
-        if d >= FULL:
-            assert grad[3] <= 0.0, "beyond the radius of the stage the energy falls with d"
+def test_one_pair_in_closed_form() -> None:
+    """Three beads in a row. The outer two are 4 apart and stand for eight times the chain."""
+    x = np.array([0.0, 0, 0, 2.0, 30.0, 0, 4.0, 0, 0])
+    f = np.array([2.0, 1.0, 2.0])
+    plain, _ = energy(x, 3)
+    assert plain == 0.0, "4 apart is beyond the radius of the stage, 3"
+    got, grad = energy(x, 3, f)
+    want = 2.0 * WEIGHT * ((6.0 - 4.0) / 6.0) ** 2
+    assert got == pytest.approx(want), "at a radius of 3 times (2 + 2) / 2, a third of it inside"
+    assert grad[0] == pytest.approx(-grad[6]) and grad[6] < 0.0, "the pair is pushed apart"
+    assert grad[3:6] == pytest.approx(0.0), "the bead between them has no gradient"
 
 
 def test_chain_share_is_the_chain_between_the_midpoints_to_the_neighbours() -> None:
@@ -113,44 +84,51 @@ def test_chain_share_is_the_chain_between_the_midpoints_to_the_neighbours() -> N
     )
 
 
-def test_stage_energy_plus_the_change_is_the_energy_at_the_radius_from_the_chain(
-    cloud: F64Array,
-) -> None:
+def test_energy_is_the_excluded_volume_at_the_radius_of_each_pair(cloud: F64Array) -> None:
     n = len(cloud)
-    share = np.random.default_rng(5).uniform(0.2, 4.0, size=n)
-    f = np.cbrt(share)
+    f = np.cbrt(np.random.default_rng(5).uniform(0.2, 4.0, size=n))
     radius = FULL * 0.5 * (f[:, None] + f[None, :])
-    pair_i, pair_j, own = pair_radii(share, FULL, 1)
-    assert own == pytest.approx(radius[pair_i, pair_j]), "the radius of each pair"
-    assert len(pair_i) == (n - 1) * (n - 2) // 2, "every pair two or more apart in order"
     x = cloud.reshape(-1).copy()
-    base, _ = stage_energy(x, n)
-    assert base == pytest.approx(by_hand(cloud, np.full((n, n), FULL))), (
-        "the stage scores every pair at its radius"
+    plain, _ = energy(x, n)
+    assert plain == pytest.approx(by_hand(cloud, np.full((n, n), FULL))), (
+        "without the factors every pair is at the radius of the stage"
     )
-    change, _ = pair_radius_energy_grad(x, pair_i, pair_j, own, FULL, WEIGHT)
-    assert base + change == pytest.approx(by_hand(cloud, radius)), (
-        "with the change, each pair at the radius from its chain"
-    )
-    assert base + change >= 0.0, "the excluded volume is not negative"
+    got, _ = energy(x, n, f)
+    assert got == pytest.approx(by_hand(cloud, radius)), "each pair at the radius from its chain"
+    assert got >= 0.0, "the excluded volume is not negative"
+    ones, _ = energy(x, n, np.ones(n))
+    assert ones == pytest.approx(plain), "factors of one are the radius of the stage"
 
 
-def test_gradient_with_radii_on_both_sides_of_the_stage_matches_a_finite_difference(
-    cloud: F64Array,
-) -> None:
-    pair_i = np.array([0, 2, 1, 3], dtype=np.int32)
-    pair_j = np.array([5, 9, 7, 11], dtype=np.int32)
-    radius = np.array([1.2, 5.0, 7.5, 3.4])
+def test_gradient_matches_a_finite_difference(cloud: F64Array) -> None:
+    n = len(cloud)
+    f = np.cbrt(np.random.default_rng(6).uniform(0.2, 4.0, size=n))
     x = cloud.reshape(-1).copy()
-    _, grad = pair_radius_energy_grad(x, pair_i, pair_j, radius, FULL, WEIGHT)
+    _, grad = energy(x, n, f)
     eps = 1e-6
     for k in (0, 3, 7, 10, 15, 21, 27, 33):
         up, down = x.copy(), x.copy()
         up[k] += eps
         down[k] -= eps
-        e_up, _ = pair_radius_energy_grad(up, pair_i, pair_j, radius, FULL, WEIGHT)
-        e_down, _ = pair_radius_energy_grad(down, pair_i, pair_j, radius, FULL, WEIGHT)
-        assert grad[k] == pytest.approx((e_up - e_down) / (2 * eps), abs=1e-6), f"coordinate {k}"
+        assert grad[k] == pytest.approx(
+            (energy(up, n, f)[0] - energy(down, n, f)[0]) / (2 * eps), abs=1e-6
+        ), f"coordinate {k}"
+
+
+def test_the_device_energy_is_the_cpu_energy(cloud: F64Array) -> None:
+    pytest.importorskip("jax")
+    from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy  # noqa: PLC0415
+
+    n = len(cloud)
+    f = np.cbrt(np.random.default_rng(7).uniform(0.2, 4.0, size=n))
+    x = cloud.reshape(-1).copy()
+    exp = np.zeros((n, n))
+    want, grad = energy(x, n, f)
+    got, got_grad = DeviceArcsEnergy(exp, ARGS, None, f)(x)
+    assert got == pytest.approx(want, rel=1e-4), "the energy on the device, in float32"
+    assert got_grad == pytest.approx(grad, abs=2e-4), "and its gradient"
+    plain, _ = DeviceArcsEnergy(exp, ARGS)(x)
+    assert plain == pytest.approx(energy(x, n)[0], rel=1e-4), "without the factors"
 
 
 def test_solver_pushes_a_pair_out_to_the_radius_from_its_chain() -> None:
