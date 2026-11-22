@@ -1,0 +1,7 @@
+chr1:10000000-15000000, pooled ensemble against Hi-C at 10000 bp, 48 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman   per bead pair: raw SCC  bal SCC
+             HFFC6_chr1_10000000_15000000_prod  20   0.602   0.432   0.504   0.652   0.432   0.440                     0.422    0.336    0.179                  0.416    0.390
+           HFFC6_chr1_10000000_15000000_o_st10  20   0.633   0.467   0.417   0.640   0.455   0.365                     0.386    0.333    0.323                  0.408    0.360
+             HFFC6_chr1_10000000_15000000_o_on  20   0.639   0.473   0.416   0.639   0.460   0.368                     0.383    0.333    0.328                  0.407    0.362
+            HFFC6_chr1_10000000_15000000_o_off  20   0.634   0.468   0.419   0.641   0.455   0.368                     0.387    0.332    0.321                  0.410    0.362
+             HFFC6_chr1_10000000_15000000_o_st  20   0.633   0.467   0.418   0.640   0.455   0.361                     0.387    0.326    0.323                  0.409    0.356

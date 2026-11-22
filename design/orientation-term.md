@@ -227,10 +227,26 @@ key of the trial. The trace on GM12878 chr1 11 to 13 Mb, 4 structures an arm:
 - At 100 an eighth of the bonds at the sites are over twice their target. The stretch of a site is pulled out
   along its direction.
 
-The arm `o_st10` on the 18 held out rows is building on the workstation as `ornst10`.
+The arm `o_st10` on the 18 held out rows, the trial `ornst10`, scores in
+`design/figures/uniform-2026-11-19/scores-ornst10*`:
+
+| at 25 kb | the rewrite at 10 against the term as it is | rows above | p | against no term | rows above | p |
+|---|---|---|---|---|---|---|
+| SCC per bead pair, raw | -0.005 ± 0.002 | 4 of 18 | 0.023 | +0.000 ± 0.002 | 8 of 18 | 0.95 |
+| SCC per bead pair, balanced | -0.008 ± 0.002 | 2 of 18 | 0.001 | -0.001 ± 0.002 | 6 of 18 | 0.41 |
+| Spearman | -0.008 ± 0.001 | 0 of 18 | 0.0002 | +0.001 ± 0.001 | 10 of 18 | 0.23 |
+
+- The rewrite at ten times its weight scores as the model without the term, as the rewrite at its weight does,
+  at 25, 10 and 5 kb.
+- It holds the direction harder than the term as it is and does not have its 0.007 of balanced SCC. The
+  direction of the chain at an anchor does not move the agreement with Hi-C at 5 to 25 kb. The gain of the term
+  as it is comes with the two neighbours of a site that it moves out of the chain.
 
 ## Open
 
-The choice of the maintainer between the rewrite as it is, the model without the term and a trial of the rewrite
-at a larger weight. With a form adopted, the same form in the JAX kernel and the removal of the other form and
-of the key.
+The choice of the maintainer between the rewrite at its weight, the rewrite at ten times it and the model
+without the term. The three score alike. With a form adopted, the same form in the JAX kernel and the removal of
+the other forms and of the keys of the trial.
+
+The term as it is gains 0.007 of balanced SCC on the uniform chain by moving the two neighbours of a loop anchor
+out of the chain. No trial has looked at what in the chain beside a loop anchor that movement mends.
