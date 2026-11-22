@@ -1,5 +1,0 @@
-  H1ESC_E_60mb             n 10  APA 3.353  r_fine 0.111
-  H1ESC_C_60mb             n 10  APA 1.310  r_fine 0.121
-  H1ESC_R_60mb             n 10  APA 0.964  r_fine 0.101
-  H1ESC_M_60mb             n 10  APA 1.175  r_fine 0.111
-  map APA 1.789 over 2666 loops

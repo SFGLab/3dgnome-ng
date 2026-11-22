@@ -78,7 +78,7 @@ The trial `orn20` on the workstation: 18 rows of three cell lines and six region
 structures an arm, the inputs of production with the contact cells of one half of the deep map and the score
 against the other half. `o_on` is the locked uniform chain, `o_off` the same without the term, `d_off` the default
 chain without the term, `prod` the default chain. Differences are over the rows with their standard error,
-`playground/arm_stats.py`. Scores in `design/figures/uniform-2026-11-19/scores-orn20*`.
+`playground/arm_stats.py`. Scores in `data/figures/uniform-2026-11-19/scores-orn20*`, outside git.
 
 | without the term, against with it | uniform chain | rows above | p | default chain | rows above | p |
 |---|---|---|---|---|---|---|
@@ -195,7 +195,7 @@ with the vector over three beads a side for every arm.
 ## The rewrite on held out inputs, 2026-11-22
 
 The trial `ornst20`: `o_st`, the locked uniform chain with the form `stretch`, on the 18 rows at twenty
-structures, beside `o_on` and `o_off` of `orn20`. Scores in `design/figures/uniform-2026-11-19/scores-ornst20*`.
+structures, beside `o_on` and `o_off` of `orn20`. Scores in `data/figures/uniform-2026-11-19/scores-ornst20*`, outside git.
 
 | at 25 kb | the rewrite against the term as it is | rows above | p | the rewrite against no term | rows above | p |
 |---|---|---|---|---|---|---|
@@ -231,7 +231,7 @@ key of the trial. The trace on GM12878 chr1 11 to 13 Mb, 4 structures an arm:
   along its direction.
 
 The arm `o_st10` on the 18 held out rows, the trial `ornst10`, scores in
-`design/figures/uniform-2026-11-19/scores-ornst10*`:
+`data/figures/uniform-2026-11-19/scores-ornst10*`, outside git:
 
 | at 25 kb | the rewrite at 10 against the term as it is | rows above | p | against no term | rows above | p |
 |---|---|---|---|---|---|---|

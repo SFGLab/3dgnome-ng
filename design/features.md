@@ -878,7 +878,7 @@ last section are dated records and are not rewritten when production moves on. `
   since the smooth stage holds bonds and nothing holds a gap's interior, so its size is the
   start's. Without the hard wall overlaps rose tenfold, and with the subanchor heat term SCC
   went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
-  `slurm/ensemble/gap_start_overnight.sh` and `playground/square_blocks/gapnight/` are the record.
+  `slurm/ensemble/gap_start_overnight.sh` and `data/figures/square_blocks/gapnight/` are the record.
 
   **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, measured 2026-11-14
   and left opt in.** ([pipeline/ib/maxent.py](../gnome3d/pipeline/ib/maxent.py)) Both dropped
@@ -893,7 +893,7 @@ last section are dated records and are not rewritten when production moves on. `
   On three cells, three 5 Mb regions and chr1 it lost Pearson by 0.01 to 0.05 against the coil
   with SCC level and the distance exponent nearer Hi-C. The smooth stage widens the drawn gaps to
   1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
-  `playground/square_blocks/gapme/` are the record.
+  `data/figures/square_blocks/gapme/` are the record.
   Unit checks in `tests/unit/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
 
 - **Long range in the arcs stage: `[excluded_volume] arcs_repulsion = no`, `[springs]

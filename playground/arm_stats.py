@@ -3,7 +3,7 @@
     python playground/arm_stats.py SCORES_DIR REF_ARM [ARM ...]
 
 SCORES_DIR holds the pooled scores of a trial, one file per cell and region, as
-`design/figures/uniform-2026-11-19/scores-ev20q/`. A row is a cell and a region. For each arm and
+`data/figures/uniform-2026-11-19/scores-ev20q/`. A row is a cell and a region. For each arm and
 each metric the script prints the mean over the rows, the mean of the difference to REF_ARM on the
 same row with its standard error, the number of rows above REF_ARM and the p value of the Wilcoxon
 signed rank test of the differences. Without ARM every arm of the folder is compared.

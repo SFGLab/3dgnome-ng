@@ -518,7 +518,7 @@ already means JAX for every stage, and the solver follows it.
 
 Measured on 36 cores and an RTX 3090, GM12878 chr1 from 10 Mb, two structures per arm,
 wall clock from the command to the last structure. `slurm/ensemble/executor_crossover.sh`,
-tables in `playground/square_blocks/crossover/`.
+tables in `data/figures/square_blocks/crossover/`.
 
 Two costs came first. The maxent fit, the arcs solver and the stitch call scipy's L-BFGS-B,
 which does its vector arithmetic through BLAS between evaluations, and OpenBLAS ran each call

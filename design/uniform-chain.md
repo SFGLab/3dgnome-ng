@@ -3,6 +3,11 @@
 Status 2026-11-19: design, not built. The first build of `[main] uniform_chain` is in the code and is described in
 its own section at the end. The rules below replace it in place. Its trial is the baseline.
 
+A trial below gives a folder with its figure and its table of arms, `design/figures/uniform-2026-11-19/<trial>/`, and
+a folder of score files, `scores-<trial>/`. The tables of overlaps, stretches and ends of `scores-<trial>/` are in
+`design/figures/uniform-2026-11-19/`. The score files per row, the battery and the pooled tables, are in
+`data/figures/uniform-2026-11-19/scores-<trial>/`, outside git.
+
 ## The object
 
 A block is a chain of beads of equal width, one per `target_bp_per_subanchor`, from the start of its first anchor to

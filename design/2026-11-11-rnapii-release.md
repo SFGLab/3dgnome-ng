@@ -337,9 +337,9 @@ manifest format is in that script's docstring.
 
 ## Results, 2026-11-12
 
-chr1, the battery and pile-ups on chr1:1-60 Mb, ten conformations per arm. Figures and every
-readout table in `design/figures/rnapii-2026-11-12/` (`figures/rnapii_main`, `figures/rnapii_grid`,
-`readouts/`). Each claim names its yardstick.
+chr1, the battery and pile-ups on chr1:1-60 Mb, ten conformations per arm. The figures are in
+`design/figures/rnapii-2026-11-12/` (`figures/rnapii_main`, `figures/rnapii_grid`) and every readout table in
+`data/figures/rnapii-2026-11-12/readouts/`, outside git. Each claim names its yardstick.
 
 **Large scale structure, bulk Hi-C at 25 kb.** SCC, E C R M:
 

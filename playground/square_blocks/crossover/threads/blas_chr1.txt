@@ -1,5 +1,0 @@
-threads 1 seconds 745.004301127 [executor]   coarse[serial]: 1 nodes in 0.3s
-[executor]   coarse[serial]: 1 nodes in 467.8s
-threads 8 seconds 543.891700008 [executor]   coarse[serial]: 1 nodes in 0.3s
-[executor]   coarse[serial]: 1 nodes in 252.1s
-EXIT

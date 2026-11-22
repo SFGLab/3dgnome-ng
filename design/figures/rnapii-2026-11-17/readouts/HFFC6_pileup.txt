@@ -1,5 +1,0 @@
-  map                          models   0  loops   2235  APA 1.564
-  HFFC6_E_60mb                 models  10  loops   2235  APA 6.221
-  HFFC6_C_60mb                 models  10  loops   2235  APA 1.582
-  HFFC6_R_60mb                 models  10  loops   2235  APA 1.984
-  HFFC6_M_60mb                 models  10  loops   2235  APA 1.980

@@ -1,4 +1,0 @@
-chr1:35000000-40000000, pooled ensemble against Hi-C at 25000 bp, 0 unmapped bins
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC
-             HFFC6_chr1_35000000_40000000_prod   5   0.606   0.536   0.395   0.612   0.535   0.259                     0.395    0.259
-             HFFC6_chr1_35000000_40000000_rw10   5   0.607   0.536   0.394   0.612   0.536   0.258                     0.394    0.258

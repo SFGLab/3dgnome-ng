@@ -1,3 +1,0 @@
-  map                          models   0  loops   2356  APA 3.916
-  GM19238_C_60mb               models  10  loops   2356  APA 1.397
-  GM19238_R_60mb               models  10  loops   2356  APA 1.937
