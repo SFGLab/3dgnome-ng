@@ -1,0 +1,1806 @@
+.job-page {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  /* The screen less the header of 59px and the footer of 55px. */
+  min-height: calc(100vh - 114px);
+}
+
+.job-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+
+.job-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.job-state:global(.done) .state-dot {
+  background: var(--enhancer);
+}
+
+.job-state:global(.failed) .state-dot {
+  background: #C2410C;
+}
+
+.job-state:global(.running) .state-dot {
+  background: var(--accent);
+}
+
+.job-title {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+/* The region of the heading stays on one line. */
+.job-title .nowrap {
+  white-space: nowrap;
+}
+
+.rename {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 600 16px var(--font);
+}
+
+.job-locus {
+  margin: 0;
+  font: 12px var(--mono);
+  color: var(--muted);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  margin: 18px 0 8px;
+  font-size: 12px;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.side-label {
+  margin: 12px 0 2px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: normal;
+}
+
+.structure-select {
+  display: flex;
+  gap: 6px;
+}
+
+.structure-select button,
+.structure-select select {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 13px var(--font);
+}
+
+.structure-select select {
+  flex: 1;
+}
+
+.picks {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.picks button {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: 11px var(--font);
+  cursor: pointer;
+}
+
+.files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 12px var(--mono);
+}
+
+.files li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.files a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.files .selected {
+  background: var(--accent-soft);
+}
+
+.files .selected a {
+  color: var(--accent);
+}
+
+/* Every structure's file, in a box that scrolls once the list is long. */
+.files .models {
+  display: block;
+  padding: 0;
+}
+
+/* The structures are inside their folder, set in from it, with a line down the side of the folder. */
+.files .models > ul {
+  max-height: 190px;
+  overflow-y: auto;
+  margin-left: 14px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+/* A long file name is cut, not its icon. */
+.files a svg {
+  flex: none;
+}
+
+.files .size {
+  margin-left: auto;
+  font: 11px var(--font);
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.job-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.job-tabs {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* The tabs stay on one row and scroll sideways where they do not fit. */
+.job-tabs [role='tablist'] {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.job-tabs [role='tablist']::-webkit-scrollbar {
+  display: none;
+}
+
+:global(.job-tab) {
+  flex: none;
+  white-space: nowrap;
+}
+
+:global(.job-tab) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 14px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: 14px var(--font);
+  cursor: pointer;
+}
+
+:global(.job-tab)[aria-selected='true'] {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+:global(.job-tab) .count {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:global(.action) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 13px var(--font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+:global(.action).dark {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+.tab-body {
+  flex: 1;
+  padding: 20px 24px;
+  min-width: 0;
+}
+
+.job-message {
+  padding: 40px 24px;
+  color: var(--muted);
+}
+
+.log-tail {
+  max-height: 400px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  background: #1E1E1C;
+  color: #F1F0EC;
+  border-radius: 8px;
+  font: 12px var(--mono);
+}
+
+@media (max-width: 960px) {
+  .job-page {
+    grid-template-columns: 1fr;
+  }
+  .job-side {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  /* The selector has the panel. It wins over the rule that hides the button on a wide screen. */
+  .job-side .side-fold-toggle {
+    display: inline-flex;
+  }
+  .job-side.folded .facts,
+  .job-side.folded .side-files {
+    display: none;
+  }
+}
+
+.structure-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  /* The toolbar is laid out by the width of the view, not of the screen. The view is narrow beside
+     the cards on a wide screen too. */
+  container: view / inline-size;
+}
+
+.tool-group {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Where the toolbar does not fit one row, the colour choice takes a row of its own under the
+   rest and its three buttons share it. */
+@container view (max-width: 860px) {
+  .view-toolbar :global(.segmented) {
+    order: 9;
+    flex: 1 1 100%;
+  }
+  .view-toolbar :global(.segmented) button {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .view-toolbar .find-gene {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+/* On a phone the gene field has the first row and the tools share the second. */
+@container view (max-width: 420px) {
+  .view-toolbar .find-gene {
+    flex-basis: 100%;
+  }
+}
+
+.view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+:global(.segmented) {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--panel);
+  border-radius: 8px;
+}
+
+:global(.segmented) button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: 13px var(--font);
+  cursor: pointer;
+}
+
+:global(.segmented) button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.icon-tool {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.view-box {
+  position: relative;
+  height: 640px;
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* With the loops over it the box is as tall as the screen leaves. Both are seen at once. */
+.structure-view.with-above .view-box {
+  height: clamp(380px, calc(100vh - 470px), 640px);
+}
+
+.structure-view.with-above .view-box:fullscreen {
+  height: 100vh;
+}
+
+.view-box:fullscreen {
+  height: 100vh;
+  border-radius: 0;
+}
+
+.hover-box {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: #FFFFFF;
+  border: 1px solid #E4E3DF;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+  color: #5B5A56;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hover-box :global(.mono) {
+  font-family: var(--mono);
+  color: #151514;
+}
+
+.view-legend {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 6px 10px;
+  list-style: none;
+  background: #FFFFFFE6;
+  border: 1px solid #E4E3DF;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #5B5A56;
+  /* Over the letters of the marks, as the hover box is. */
+  z-index: 2;
+}
+
+.view-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-legend .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.view-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.marker.loop-anchor {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
+
+.marker {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #151514;
+  color: #FFFFFF;
+  font: 700 11px var(--font);
+}
+
+.structure-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Shown on a narrow screen alone, where it folds the facts and the files of the side panel. */
+.side-fold-toggle {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 12px var(--font);
+  cursor: pointer;
+}
+
+.side-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A table wider than its place scrolls sideways inside it. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.side-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.side-card.dark-border {
+  border: 1.5px solid var(--ink);
+}
+
+.side-card p {
+  margin: 0;
+}
+
+.card-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.big {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.big-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.unit,
+.card-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.strip {
+  position: relative;
+  height: 16px;
+  margin: 6px 0;
+}
+
+.strip .axis {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+}
+
+.strip .dot {
+  position: absolute;
+  top: 4px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: #A8C8F0;
+}
+
+.strip .dot.current {
+  background: var(--ink);
+}
+
+.point {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 12px var(--mono);
+}
+
+.point .marker {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
+
+.gene-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+:global(.mono) {
+  font-family: var(--mono);
+}
+
+.small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.gene-facts {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.gene-facts dt {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.gene-facts dd {
+  margin: 0;
+}
+
+.find-gene {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--faint);
+}
+
+.find-gene.miss {
+  border-color: #C2410C;
+}
+
+.find-gene input {
+  width: 110px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--font);
+  outline: none;
+}
+
+.measure {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 13px var(--font);
+  cursor: pointer;
+}
+
+.measure.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+@media (max-width: 1200px) {
+  .structure-tab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.genes-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* The table scrolls sideways inside its column where the column is narrower than it. */
+.genes-main {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.genes-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filter-genes {
+  display: inline-flex;
+  flex: 1;
+  min-width: 180px;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--faint);
+}
+
+.filter-genes input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--font);
+  outline: none;
+}
+
+:global(.chip-button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 13px var(--font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+:global(.chip-button).on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+.genes-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.genes-table th {
+  padding: 9px 12px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.genes-table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.genes-table tr.selected td {
+  background: var(--accent-soft);
+}
+
+.genes-table tbody tr {
+  cursor: pointer;
+}
+
+.genes-table .gene {
+  font-weight: 600;
+}
+
+.genes-table .num {
+  text-align: right;
+}
+
+.genes-table .strong {
+  font-weight: 600;
+}
+
+.range {
+  position: relative;
+  display: block;
+  width: 170px;
+  height: 10px;
+}
+
+.range .whisker {
+  position: absolute;
+  top: 4px;
+  height: 2px;
+  background: #A8C8F0;
+}
+
+.range .box {
+  position: absolute;
+  top: 2px;
+  height: 6px;
+  border-radius: 3px;
+  background: #7FB0EB;
+}
+
+.range .med {
+  position: absolute;
+  top: 1px;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid #FFFFFF;
+}
+
+.loop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.loop-badge::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ctcf);
+}
+
+.loop-badge.rnapii::before {
+  background: var(--rnapii);
+}
+
+.no-loop {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.hist {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 130px;
+}
+
+.hist span {
+  flex: 1;
+  background: #A8C8F0;
+  border-radius: 2px 2px 0 0;
+}
+
+.hist-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+@media (max-width: 1200px) {
+  .genes-tab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.contacts-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* The controls of the toolbar share one height and their boxes line up. */
+.map-toolbar > select,
+.map-toolbar :global(.segmented),
+.locus-input {
+  box-sizing: border-box;
+  height: 36px;
+}
+
+.map-toolbar > select {
+  width: auto;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background-color: var(--surface);
+  color: var(--ink);
+  font: 13px var(--font);
+}
+
+.map-toolbar :global(.segmented) {
+  align-items: stretch;
+}
+
+.locus-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+/* Wide enough for chr10:100,000,000-120,000,000 in the mono face. */
+.locus-input input {
+  width: 30ch;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 12px var(--mono);
+  outline: none;
+}
+
+.locus-input button {
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--ink);
+  color: var(--bg);
+  font: 600 11px var(--font);
+  cursor: pointer;
+}
+
+.zoom-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+/* The loop view of the whole region over the map, as wide as the map. */
+.loop-overview {
+  width: min(100%, max(320px, calc(100vh - 360px)));
+}
+
+.row-action {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.row-action:hover {
+  background: var(--accent-soft);
+}
+
+.contact-frame {
+  position: relative;
+  box-sizing: border-box;
+  /* As wide as the panel and short enough that the whole square fits on the screen. */
+  width: min(100%, max(320px, calc(100vh - 360px)));
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px 6px 0 0;
+  background: #FFFFFF;
+}
+
+/* The part of the map on screen that the next map will show, while zooming in. */
+.zoom-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  pointer-events: none;
+}
+
+.contact-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  transition: opacity 150ms;
+}
+
+/* Before the first map arrives the frame takes the theme's surface, not a white square. */
+.contact-frame.empty {
+  background: var(--surface);
+}
+
+.contact-frame.empty .contact-canvas {
+  visibility: hidden;
+}
+
+/* A band of light crosses the frame, from wholly left of it to wholly right. The frame clips it. */
+.contact-frame.empty.loading::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--ink) 7%, transparent) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: map-sheen 1.8s linear infinite;
+  pointer-events: none;
+}
+
+/* A map already shown stays under the message, dimmed, while the next one is read. */
+.contact-frame.loading:not(.empty) .contact-canvas {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* The frame's lower corners are square only where the hover bar joins it. */
+.contact-frame.empty {
+  border-radius: 6px;
+}
+
+.map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.map-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  padding: 16px 20px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 12%);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.map-loading-card strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.map-spinner {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 2px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: map-spin 0.8s linear infinite;
+}
+
+@keyframes map-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes map-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-spinner,
+  .contact-frame.empty.loading::before {
+    animation: none;
+  }
+}
+
+.hover-bar {
+  width: min(100%, max(320px, calc(100vh - 360px)));
+  box-sizing: border-box;
+  min-height: 30px;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 0 0 6px 6px;
+  background: #151514;
+  color: #F1F0EC;
+  font-size: 11px;
+  white-space: pre;
+  overflow: hidden;
+}
+
+/* With nothing under the pointer the bar holds a hint, in a quieter colour. */
+.hover-bar.idle {
+  color: #9A988F;
+  white-space: normal;
+}
+
+.range-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.range-inputs label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.range-inputs input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 12px var(--mono);
+  outline: none;
+}
+
+.check {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.log-tail.full {
+  max-height: none;
+  min-height: 300px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1100px) {
+  .contacts-tab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.paste {
+  display: flex;
+  gap: 6px;
+}
+
+.paste input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 12px var(--mono);
+}
+
+.compare-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.compare-toolbar .check {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+/* The buttons of the toolbar are as tall as its checkboxes. */
+.compare-toolbar :global(.action) {
+  align-self: stretch;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.compare-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.compare-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The head of the side that shows this job is not a button. */
+.panel-head.fixed {
+  cursor: default;
+}
+
+.panel-head > svg {
+  flex: none;
+  margin-left: auto;
+}
+
+.panel-pick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The jobs a side can show, under its head and over the view. */
+.panel-menu {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.menu-item {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--accent-soft);
+}
+
+.panel-menu .paste {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+/* The side with no job chosen yet. */
+.compare-box.empty-side {
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.factor-line {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.panel-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.panel-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.compare-box {
+  height: 520px;
+}
+
+.ab-label {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #151514;
+  color: #C9C8C3;
+  font-size: 11px;
+}
+
+/* The button that saves the picture of one side, in the corner of its view. */
+.panel-save {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+
+.ab-label strong {
+  margin-left: 4px;
+  color: #FFFFFF;
+}
+
+/* The change of expression of two jobs, a line on what was computed and then the plot beside the table. */
+/* Under the two structures are the values and the tables, with the figures in a column beside them. */
+.compare-results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+  margin-top: 20px;
+}
+
+/* The figures are an accordion. A closed figure shows its title. */
+.compare-figures {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.compare-figure {
+  margin: 0;
+}
+
+.compare-figure + .compare-figure {
+  border-top: 1px solid var(--line);
+}
+
+.compare-figure figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 10px;
+}
+
+.figure-head {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 600 12px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.compare-figure:global(.open) .figure-head svg {
+  transform: rotate(90deg);
+}
+
+.compare-figure .expression-plot {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.figure-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 11px var(--font);
+  cursor: pointer;
+}
+
+.figure-save:hover {
+  color: var(--ink);
+}
+
+.figure-empty {
+  margin: 0;
+  padding: 22px 16px 26px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.compare-tables {
+  min-width: 0;
+}
+
+/* A table keeps to its column. A long head wraps and the rest scrolls. */
+.compare-scroll {
+  overflow-x: auto;
+}
+
+.compare-scroll .compare-table {
+  margin-top: 0;
+}
+
+.compare-scroll .compare-table th {
+  min-width: 5.5em;
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+/* A value stays on one line. The name of a gene with its enhancer may wrap. */
+.compare-scroll .compare-table td:not(:first-child) {
+  white-space: nowrap;
+}
+
+/* The column on the right, with the figures and the main values under them. */
+.compare-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.compare-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.compare-scroll + :global(.pager) {
+  margin-top: 14px;
+}
+
+/* A change that is not significant is grey. */
+.compare-table tr.insignificant td {
+  color: var(--faint);
+}
+
+.compare-cards .big {
+  margin-top: 2px;
+}
+
+.compare-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.compare-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+:global(.csv-button) {
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.compare-tabs :global(.chip-button) {
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* The number of genes of a table, drawn as the counts of the tabs of the job are. */
+.compare-tabs .count {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.compare-tabs .on .count {
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+  color: var(--bg);
+}
+
+.compare-note {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 1000px) {
+  .compare-results {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-side {
+    max-width: 420px;
+  }
+}
+
+.expression-plot {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.expression-plot .axis {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.expression-plot .zero,
+.expression-plot .threshold {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.expression-plot .threshold {
+  stroke: var(--muted);
+}
+
+.expression-plot .tick {
+  fill: var(--muted);
+  font-size: 9px;
+}
+
+.expression-plot .axis-title {
+  fill: var(--ink);
+  font-size: 10px;
+}
+
+.expression-plot .back {
+  fill: var(--faint);
+  opacity: 0.35;
+}
+
+.expression-plot .point {
+  fill: var(--muted);
+  cursor: pointer;
+}
+
+.expression-plot .point:global(.sure) {
+  fill: var(--accent);
+}
+
+.expression-plot .point.selected {
+  fill: var(--promoter);
+}
+
+/* The box plot of one gene, with the box of each job, its median and a point for each structure. */
+.expression-plot .quartiles {
+  fill: var(--panel);
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.expression-plot :global(.side-1) .quartiles {
+  fill: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  stroke: var(--accent);
+}
+
+.expression-plot .whisker {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.expression-plot .median {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.expression-plot .structure {
+  fill: var(--ink);
+  opacity: 0.55;
+}
+
+.compare-table {
+  margin-top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .compare-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.map-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.map-note[role='status'] {
+  color: var(--accent);
+}
+
+/* A running job takes the whole main part of the page, the screen less the header and the footer. */
+.job-message:has(> .progress) {
+  display: flex;
+  box-sizing: border-box;
+  height: max(calc(100vh - 114px), 420px);
+  padding: 20px 24px;
+}
+
+/* A waiting job has no log to fill the screen. Its box is as tall as its lines. */
+.job-message:has(> .progress.waiting) {
+  height: auto;
+}
+
+.progress {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-line {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.progress-pct {
+  color: var(--muted);
+  font: 13px var(--mono);
+}
+
+/* The log has the screen under the header, down to the footer. It scrolls inside itself. */
+.log-tail.live {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.progress-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.6s ease;
+}
+
+/* The stages of the job in a row. A finished stage has a tick and the time it took, the running
+   one a spinner and its time so far, a stage to come a dot. */
+.status-log {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.status-log li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+}
+
+.status-log li.now {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.status-log li:global(.next) {
+  color: var(--faint);
+}
+
+.stage-mark {
+  flex: none;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+}
+
+.status-log li:global(.done) .stage-mark {
+  color: var(--accent);
+}
+
+.stage-spinner {
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: map-spin 0.8s linear infinite;
+}
+
+.stage-dot {
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-spinner {
+    animation: none;
+  }
+}
+
+.status-time {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* The hovered bead has a ring in the hover colour around it, above the chain. */
+.hover-ring {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 2.5px solid #2A78D6;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #FFFFFF;
+  pointer-events: none;
+}
+
+.hover-box {
+  border-left: 3px solid #2A78D6;
+}
+
+/* The wrapper drei puts around a label over the canvas. It must not take the pointer from the canvas. */
+:global(.scene-mark) {
+  pointer-events: none;
+}
+

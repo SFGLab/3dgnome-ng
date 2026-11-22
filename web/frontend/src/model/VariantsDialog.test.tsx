@@ -24,7 +24,7 @@ let checks: FormData[] = []
 function mock() {
   checks = []
   return mockApi([
-    [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'HG00733.sv.vcf.gz', size: 48_000_000, ok: true, summary: 'VCF with 2 samples.', error: null, samples: ['HG00733', 'HG00512'] }]],
+    [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'HG00733.sv.vcf.gz', size: 48_000_000, ok: true, summary: 'VCF with 2 samples.', error: null, samples: ['HG00733', 'HG00512'], counts: false }]],
     [/^\/api\/uploads\/[\w-]+\/preview$/, () => [200, [[11_600_000, 11_900_000, 7]]]],
     [/^\/api\/variants\/check$/, (_u, init) => {
       checks.push(init!.body as FormData)
@@ -71,7 +71,7 @@ describe('Structural variants dialog', () => {
 
   it('reuses an upload it was given rather than uploading again', async () => {
     const fetchMock = mock()
-    const upload = { id: 'vcfupload9', kind: 'vcf' as const, name: 'kept.vcf.gz', size: 1000, ok: true, summary: '', error: null, samples: ['HG00733'] }
+    const upload = { id: 'vcfupload9', kind: 'vcf' as const, name: 'kept.vcf.gz', size: 1000, ok: true, summary: '', error: null, samples: ['HG00733'], counts: false }
     renderDialog({ file: null, upload, sample: 'HG00733' })
     await screen.findByRole('table')
     expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/uploads')).toBe(false)
@@ -82,13 +82,23 @@ describe('Structural variants dialog', () => {
   it('pages a long list of variants', async () => {
     const many = { ...CHECK, variants: Array.from({ length: 60 }, (_, i) => ({ ...CHECK.variants[0], pos: 11_600_000 + i * 1000 })) }
     mockApi([
-      [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'HG00733.sv.vcf.gz', size: 48_000_000, ok: true, summary: '', error: null, samples: ['HG00733'] }]],
+      [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'HG00733.sv.vcf.gz', size: 48_000_000, ok: true, summary: '', error: null, samples: ['HG00733'], counts: false }]],
       [/^\/api\/variants\/check$/, () => [200, many]],
     ])
     renderDialog()
     const table = await screen.findByRole('table')
     expect(within(table).getAllByRole('row').slice(1)).toHaveLength(50)
     expect(screen.getByText('variants 1 to 50 of 60')).toBeInTheDocument()
+    // Next shows the rest and Previous the first page again.
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }))
+    expect(screen.getByText('variants 51 to 60 of 60')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getAllByRole('row').slice(1)).toHaveLength(10)
+    fireEvent.click(screen.getByRole('button', { name: /Previous/ }))
+    expect(screen.getByText('variants 1 to 50 of 60')).toBeInTheDocument()
+    // Another haplotype is another check and starts at its first page.
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }))
+    fireEvent.change(screen.getByLabelText('Haplotype'), { target: { value: '1' } })
+    expect(await screen.findByText('variants 1 to 50 of 60')).toBeInTheDocument()
   })
 
   it('checks again for the second haplotype', async () => {
@@ -127,7 +137,7 @@ describe('Structural variants dialog', () => {
   })
 
   it('checks the variants against own loops and draws them', async () => {
-    const mine = { id: 'loopsupload1', kind: 'loops' as const, name: 'mine.bedpe', size: 10, ok: true, summary: '', error: null, samples: [] }
+    const mine = { id: 'loopsupload1', kind: 'loops' as const, name: 'mine.bedpe', size: 10, ok: true, summary: '', error: null, samples: [], counts: false }
     renderDialog({ own: { loops: [{ factor: 'H3K27ac', upload: mine }], anchors: null, contacts: null, enhancers: null } })
     await screen.findByRole('table')
     expect(JSON.parse(String(checks[0].get('own'))).loops).toEqual([{ factor: 'H3K27ac', upload: 'loopsupload1' }])

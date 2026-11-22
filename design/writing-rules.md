@@ -167,4 +167,4 @@ Reread new text against these rules while writing it. Then search the added line
 - A dash, a colon or a semicolon inside a comment.
 
 The text of the website is checked by `web/frontend/src/test/copy.ts` and the help texts of its settings by
-`web/tests/test_settings_schema.py`. Comments and docstrings have no automatic check.
+`web/tests/test_engine_settings.py`. Comments and docstrings have no automatic check.

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { GENES, KEY, PICKS, SUMMARY_DONE } from '../test/job'
-import { recentJobs } from '../model/recent'
+import { recentJobs } from '../myjobs/recent'
 import { Job } from './Job'
 
 function Back() {
@@ -45,15 +45,37 @@ describe('Job explorer', () => {
     expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Structure', 'Genes312', 'Contact map', 'Loops182', 'Log'])
   })
 
+  it('shows the page of a missing address for a job the site does not have, shared or private', async () => {
+    for (const path of ['/jobs/sdfsdfd', '/p/werewwerwe']) {
+      const f = mockApi([[/summary$/, () => [404, { detail: 'Not Found' }]]])
+      const view = renderJob(path)
+      expect(await screen.findByRole('heading', { level: 1, name: 'No structure at this address' })).toBeInTheDocument()
+      expect(screen.getByText('404')).toBeInTheDocument()
+      // The site asks once. A job that is not there is not asked for again.
+      expect(f.mock.calls.filter(([u]) => String(u).endsWith('/summary'))).toHaveLength(1)
+      view.unmount()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('keeps the message of the server for a failure that is not a missing job', async () => {
+    mockApi([[/summary$/, () => [500, { error: 'The results directory cannot be read.' }]]])
+    renderJob()
+    // Such a failure is asked for again three times before the page gives up.
+    expect(await screen.findByText('The results directory cannot be read.', {}, { timeout: 12000 })).toBeInTheDocument()
+    expect(screen.queryByText('404')).toBeNull()
+  }, 15000)
+
   it('shows the facts and the files in the side panel', async () => {
     mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
     renderJob()
     expect(await screen.findByText('Done in 6 min 12 s')).toBeInTheDocument()
     expect(screen.getByText('118 CTCF, 64 RNAPII')).toBeInTheDocument()
     expect(screen.getByText('CTCF and RNAPII')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /ep\.tsv/ })).toHaveAttribute('href', `/jobs/${KEY}/files/ep.tsv`)
+    // Every file the summary lists is a download of the panel.
+    for (const f of SUMMARY_DONE.files) expect(screen.getByRole('link', { name: f.name })).toHaveAttribute('href', `/jobs/${KEY}/files/${f.name}`)
     expect(within(screen.getByRole('list', { name: 'Structure files' })).getAllByRole('listitem')).toHaveLength(SUMMARY_DONE.models.length)
-    // Every file in one archive is the Download all button of the tabs, and the list does not repeat it.
+    // Every file in one archive is the Download all button of the tabs. The list does not repeat it.
     expect(screen.queryByRole('link', { name: /all files, zip/ })).not.toBeInTheDocument()
   })
 
@@ -164,6 +186,7 @@ describe('Job explorer', () => {
         { stage: 'inputs', at: 1012 },
         { stage: 'modelling', at: 1020 },
       ],
+      now: 1050,
       log_recent: 'structure 1 written\nstructure 2 written',
     }
     mockApi([[/summary$/, () => [200, running]]])
@@ -177,13 +200,36 @@ describe('Job explorer', () => {
       </QueryClientProvider>,
     )
     const bar = await screen.findByRole('progressbar', { name: 'Progress of the job' })
-    // inputs 5, then modelling's 85 by two fifths: 5 + 34 = 39
+    // The inputs are 5 and two fifths of the 85 of modelling are 34, together 39.
     expect(bar).toHaveAttribute('aria-valuenow', '39')
     expect(screen.getByText('Modelling the structures, 2 of 5 written')).toBeInTheDocument()
-    const log = screen.getByRole('list', { name: 'Status log' })
-    expect(within(log).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Queued0 s', 'Building the inputs12 s', 'Modelling the structures20 s'])
+    // Every stage of the job, each with the time it took, 12 s in the queue, 8 s on the inputs and
+    // 30 s of modelling so far. The stage to come has no time.
+    const log = screen.getByRole('list', { name: 'Stages of the job' })
+    const rows = within(log).getAllByRole('listitem')
+    expect(rows.map((li) => li.textContent)).toEqual(['Queued12 s', 'Building the inputs8 s', 'Modelling the structures30 s', 'Marking promoters and enhancers'])
+    expect(rows.map((li) => li.className)).toEqual(['done', 'done', 'now', 'next'])
+    expect(rows[2]).toHaveAttribute('aria-current', 'step')
+    expect(rows[2].querySelector('.stage-spinner')).not.toBeNull()
+    expect(rows[3].querySelector('.status-time')).toBeNull()
     expect(screen.getByText(/structure 2 written/)).toBeInTheDocument()
+    expect(screen.getByLabelText('End of the engine log')).toBeInTheDocument()
     expect(checkCopy(container)).toEqual([])
+  })
+
+  it('heads a waiting job with the region of the request in megabases', async () => {
+    const waiting = { ...SUMMARY_DONE, state: 'queued', stage: null, region: null, ahead: 2, models: [], structures: 0, stages: [{ stage: 'queued', at: 1000 }], now: 1754, request: { ...SUMMARY_DONE.request, region: 'chr3:120,184,079-140,184,000' } }
+    mockApi([[/summary$/, () => [200, waiting]]])
+    renderJob()
+    expect(await screen.findByText('Waiting in the queue behind 2 jobs')).toBeInTheDocument()
+    // The whole coordinates do not fit the panel on one line. They are on the line under the heading.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('GM12878 chr3:120.184-140.184 Mb')
+    expect(screen.getByText(/chr3:120,184,079-140,184,000/)).toBeInTheDocument()
+    const rows = within(screen.getByRole('list', { name: 'Stages of the job' })).getAllByRole('listitem')
+    expect(rows.map((li) => li.textContent)).toEqual(['Queued12 min 34 s', 'Building the inputs', 'Modelling the structures', 'Marking promoters and enhancers'])
+    expect(rows.map((li) => li.className)).toEqual(['now', 'next', 'next', 'next'])
+    // No engine runs yet. The box of its log is not shown.
+    expect(screen.queryByLabelText('End of the engine log')).toBeNull()
   })
 
   it('shows a failed job with its error and log', async () => {
@@ -191,6 +237,12 @@ describe('Job explorer', () => {
     renderJob()
     expect(await screen.findByText('RuntimeError: engine exploded')).toBeInTheDocument()
     expect(document.querySelector('pre.log-tail')?.textContent).toBe('line 1\nengine exploded')
+  })
+
+  it('links to the form filled with the request of the job', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob()
+    expect(await screen.findByRole('link', { name: /New job from this request/ })).toHaveAttribute('href', `/model?from=${encodeURIComponent(`/jobs/${KEY}`)}`)
   })
 
   it('renames the job in this browser', async () => {

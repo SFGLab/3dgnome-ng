@@ -1,0 +1,25 @@
+{
+  "cell_type": "GMX",
+  "region": "chr1:800000-2800000",
+  "factors": "CTCF",
+  "sv_set": "",
+  "sample": "",
+  "haplotype": 0,
+  "n_models": 2,
+  "hicdiffusion": false,
+  "upload_vcf": "",
+  "overrides": {},
+  "background": "hic",
+  "own": {},
+  "expression": {
+    "source": "LINES",
+    "path": "/srv/site/data/expression/lines.tsv",
+    "columns": [
+      "a1",
+      "a2"
+    ],
+    "kind": "counts",
+    "unit": "",
+    "label": "Lines RNA-seq of GMX, 2 replicates"
+  }
+}

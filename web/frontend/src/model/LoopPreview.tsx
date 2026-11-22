@@ -1,12 +1,17 @@
+import { asked, type Region } from '../api'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { api, type Region } from '../api'
 import type { Factors } from './form'
+import { around } from './loopWindow'
+import { scoped } from '../lib/css'
+import sheet from './model.module.css'
+
+const cn = scoped(sheet)
 
 const W = 780
 const H = 150
 const AXIS = 75
-/** The shortest region a drag leaves, and the step positions are rounded to, in bp. */
+/** The shortest region a drag leaves and the step of a rounded position, in bp. */
 const MIN_SPAN = 20_000
 const STEP = 1_000
 
@@ -14,14 +19,7 @@ const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word
 const mb = (n: number) => `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)} Mb`
 const round = (p: number) => Math.round(p / STEP) * STEP
 
-/** The stretch drawn around a region: the region with its own length on either side, from 0. */
-export function around(start: number, end: number): [number, number] {
-  const pad = end - start
-  const from = Math.max(0, start - pad)
-  return [from, from === 0 ? Math.max(end + pad, 3 * pad) : end + pad]
-}
-
-/** Whether a region is drawn well in a view: inside it and between an eighth and seven tenths of it. */
+/** Returns true for a region that is drawn well in a view, inside it and between an eighth and seven tenths of it. */
 const fits = (start: number, end: number, view: [number, number]) => {
   const share = (end - start) / (view[1] - view[0])
   return start >= view[0] && end <= view[1] && share >= 0.125 && share <= 0.7
@@ -33,25 +31,31 @@ type Drag = { kind: 'start' | 'end' | 'move'; at: number; from: [number, number]
  * The loops around a region as arcs over an axis, CTCF above and RNAPII below, the genes as ticks
  * and the region as a box. With `onRegion` the edges of the box are sliders and the box can be
  * moved. The new coordinates are reported when the drag ends.
+ *
+ * `maxSpan` is the longest region of a job in bp. A drag does not make the region longer than
+ * that. A region that is longer already is drawn in the colour of an error and a drag makes it
+ * shorter.
  */
-export function LoopPreview({ cell, region, factors, onRegion }: { cell: string; region: Region; factors: Factors; onRegion?: (text: string) => void }) {
-  // The view moves only when the region no longer fits it, so the picture stays still while the
-  // region is dragged inside it.
-  const [view, setView] = useState<[number, number]>(() => around(region.start, region.end))
+export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegion }: { cell: string; region: Region; factors: Factors; maxSpan?: number; onRegion?: (text: string) => void }) {
+  // The server draws three times the longest region at most.
+  const cap = 3 * maxSpan
+  // The view moves only when the region no longer fits it. The picture stays still while the region
+  // is dragged inside it.
+  const [view, setView] = useState<[number, number]>(() => around(region.start, region.end, cap))
   const [chrom, setChrom] = useState(region.chrom)
   useEffect(() => {
     if (region.chrom !== chrom || !fits(region.start, region.end, view)) {
-      setView(around(region.start, region.end))
+      setView(around(region.start, region.end, cap))
       setChrom(region.chrom)
     }
-  }, [region.chrom, region.start, region.end]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [region.chrom, region.start, region.end, cap]) // eslint-disable-line react-hooks/exhaustive-deps
   const span = `${region.chrom}:${view[0]}-${view[1]}`
-  const preview = useQuery({ queryKey: ['preview', cell, span], queryFn: () => api.preview(cell, span), placeholderData: keepPreviousData })
+  const preview = useQuery({ ...asked.preview(cell, span), placeholderData: keepPreviousData })
   const svg = useRef<SVGSVGElement>(null)
   const drag = useRef<Drag | null>(null)
   const [moved, setMoved] = useState<[number, number] | null>(null)
   const latest = useRef<[number, number] | null>(null)
-  if (!preview.data) return <div className="loop-preview" aria-busy="true" />
+  if (!preview.data) return <div className={cn('loop-preview')} aria-busy="true" />
   const [start, end] = moved ?? [region.start, region.end]
   const width = view[1] - view[0]
   const x = (p: number) => ((p - view[0]) / width) * W
@@ -67,7 +71,7 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
       return (
         <path
           key={`${factor}${i}`}
-          className={`arc ${factor.toLowerCase()}${chosen(factor) && inside(l) ? '' : ' faint'}`}
+          className={cn(`arc ${factor.toLowerCase()}${chosen(factor) && inside(l) ? '' : ' faint'}`)}
           d={`M ${x1} ${AXIS} A ${r} ${Math.min(r, AXIS - 6)} 0 0 ${above ? 1 : 0} ${x2} ${AXIS}`}
         >
           <title>{`${factor} loop, ${a.toLocaleString('en-US')} to ${b.toLocaleString('en-US')}, ${n} PETs`}</title>
@@ -81,11 +85,20 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
     const box = svg.current!.getBoundingClientRect()
     return view[0] + (box.width ? (clientX - box.left) / box.width : 0) * width
   }
-  /** The region a drag gives, kept inside the view and at least the shortest span long. */
+  /**
+   * Returns the region a drag gives, kept inside the view, at least the shortest span long and at
+   * most the longest. An edge of a region that is too long already moves inwards alone.
+   */
   const dragged = (d: Drag, p: number): [number, number] => {
     const [a, b] = d.from
-    if (d.kind === 'start') return [round(Math.min(Math.max(a + p - d.at, view[0]), b - MIN_SPAN)), b]
-    if (d.kind === 'end') return [a, round(Math.max(Math.min(b + p - d.at, view[1]), a + MIN_SPAN))]
+    if (d.kind === 'start') {
+      const least = Math.max(view[0], Math.min(a, b - maxSpan))
+      return [Math.max(round(Math.min(Math.max(a + p - d.at, least), b - MIN_SPAN)), least), b]
+    }
+    if (d.kind === 'end') {
+      const most = Math.min(view[1], Math.max(b, a + maxSpan))
+      return [a, Math.min(round(Math.max(Math.min(b + p - d.at, most), a + MIN_SPAN)), most)]
+    }
     const shift = Math.min(Math.max(p - d.at, view[0] - a), view[1] - b)
     return [round(a + shift), round(a + shift) + (b - a)]
   }
@@ -110,7 +123,7 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
     setMoved(null)
     if (next && onRegion && (next[0] !== region.start || next[1] !== region.end)) onRegion(text(next[0], next[1]))
   }
-  /** The arrow keys move an edge by a hundredth of the view. */
+  /** Moves an edge by a hundredth of the view at an arrow key. */
   const nudge = (kind: 'start' | 'end') => (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
     e.preventDefault()
@@ -119,24 +132,26 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
     if (next[0] !== region.start || next[1] !== region.end) onRegion?.(text(next[0], next[1]))
   }
   const handlers = { onPointerMove: move, onPointerUp: release, onPointerCancel: release }
+  const tooLong = end - start > maxSpan
+  const longest = `${maxSpan / 1e6} Mb`
   return (
-    <div className="loop-preview">
+    <div className={cn(tooLong ? 'loop-preview too-long' : 'loop-preview')}>
       <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Loops in ${region.label || text(region.start, region.end)}`}>
-        <rect className={onRegion ? 'region-box movable' : 'region-box'} x={x(start)} y={0} width={Math.max(x(end) - x(start), 2)} height={H} onPointerDown={onRegion ? grab('move') : undefined} {...(onRegion ? handlers : {})} />
-        <text className="side-label" x={6} y={14}>
+        <rect className={cn(onRegion ? 'region-box movable' : 'region-box')} x={x(start)} y={0} width={Math.max(x(end) - x(start), 2)} height={H} onPointerDown={onRegion ? grab('move') : undefined} {...(onRegion ? handlers : {})} />
+        <text className={cn('side-label')} x={6} y={14}>
           CTCF loops
         </text>
-        <text className="side-label" x={6} y={H - 6}>
+        <text className={cn('side-label')} x={6} y={H - 6}>
           RNAPII loops
         </text>
         {arcs('CTCF', true)}
         {arcs('RNAPII', false)}
-        <line className="axis" x1={0} x2={W} y1={AXIS} y2={AXIS} />
+        <line className={cn('axis')} x1={0} x2={W} y1={AXIS} y2={AXIS} />
         {preview.data.genes.map((g) => (
-          <line key={g.name + g.tss} className={g === gene ? 'gene-tick named' : 'gene-tick'} x1={x(g.tss)} x2={x(g.tss)} y1={AXIS - 5} y2={AXIS + 5} />
+          <line key={g.name + g.tss} className={cn(g === gene ? 'gene-tick named' : 'gene-tick')} x1={x(g.tss)} x2={x(g.tss)} y1={AXIS - 5} y2={AXIS + 5} />
         ))}
         {gene && (
-          <text className="gene-label" x={x(gene.tss)} y={AXIS - 9} textAnchor="middle">
+          <text className={cn('gene-label')} x={x(gene.tss)} y={AXIS - 9} textAnchor="middle">
             {gene.name}
           </text>
         )}
@@ -145,9 +160,9 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
             const p = kind === 'start' ? start : end
             return (
               <g key={kind}>
-                <line className="region-edge" x1={x(p)} x2={x(p)} y1={0} y2={H} />
+                <line className={cn('region-edge')} x1={x(p)} x2={x(p)} y1={0} y2={H} />
                 <rect
-                  className="region-handle"
+                  className={cn('region-handle')}
                   x={x(p) - 7}
                   y={AXIS - 16}
                   width={14}
@@ -168,18 +183,29 @@ export function LoopPreview({ cell, region, factors, onRegion }: { cell: string;
             )
           })}
       </svg>
-      <p className="preview-key">
-        <span className="key-item">
-          <span className="key-line ctcf" />
+      <p className={cn('preview-key')}>
+        <span className={cn('key-item')}>
+          <span className={cn('key-line ctcf')} />
           {plural(count('CTCF'), 'CTCF loop')}
         </span>
-        <span className="key-item">
-          <span className="key-line rnapii" />
+        <span className={cn('key-item')}>
+          <span className={cn('key-line rnapii')} />
           {plural(count('RNAPII'), 'RNAPII loop')}
         </span>
-        <span className="preview-span">{`${text(start, end)}, ${mb(end - start)}`}</span>
+        <span className={cn('preview-span')}>{`${text(start, end)}, ${mb(end - start)}${end - start === maxSpan ? ', the limit' : ''}`}</span>
       </p>
-      {onRegion && <p className="preview-hint">Drag the box to move the region and its two edges to make it longer or shorter. The loops outside the region are drawn faint.</p>}
+      {tooLong ? (
+        <p className={cn('preview-hint too-long')} role="status">
+          {`This region is ${mb(end - start)} long and a job takes ${longest} at most.${onRegion ? ' Drag an edge inwards to shorten it.' : ''}`}
+          {onRegion && (
+            <button type="button" className="link-button" onClick={() => onRegion(text(region.start, region.start + maxSpan))}>
+              {`Keep the first ${longest}`}
+            </button>
+          )}
+        </p>
+      ) : (
+        onRegion && <p className={cn('preview-hint')}>{`Drag the box to move the region and its two edges to make it longer or shorter${Number.isFinite(maxSpan) ? `, up to ${longest}` : ''}. The loops outside the region are drawn faint.`}</p>
+      )}
     </div>
   )
 }

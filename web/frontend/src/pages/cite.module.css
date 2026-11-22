@@ -1,0 +1,120 @@
+.primary-citation {
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.primary-citation p {
+  margin: 0 0 14px;
+}
+
+.primary-citation .buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.primary-citation button,
+.primary-citation :global(.button-link) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 500 12px var(--font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+:global(.reference) {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+:global(.reference) p {
+  margin: 0;
+}
+
+:global(.ref-title) {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+:global(.ref-authors),
+:global(.ref-venue) {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+:global(.ref-venue) a {
+  margin-left: 10px;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.unconfirmed {
+  color: var(--promoter);
+}
+
+.lab-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.data-note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+:global(.data-table) .accessions {
+  font: 12px var(--mono);
+}
+
+:global(.data-table) .accessions a,
+:global(.data-table) .accessions span {
+  display: block;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+:global(.data-table) .accessions .unconfirmed,
+:global(.data-table) .accessions .no-accession {
+  font-family: var(--font);
+}
+
+.no-accession {
+  color: var(--faint);
+}
+
+@media (max-width: 720px) {
+  :global(.data-table),
+  :global(.data-table) tbody,
+  :global(.data-table) tr,
+  :global(.data-table) td {
+    display: block;
+  }
+
+  :global(.data-table) thead {
+    display: none;
+  }
+
+  :global(.data-table) tr {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  :global(.data-table) td {
+    padding: 2px 0;
+    border: 0;
+  }
+}

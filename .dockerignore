@@ -4,6 +4,7 @@
 !pyproject.toml
 !README.md
 !SETTINGS.md
+!LICENSE
 !gnome3d
 !web
 web/frontend/node_modules

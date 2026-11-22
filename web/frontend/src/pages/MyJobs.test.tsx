@@ -2,8 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { recentJobs, rememberJob } from '../model/recent'
-import { resetSync, syncState } from '../sync/sync'
+import { recentJobs, rememberJob } from '../myjobs/recent'
+import { resetSync, syncState } from '../myjobs/sync'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { mockLists } from '../test/lists'
@@ -124,9 +124,28 @@ describe('My jobs', () => {
     localStorage.setItem('gnome3d.sync', JSON.stringify({ code: 'K7M2-9QXD-4THP-W3RZ', private: false }))
     const { container } = renderPage()
     expect(await screen.findByRole('link', { name: 'HFFc6 chr2' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Stop syncing on this computer' }))
+    // The button is beside the code and its two copy buttons.
+    const open = screen.getByRole('button', { name: 'Stop syncing on this computer' })
+    expect(open.parentElement).toBe(screen.getByRole('button', { name: 'Copy link' }).parentElement)
+    fireEvent.click(open)
+    const dialog = screen.getByRole('dialog', { name: 'Stop syncing on this computer' })
+    expect(dialog).toHaveTextContent('The jobs stay on this computer and the code keeps working on the others.')
     expect(checkCopy(container)).toEqual([])
-    fireEvent.click(screen.getByRole('button', { name: 'Stop syncing' }))
+    expect(checkCopy(dialog)).toEqual([])
+    // Stop syncing is the red button at the end, the place of the action of a dialog. Keep syncing
+    // is plain, at the place of Cancel. It has the focus, closes the dialog and changes nothing.
+    const [keep, stop] = within(dialog).getAllByRole('button').slice(-2)
+    expect(keep).toHaveTextContent('Keep syncing')
+    expect(keep).toHaveClass('secondary')
+    expect(keep).toHaveFocus()
+    expect(stop).toHaveTextContent('Stop syncing')
+    expect(stop).toHaveClass('danger')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep syncing' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(syncState()).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop syncing on this computer' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Stop syncing' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('button', { name: 'Get a sync code' })).toBeInTheDocument()
     expect(syncState()).toBeNull()
     expect(recentJobs()).toHaveLength(1)

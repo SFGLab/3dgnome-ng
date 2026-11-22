@@ -4,7 +4,7 @@
     pytest web/tests/test_api.py          one file
 
 The tests of a file run in the order they are written. A file builds its site once, in a
-fixture of module scope, and its tests read and change that one site.
+fixture of module scope. Its tests read and change that one site.
 """
 
 from __future__ import annotations

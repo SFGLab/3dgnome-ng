@@ -1,12 +1,15 @@
 fastapi==0.163.2
 starlette==1.10.0
 uvicorn==0.54.0
-jinja2==3.1.6
 python-multipart==0.0.34
+# the declared shapes of the answers and of the files of a job
+typing_extensions==4.16.0
 rq==2.1.0
 redis==5.2.1
 pandas==3.0.3
 sortedcontainers==2.4.0
+# differential expression of two jobs, gnome3d_web/expression.py
+pydeseq2==0.5.4
 scipy==1.17.1
 threadpoolctl==3.6.0
 h5py==3.16.0

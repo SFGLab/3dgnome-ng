@@ -1,31 +1,22 @@
+import { asked } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { api, ApiError, type Region } from '../api'
+import { useDebounced, useRegion } from './useRegion'
+import { scoped } from '../lib/css'
+import sheet from './model.module.css'
 
-function useDebounced<T>(value: T, ms: number): T {
-  const [v, setV] = useState(value)
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), ms)
-    return () => clearTimeout(t)
-  }, [value, ms])
-  return v
-}
+const cn = scoped(sheet)
 
-/** The region field, resolving a gene name or coordinates through the API as the user types. */
-export function useRegion(cell: string, text: string) {
-  const q = useDebounced(text.trim(), 250)
-  return useQuery<Region, ApiError>({ queryKey: ['region', cell, q], queryFn: () => api.region(cell, q), enabled: q.length > 1, retry: false })
-}
-
-/** Text that can be the start of a gene name: two characters or more that are not coordinates. */
+/** Returns true for text that can be the start of a gene name, two characters or more that are not coordinates. */
 const maybeGene = (text: string) => text.length >= 2 && !text.includes(':')
 
 /**
  * The region field. Typed letters list the matching genes under the field. The form gets
  * coordinates as they are typed and a gene name once it is chosen, Enter is pressed or the field is
- * left.
+ * left. With `quiet` a refused region marks the field and its reason is left to the caller, which
+ * shows it elsewhere.
  */
-export function RegionField({ cell, value, onChange }: { cell: string; value: string; onChange: (v: string) => void }) {
+export function RegionField({ cell, value, quiet = false, onChange }: { cell: string; value: string; quiet?: boolean; onChange: (v: string) => void }) {
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
   const region = useRegion(cell, value)
@@ -33,13 +24,13 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
   const typed = useDebounced(text, 150)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
-  // The list scrolls, and the arrow keys bring the gene they reach into view.
+  // The list scrolls. The arrow keys bring the gene they reach into view.
   const list = useRef<HTMLUListElement>(null)
   useEffect(() => {
     list.current?.children[active]?.scrollIntoView?.({ block: 'nearest' })
   }, [active])
   const settled = draft === value
-  const genes = useQuery({ queryKey: ['genes', cell, typed], queryFn: () => api.genes(cell, typed), enabled: open && maybeGene(typed), staleTime: 60_000, retry: false })
+  const genes = useQuery({ ...asked.geneHits(cell, typed), enabled: open && maybeGene(typed), staleTime: 60_000, retry: false })
   const found = open && maybeGene(text) && typed === text ? (genes.data ?? []) : []
   // A list of the one gene already in the field offers nothing.
   const options = found.length === 1 && found[0].name.toUpperCase() === text.toUpperCase() ? [] : found
@@ -54,9 +45,9 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
   // A name still being typed is not an error, nor is a part of a name the list offers genes for.
   const failed = settled && region.isError && options.length === 0
   return (
-    <div className="region-field">
+    <div className={cn('region-field')}>
       <label htmlFor="region">Region, chr:start-end or a gene name</label>
-      <div className={`region-input${failed ? ' error' : ''}`}>
+      <div className={cn(`region-input${failed ? ' error' : ''}`)}>
         <input
           id="region"
           role="combobox"
@@ -76,7 +67,7 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
           onChange={(e) => {
             const v = e.target.value
             setDraft(v)
-            // Coordinates, and an emptied field, reach the form at once.
+            // Coordinates and an emptied field reach the form at once.
             if (v.includes(':') || v.trim() === '') onChange(v)
             setOpen(true)
             setActive(0)
@@ -97,20 +88,20 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
             }
           }}
         />
-        {settled && region.data && <span className="resolved">{region.data.label}</span>}
+        {settled && region.data && <span className={cn('resolved')}>{region.data.label}</span>}
       </div>
       {options.length > 0 && (
-        <ul id="region-genes" ref={list} role="listbox" aria-label="Genes" className="gene-options">
+        <ul id="region-genes" ref={list} role="listbox" aria-label="Genes" className={cn('gene-options')}>
           {options.map((g, i) => (
             // The press is taken before the field loses the focus, which would close the list.
-            <li key={g.name} id={`region-gene-${i}`} role="option" aria-selected={i === active} className={i === active ? 'active' : undefined} onMouseDown={(e) => { e.preventDefault(); pick(g.name) }} onMouseEnter={() => setActive(i)}>
-              <span className="gene-name">{g.name}</span>
-              <span className="gene-place">{`${g.chrom}:${g.tss.toLocaleString('en-US')}`}</span>
+            <li key={g.name} id={`region-gene-${i}`} role="option" aria-selected={i === active} className={cn(i === active ? 'active' : undefined)} onMouseDown={(e) => { e.preventDefault(); pick(g.name) }} onMouseEnter={() => setActive(i)}>
+              <span className={cn('gene-name')}>{g.name}</span>
+              <span className={cn('gene-place')}>{`${g.chrom}:${g.tss.toLocaleString('en-US')}`}</span>
             </li>
           ))}
         </ul>
       )}
-      {failed && <p className="field-error">{region.error.message}</p>}
+      {failed && !quiet && <p className="field-error">{region.error.message}</p>}
     </div>
   )
 }

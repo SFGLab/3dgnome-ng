@@ -1,0 +1,35 @@
+{
+  "state": "done",
+  "stages": [
+    {
+      "stage": "queued",
+      "at": 1795285583.4756658
+    },
+    {
+      "stage": "inputs",
+      "at": 1795285583.4768908
+    },
+    {
+      "stage": "modelling",
+      "at": 1795285583.486915
+    },
+    {
+      "stage": "marks",
+      "at": 1795285583.5777652
+    },
+    {
+      "stage": "done",
+      "at": 1795285583.5870562
+    }
+  ],
+  "stage": "done",
+  "started": 1795285583.4768481,
+  "updated": 1795285583.5870562,
+  "region": "chr1:800000-2800000",
+  "n_svs": 0,
+  "skipped_svs": 0,
+  "loops": {
+    "CTCF": 9
+  },
+  "finished": 1795285583.586999
+}

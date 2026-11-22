@@ -1,7 +1,4 @@
-"""Job lists shared by a sync code: the code, the merge and the endpoints.
-
-    pytest web/tests/test_lists.py
-"""
+"""Job lists shared by a sync code, with the code, the merge and the endpoints."""
 
 from __future__ import annotations
 
@@ -22,7 +19,7 @@ def job(key: str, at: float, name: str = "", edited: float | None = None, kind: 
 
 @pytest.fixture(scope="module", autouse=True)
 def shared() -> SimpleNamespace:
-    from gnome3d_web import lists
+    from gnome3d_web.lists import store as lists
 
     code = lists.new_code()
     return SimpleNamespace(code=code, lists=lists)

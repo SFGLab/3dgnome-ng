@@ -1,13 +1,13 @@
-# 3D-GNOME website
+# Website of 3D-GNOMEᴺᴳ
 
-A scientist picks a cell type and a region, chooses CTCF loops or CTCF and RNAPII loops,
-optionally applies structural variants from a hosted call set or an uploaded VCF, and gets an
-ensemble of gnome3d structures with promoters and enhancers marked, an enhancer to promoter
-distance table and the CIF files.
+A scientist picks a cell type and a region and chooses CTCF loops or CTCF and RNAPII loops.
+Structural variants from a hosted call set or an uploaded VCF are optional. The job returns an
+ensemble of structures with promoters and enhancers marked, an enhancer to promoter distance
+table and the CIF files.
 
-Three processes: the web app (FastAPI), one or more workers per GPU (rq), and Redis. No database. The
-hosted data is a read only directory with a `catalog.json`; jobs and their results are files
-under a results directory.
+The site runs as one container with a pool of worker threads, or as three kinds of process: the
+web app, rq workers and Redis. It has no database. The hosted data is a read only directory with
+a `catalog.json`. Jobs and their results are files under a results directory.
 
 ## Run with Docker
 
@@ -54,8 +54,9 @@ The notes are under `design/website/`.
 
 | Note | Content |
 |---|---|
+| [code.md](../design/website/code.md) | The layout of the server and of the frontend code, their rules and the tests that guard the interface |
 | [deployment.md](../design/website/deployment.md) | The compose files, one container, the registry on the host, workers and GPUs, MPS, a site without a GPU |
-| [data.md](../design/website/data.md) | The data directory, cell types, SV call sets and sample tables |
-| [settings.md](../design/website/settings.md) | The environment variables and the HiCDiffusion step |
+| [data.md](../design/website/data.md) | The data directory, cell types, SV call sets, sample tables and expression tables |
+| [settings.md](../design/website/settings.md) | The environment variables, the workers, config.json and the HiCDiffusion step |
 | [frontend.md](../design/website/frontend.md) | The build, the base path and the API each page reads |
-| [jobs.md](../design/website/jobs.md) | The time of a job, caching and privacy, sync codes and uploads |
+| [jobs.md](../design/website/jobs.md) | The duration of a job, caching and privacy, sync codes and uploads |

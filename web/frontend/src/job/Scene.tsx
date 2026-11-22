@@ -5,14 +5,20 @@ import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraLink } from './cameraLink'
 import { bondRadius, focusMask, fogRange, pickOnChain, stretch } from './chain'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 const BACKGROUND = '#FFFFFF'
-/** How solid the chain outside the part in focus is drawn. */
+/** The opacity of the chain outside the part in focus. */
 const GHOST = 0.2
-/** The hovered bead's colour, one no mark uses. */
+/** The colour of the hovered bead, one no mark uses. */
 const HOVER = '#2A78D6'
-/** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
- * of the bead under it and the hover would flicker between the two. */
+/**
+ * Takes a mark drawn over the chain out of the pointer events. The pointer would hit the mark
+ * instead of the bead under it and the hover would flicker between the two.
+ */
 const noRaycast = () => null
 /**
  * The labels over the canvas take no pointer events. drei's `Html` applies its `pointerEvents` prop
@@ -25,9 +31,9 @@ const MARK_STYLE = { pointerEvents: 'none' } as const
  */
 const MARK_LAYER: [number, number] = [1, 0]
 /**
- * Hover and pick by the screen: every bond is projected as the tube it is drawn as and the front
- * tube under the cursor gives the bead. No hover while a drag rotates the view. A click is a press
- * and release that hardly moved.
+ * Hover and pick by the screen. Every bond is projected as its drawn tube and the front tube under
+ * the cursor gives the bead. No hover while a drag rotates the view. A click is a press and release
+ * that hardly moved.
  */
 function Picker({
   points,
@@ -110,7 +116,8 @@ function Picker({
 
 export type Marker = { label: string; at: [number, number, number] }
 const NO_FOCUS: [number, number][] = []
-export type SceneHandle = { reset: () => void; png: () => string | null }
+/** `png` gives the view as a picture with its marks drawn on it and `caption` in its lower left corner. */
+export type SceneHandle = { reset: () => void; png: (caption?: string) => string | null }
 
 function CameraSync({ link, id }: { link: CameraLink; id: string }) {
   const { camera, controls } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null }
@@ -143,7 +150,7 @@ function CameraLight() {
   return <directionalLight ref={light} intensity={1.6} />
 }
 
-/** Fog from the structure's middle to its far side, kept there as the camera zooms. */
+/** Fog from the middle of the structure to its far side, kept there as the camera zooms. */
 function DepthFog({ radius }: { radius: number }) {
   const { scene } = useThree()
   useEffect(() => {
@@ -166,7 +173,7 @@ type Matrices = { joints: THREE.Matrix4[]; tubes: THREE.Matrix4[] }
 /** An instance drawn at no size is not drawn. */
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0)
 
-/** The place of every bead's sphere and every bond's tube. */
+/** Returns the place of the sphere of every bead and of the tube of every bond. */
 function chainMatrices(points: [number, number, number][]): Matrices {
   const q = new THREE.Quaternion()
   const up = new THREE.Vector3(0, 1, 0)
@@ -264,7 +271,6 @@ type Props = {
   points: [number, number, number][]
   colors: string[]
   markers?: Marker[]
-  highlight?: [number, number, number][][]
   onHover?: (index: number | null, x: number, y: number) => void
   onPick?: (index: number) => void
   link?: CameraLink
@@ -274,9 +280,9 @@ type Props = {
   focus?: [number, number][]
 }
 
-/** The chain as lit tubes in a WebGL canvas with depth fog, orbit controls, markers, highlights
+/** The chain as lit tubes in a WebGL canvas with depth fog, orbit controls, markers
  * and the hovered bead marked. */
-export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], highlight = [], onHover, onPick, link, linkId = 'scene', hovered = null, focus = NO_FOCUS }, ref) {
+export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], onHover, onPick, link, linkId = 'scene', hovered = null, focus = NO_FOCUS }, ref) {
   const controls = useRef<OrbitControlsImpl>(null)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const { center, radius } = useMemo(() => {
@@ -288,11 +294,59 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
   const tube = useMemo(() => bondRadius(shifted), [shifted])
   const mask = useMemo(() => focusMask(shifted.length, focus), [shifted.length, focus])
   const near = hovered === null || hovered >= shifted.length ? null : stretch(hovered, shifted.length)
+  const shift = (p: [number, number, number]) => [p[0] - center.x, p[1] - center.y, p[2] - center.z] as [number, number, number]
   useImperativeHandle(ref, () => ({
     reset: () => controls.current?.reset(),
-    png: () => gl.current?.domElement.toDataURL('image/png') ?? null,
+    png: (caption?: string) => {
+      const view = gl.current?.domElement
+      const camera = controls.current?.object
+      if (!view) return null
+      // The marks of the page are drawn over the view. The picture gets them drawn in.
+      const out = document.createElement('canvas')
+      out.width = view.width
+      out.height = view.height
+      const ctx = out.getContext('2d')
+      if (!ctx || !camera) return view.toDataURL('image/png')
+      ctx.drawImage(view, 0, 0)
+      const k = view.width / Math.max(view.clientWidth, 1)
+      const at = markers.map((m) => {
+        const p = new THREE.Vector3(...shift(m.at)).project(camera)
+        return [((p.x + 1) / 2) * view.width, ((1 - p.y) / 2) * view.height] as const
+      })
+      if (at.length === 2) {
+        ctx.strokeStyle = '#151514'
+        ctx.lineWidth = 1.5 * k
+        ctx.beginPath()
+        ctx.moveTo(...at[0])
+        ctx.lineTo(...at[1])
+        ctx.stroke()
+      }
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = `700 ${11 * k}px sans-serif`
+      markers.forEach((m, i) => {
+        ctx.beginPath()
+        ctx.arc(at[i][0], at[i][1], 10 * k, 0, 2 * Math.PI)
+        ctx.fillStyle = '#151514'
+        ctx.fill()
+        ctx.strokeStyle = '#FFFFFF'
+        ctx.lineWidth = 1.5 * k
+        ctx.stroke()
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillText(m.label, at[i][0], at[i][1] + 0.5 * k)
+      })
+      if (caption) {
+        ctx.font = `600 ${12 * k}px sans-serif`
+        ctx.textAlign = 'left'
+        const w = ctx.measureText(caption).width + 16 * k
+        ctx.fillStyle = '#151514'
+        ctx.fillRect(12 * k, view.height - 36 * k, w, 24 * k)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillText(caption, 20 * k, view.height - 24 * k)
+      }
+      return out.toDataURL('image/png')
+    },
   }))
-  const shift = (p: [number, number, number]) => [p[0] - center.x, p[1] - center.y, p[2] - center.z] as [number, number, number]
   return (
     <Canvas
       camera={{ position: [0, 0, radius * 2.4], fov: 45, near: radius / 100, far: radius * 20 }}
@@ -315,17 +369,14 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
             <meshBasicMaterial color={HOVER} depthTest={false} transparent opacity={0.9} fog={false} />
           </mesh>
           <Html position={shifted[hovered!]} center wrapperClass="scene-mark" style={MARK_STYLE} zIndexRange={MARK_LAYER}>
-            <span className="hover-ring" />
+            <span className={cn('hover-ring')} />
           </Html>
         </>
       )}
-      {highlight.map((seg, i) => (
-        <Line key={i} points={seg.map(shift)} color="#151514" lineWidth={7} transparent opacity={0.25} raycast={noRaycast} />
-      ))}
       {markers.length === 2 && <Line points={[shift(markers[0].at), shift(markers[1].at)]} color="#151514" lineWidth={1.5} raycast={noRaycast} />}
       {markers.map((m) => (
         <Html key={m.label} position={shift(m.at)} center wrapperClass="scene-mark" style={MARK_STYLE} zIndexRange={MARK_LAYER}>
-          <span className="marker">{m.label}</span>
+          <span className={cn('marker')}>{m.label}</span>
         </Html>
       ))}
       <OrbitControls ref={controls} makeDefault enableDamping={false} />

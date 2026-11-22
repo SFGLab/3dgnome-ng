@@ -1,7 +1,4 @@
-"""Catalog loading and region parsing.
-
-    pytest web/tests/test_catalog.py
-"""
+"""Catalog loading and region parsing."""
 
 from __future__ import annotations
 
@@ -12,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 from fixture import make_data
 
-from gnome3d_web.catalog import Catalog
+from gnome3d_web.catalog.model import Catalog
 from gnome3d_web.regions import RegionError, parse_region
 
 
@@ -22,6 +19,11 @@ def shared(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
     cat = Catalog.load(make_data(Path(d)))
     ct = cat.cell_types["GMX"]
     return SimpleNamespace(ct=ct, cat=cat, d=d)
+
+
+def test_the_gene_table_of_a_cell_type_is_read_once(shared: SimpleNamespace) -> None:
+    ct = shared.ct
+    assert ct.genes() is ct.genes() and list(ct.genes()["name"]) == ["ALPHA", "BETA"], "the genes of a cell type are one table for the process"
 
 
 def test_a_cell_type_loads_with_absolute_paths(shared: SimpleNamespace) -> None:

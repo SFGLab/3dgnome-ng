@@ -1,0 +1,11 @@
+{
+ "source": "LINES",
+ "label": "Lines RNA-seq of GMX, 2 replicates",
+ "kind": "counts",
+ "unit": "",
+ "key": "name",
+ "columns": [
+  "a1",
+  "a2"
+ ]
+}

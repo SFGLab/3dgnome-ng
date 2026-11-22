@@ -1,7 +1,7 @@
 /** Geometry of the chain as the 3D view draws it. */
 type P = [number, number, number]
 
-/** The tube radius, a fixed share of the median bond. A chain then looks the same at any scale. */
+/** Returns the tube radius, a fixed share of the median bond. A chain then looks the same at any scale. */
 export function bondRadius(points: P[]): number {
   const bonds: number[] = []
   for (let i = 1; i < points.length; i++) {
@@ -13,21 +13,20 @@ export function bondRadius(points: P[]): number {
   return 0.28 * bonds[Math.floor(bonds.length / 2)]
 }
 
-/** The beads either side of a hovered bead that are brightened with it, cut at the chain's ends. */
+/** Returns the beads either side of a hovered bead that are brightened with it, cut at the ends of the chain. */
 export function stretch(i: number, n: number, k = 6): [number, number] {
   return [Math.max(0, i - k), Math.min(n - 1, i + k)]
 }
 
-/**
- * Fog that starts at the middle of the structure and would be full at 2.5 radii behind it. The far
- * side fades by two fifths.
- */
+/** Returns fog that starts at the middle of the structure and would be full at 2.5 radii behind it. The far side fades by two fifths. */
 export function fogRange(radius: number, cameraDistance: number): [number, number] {
   return [cameraDistance, cameraDistance + 2.5 * radius]
 }
 
-/** The points of the chain inside any of the ranges, as a mask. Null for no ranges, which marks
- * no part of the chain over the rest. */
+/**
+ * Returns the points of the chain inside any of the ranges, as a mask. Null for no ranges, which
+ * marks no part of the chain over the rest.
+ */
 export function focusMask(n: number, ranges: [number, number][]): Uint8Array | null {
   if (!ranges.length) return null
   const mask = new Uint8Array(n)
@@ -36,12 +35,14 @@ export function focusMask(n: number, ranges: [number, number][]): Uint8Array | n
 }
 
 /**
- * The bead whose tube is drawn under the cursor, or null. The cursor is on a bond when it is within
- * the drawn radius of the bond plus two pixels of its line on the screen. The bond nearest the
- * camera wins and of its two beads the one nearer the cursor.
+ * Returns the bead whose tube is drawn under the cursor, or null. The cursor is on a bond when it
+ * is within the drawn radius of the bond plus two pixels of its line on the screen. The bond
+ * nearest the camera wins and of its two beads the one nearer the cursor.
  *
  * @param chain the screen x and y of each bead in pixels, its distance from the camera and the
- * drawn radius of the tube in pixels at that bead
+ *   drawn radius of the tube in pixels at that bead
+ * @param x the x of the cursor in pixels
+ * @param y the y of the cursor in pixels
  */
 export function pickOnChain(chain: [number, number, number, number][], x: number, y: number): number | null {
   if (chain.length === 1) {

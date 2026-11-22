@@ -1,0 +1,563 @@
+.wizard {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+:global(.wizard-steps) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+:global(.wizard-steps) [role='tab'] {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The chosen step is marked as a chosen option is everywhere on the form. */
+:global(.wizard-steps) [role='tab'][aria-selected='true'] {
+  background: var(--accent-soft);
+}
+
+:global(.wizard-steps) [role='tab'][aria-selected='true'] .step-title {
+  color: var(--accent);
+}
+
+:global(.wizard-steps) .step-number {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+:global(.wizard-steps) [aria-selected='true'] .step-number {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #FFFFFF;
+}
+
+.step-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.step-uses {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Every block of a step is 14px under the one before it, whichever part of the step it belongs
+   to. A step can hold two parts, the choice and the file. */
+.own-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The body of the dialog has three text styles, which are plain text, a label and a line of code. */
+.own-tab .rule {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.own-tab .rule p,
+.own-tab .hint,
+.contact-card .contact-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* The columns of a file, or a command, on a line of their own. */
+.own-tab .columns {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.own-tab .columns code,
+.own-tab .command {
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 12px var(--mono);
+  word-spacing: 0.5em;
+  overflow-wrap: anywhere;
+}
+
+.own-tab .command {
+  display: block;
+  margin-top: 8px;
+  word-spacing: normal;
+}
+
+.factor-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.factor-row.bad {
+  border-color: #F2B8B5;
+  background: #FDF1F0;
+}
+
+.row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.factor-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 150px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.factor-name input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.factor-name .key-line {
+  flex: 0 0 12px;
+  height: 2px;
+  background: var(--original);
+}
+
+.factor-name:global(.f0) .key-line {
+  background: var(--ctcf);
+}
+
+.factor-name:global(.f1) .key-line {
+  background: var(--rnapii);
+}
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.file-name {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.file-size {
+  color: var(--faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.check svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.check.good svg {
+  color: var(--enhancer);
+}
+
+.check.bad {
+  color: #A11B12;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A place to choose or drop a file, drawn as the VCF field of the form is. */
+.add-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.add-file:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.own-preview {
+  margin: 4px 0 0;
+}
+
+.own-preview figcaption {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.own-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.own-preview .arc {
+  fill: none;
+  stroke: var(--original);
+  stroke-width: 1.5;
+}
+
+.own-preview .arc:global(.f0) {
+  stroke: var(--ctcf);
+}
+
+.own-preview .arc:global(.f1) {
+  stroke: var(--rnapii);
+}
+
+.own-preview .axis {
+  stroke: var(--faint);
+  stroke-width: 1;
+}
+
+.foot-note {
+  flex: 1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.foot-note.bad {
+  color: #A11B12;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .factor-row.bad {
+    border-color: #6B2A26;
+    background: #2A1A19;
+  }
+
+  :root:not([data-theme='light']) .check.bad,
+  :root:not([data-theme='light']) .contact-card.bad > svg,
+  :root:not([data-theme='light']) .foot-note.bad {
+    color: #F2A29C;
+  }
+}
+
+:root[data-theme='dark'] .factor-row.bad {
+  border-color: #6B2A26;
+  background: #2A1A19;
+}
+
+:root[data-theme='dark'] .check.bad,
+:root[data-theme='dark'] .contact-card.bad > svg,
+:root[data-theme='dark'] .foot-note.bad {
+  color: #F2A29C;
+}
+
+.own-select {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.own-select select {
+  align-self: flex-start;
+  min-width: 200px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background-color: var(--surface);
+  color: var(--ink);
+  font: 13px var(--font);
+}
+
+/* The samples of an expression table, to tick the ones a job takes. */
+.own-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  max-height: 132px;
+  margin: 0;
+  padding: 8px 12px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.own-samples legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.own-sample {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.routes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+/* A choice of a step. Every choice has one height, with an icon or without, in every step. */
+.route {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 62px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.route[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.route > svg {
+  flex: none;
+}
+
+.route-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.route-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.link-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.link-field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.link-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.link-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--font);
+  outline: none;
+}
+
+.read-button {
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 13px var(--font);
+  cursor: pointer;
+}
+
+.contact-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.contact-card > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.contact-card.good > svg {
+  color: var(--enhancer);
+}
+
+.contact-card.bad > svg {
+  color: #A11B12;
+}
+
+.contact-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.contact-card .contact-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.contact-card .contact-body {
+  overflow-wrap: anywhere;
+}
+
+.hint-card {
+  color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .wizard {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  :global(.wizard-steps) {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  :global(.wizard-steps) [role='tab'] {
+    flex: none;
+  }
+
+  .routes {
+    grid-template-columns: 1fr;
+  }
+
+  .row-head {
+    flex-wrap: wrap;
+  }
+
+  .factor-name {
+    flex: 1 1 100%;
+  }
+
+  .foot-note {
+    flex: 1 1 100%;
+  }
+}

@@ -1,21 +1,25 @@
+import { Unanswered } from '../components/Unanswered'
+import { askedOf } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { Ruler } from 'lucide-react'
 import { useState } from 'react'
-import type { Annotations, JobApi, Loop, Structure, Summary } from './api'
+import type { Annotations, JobApi, Loop, Structure, Summary } from '../api'
 import type { Mode } from './colors'
 import { FindGene } from './FindGene'
-import { bp, kb } from './format'
+import { bp, kb } from '../lib/format'
 import { GeneCard } from './GeneCard'
-import { LoopView, sameLoop } from './LoopView'
+import { LoopView } from './LoopView'
+import { sameLoop } from './loops'
 import { DistanceCard } from './Measure'
-import { beadAt, StructureView } from './StructureView'
+import { StructureView } from './StructureView'
+import { beadAt, solidSpan } from './structure'
+import { parseRegion } from '../lib/region'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
 
-export function parseRegion(region: string | null): { chrom: string; start: number; end: number } | null {
-  const m = region?.match(/^(\w+):(\d+)-(\d+)$/)
-  return m ? { chrom: m[1], start: Number(m[2]), end: Number(m[3]) } : null
-}
+const cn = scoped(sheet)
 
-/** What a measured position is: a gene's TSS, an enhancer or a plain coordinate. */
+/** Returns the kind of a measured position, the TSS of a gene, an enhancer or a plain coordinate. */
 function describe(pos: number, chrom: string, ann: Annotations): string {
   const gene = ann.genes.find((g) => Math.abs(g.tss - pos) <= 5000)
   if (gene) return `${gene.name} TSS, ${chrom}:${bp(pos)}`
@@ -25,27 +29,21 @@ function describe(pos: number, chrom: string, ann: Annotations): string {
 
 const mid = (s: Structure, k: number) => Math.round((s.beads[k][0] + s.beads[k][1]) / 2)
 
-/** The stretch of the genome the model keeps solid: the whole chain between the two anchors of
- * a selected loop, and without one the part of the region chosen on the loop view. */
-export function solidSpan(loop: Loop | null, part: [number, number] | null): [number, number] | null {
-  return loop ? [(loop.a[0] + loop.a[1]) / 2, (loop.b[0] + loop.b[1]) / 2] : part
-}
-
-/** The card of a selected loop: its factor, its two anchors, its span and its PET count. */
+/** The card of a selected loop, with its factor, its two anchors, its span and its PET count. */
 function LoopCard({ loop }: { loop: Loop }) {
   return (
-    <section className="side-card" aria-label="Selected loop">
-      <p className="card-label">Selected loop</p>
+    <section className={cn('side-card')} aria-label="Selected loop">
+      <p className={cn('card-label')}>Selected loop</p>
       <p>
-        <span className={`loop-badge ${loop.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}`}>{loop.factor}</span>
+        <span className={cn(`loop-badge ${loop.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}`)}>{loop.factor}</span>
       </p>
-      <p className="point">
-        <span className="marker">A</span> <span className="mono">{`${loop.chrom}:${bp(loop.a[0])}-${bp(loop.a[1])}`}</span>
+      <p className={cn('point')}>
+        <span className={cn('marker')}>A</span> <span className="mono">{`${loop.chrom}:${bp(loop.a[0])}-${bp(loop.a[1])}`}</span>
       </p>
-      <p className="point">
-        <span className="marker">B</span> <span className="mono">{`${loop.chrom}:${bp(loop.b[0])}-${bp(loop.b[1])}`}</span>
+      <p className={cn('point')}>
+        <span className={cn('marker')}>B</span> <span className="mono">{`${loop.chrom}:${bp(loop.b[0])}-${bp(loop.b[1])}`}</span>
       </p>
-      <p className="card-text">{`The anchors are ${kb(loop.span)} apart on the genome and the loop has ${loop.pets} PET${loop.pets === 1 ? '' : 's'}.`}</p>
+      <p className={cn('card-text')}>{`The anchors are ${kb(loop.span)} apart on the genome and the loop has ${loop.pets} PET${loop.pets === 1 ? '' : 's'}.`}</p>
     </section>
   )
 }
@@ -62,8 +60,10 @@ type Props = {
   onLoop?: (loop: Loop | null) => void
 }
 
-/** The Structure tab: the selected structure in 3D, its loops in two dimensions under it,
- * measurement between two beads over the ensemble and the card of a selected gene or loop. */
+/**
+ * The Structure tab. It has the selected structure in 3D, its loops in two dimensions under it,
+ * measurement between two beads over the ensemble and the card of a selected gene or loop.
+ */
 export function StructureTab({ api, summary, selected, gene: geneProp, onGene, onOpenGenes = () => {}, loop: loopProp, onLoop }: Props) {
   const [mode, setMode] = useState<Mode>('elements')
   const [measure, setMeasure] = useState(false)
@@ -77,21 +77,17 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
   const setLoop = (l: Loop | null) => (onLoop ? onLoop(l) : setOwnLoop(l))
   const gene = geneProp !== undefined ? geneProp : ownGene
   const setGene = (g: string | null) => (onGene ? onGene(g) : setOwnGene(g))
-  const structure = useQuery({ queryKey: ['structure', api.base, selected], queryFn: () => api.structure(selected) })
-  const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
-  const genes = useQuery({ queryKey: ['genes', api.base], queryFn: api.genes })
+  const structure = useQuery(askedOf(api).structure(selected))
+  const annotations = useQuery(askedOf(api).annotations())
+  const genes = useQuery(askedOf(api).genes())
   const row = genes.data?.find((r) => r.gene === gene)
   const s = structure.data
-  // A selected loop is its two anchors: the beads that hold the middles of its two ends.
+  // A selected loop is its two anchors, the beads that hold the middles of its two ends.
   const loopBeads = s && loop ? [beadAt(s.beads, (loop.a[0] + loop.a[1]) / 2), beadAt(s.beads, (loop.b[0] + loop.b[1]) / 2)] : null
   const pair = row ? [row.promoter_bead, row.enhancer_bead] : (loopBeads ?? picks)
-  const distance = useQuery({
-    queryKey: ['distance', api.base, pair[0], pair[1]],
-    queryFn: () => api.distance(mid(s!, pair[0]), mid(s!, pair[1])),
-    enabled: !!s && pair.length === 2,
-  })
+  const distance = useQuery({ ...askedOf(api).distance(s && pair.length === 2 ? mid(s, pair[0]) : 0, s && pair.length === 2 ? mid(s, pair[1]) : 0), enabled: !!s && pair.length === 2 })
   const region = parseRegion(summary.region)
-  if (!s || !annotations.data || !region) return <div className="view-box" aria-busy="true" />
+  if (!s || !annotations.data || !region) return <Unanswered of={[structure, annotations]} className={cn('view-box')} />
   const markers = pair.map((k, i) => ({ label: 'AB'[i], at: [s.beads[k][2], s.beads[k][3], s.beads[k][4]] as [number, number, number] }))
   const loops = annotations.data.loops
   const loopIndex = loop ? loops.findIndex((l) => sameLoop(l, loop)) : -1
@@ -102,7 +98,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
     setPicks((p) => (p.length >= 2 ? [k] : [...p, k]))
   }
   return (
-    <div className="structure-tab">
+    <div className={cn('structure-tab')}>
       <StructureView
         structure={s}
         annotations={annotations.data}
@@ -139,12 +135,12 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
         }
         toolbarStart={<FindGene names={(genes.data ?? []).map((r) => r.gene)} onFind={(g) => { setLoop(null); setGene(g) }} />}
         toolbarEnd={
-          <button type="button" className={measure ? 'measure on' : 'measure'} aria-pressed={measure} onClick={() => setMeasure((m) => !m)}>
+          <button type="button" className={cn(measure ? 'measure on' : 'measure')} aria-pressed={measure} onClick={() => setMeasure((m) => !m)}>
             <Ruler size={14} aria-hidden /> Measure
           </button>
         }
       />
-      <div className="side-cards">
+      <div className={cn('side-cards')}>
         {distance.data && pair.length === 2 && (
           <DistanceCard
             d={distance.data}

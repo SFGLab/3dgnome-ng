@@ -55,7 +55,7 @@ describe('Variants', () => {
   it('takes a typed sample of a large call set once it names one', () => {
     const onChange = vi.fn()
     const samples = Array.from({ length: 3202 }, (_, i) => `HG${String(i).padStart(5, '0')}`)
-    const big = { ...CATALOG, sv_sets: { ...CATALOG.sv_sets, KGP: { label: '1000 Genomes', samples } } }
+    const big = { ...CATALOG, sv_sets: { ...CATALOG.sv_sets, KGP: { label: '1000 Genomes', samples, sample_table: false } } }
     render(<Variants catalog={big} svSet="KGP" sample="" haplotype={0} vcfUpload={null} onChange={onChange} onOpen={vi.fn()} />)
     const field = screen.getByLabelText('Sample')
     expect(field.tagName).toBe('INPUT')
@@ -70,7 +70,7 @@ describe('Variants', () => {
   it('drops the sample of a large call set when the text no longer names one', () => {
     const onChange = vi.fn()
     const samples = Array.from({ length: 100 }, (_, i) => `NA${String(i).padStart(5, '0')}`)
-    const big = { ...CATALOG, sv_sets: { KGP: { label: '1000 Genomes', samples } } }
+    const big = { ...CATALOG, sv_sets: { KGP: { label: '1000 Genomes', samples, sample_table: false } } }
     render(<Variants catalog={big} svSet="KGP" sample="NA00007" haplotype={0} vcfUpload={null} onChange={onChange} onOpen={vi.fn()} />)
     expect(screen.getByLabelText('Sample')).toHaveValue('NA00007')
     fireEvent.change(screen.getByLabelText('Sample'), { target: { value: 'NA0000' } })
@@ -168,11 +168,16 @@ describe('Background', () => {
     expect(screen.getByText('HiCDiffusion is not set up on this server.')).toBeInTheDocument()
   })
 
-  it('warns for a cell type that is not lymphoblastoid', () => {
-    const { rerender } = render(<Background value="hic" region={REGION_1MB} available lymphoblastoid onChange={() => {}} />)
+  it('warns for a cell type that is not lymphoblastoid once HiCDiffusion is chosen', () => {
+    const { rerender } = render(<Background value="hicdiffusion" region={REGION_1MB} available lymphoblastoid onChange={() => {}} />)
     expect(screen.queryByText(/HiCDiffusion was trained on GM12878/)).toBeNull()
+    // Another background of the same cell type has no use for the note.
     rerender(<Background value="hic" region={REGION_1MB} available lymphoblastoid={false} onChange={() => {}} />)
-    expect(screen.getByText(/HiCDiffusion was trained on GM12878/)).toBeInTheDocument()
+    expect(screen.queryByText(/HiCDiffusion was trained on GM12878/)).toBeNull()
+    rerender(<Background value="none" region={REGION_1MB} available lymphoblastoid={false} onChange={() => {}} />)
+    expect(screen.queryByText(/HiCDiffusion was trained on GM12878/)).toBeNull()
+    rerender(<Background value="hicdiffusion" region={REGION_1MB} available lymphoblastoid={false} onChange={() => {}} />)
+    expect(screen.getByText('HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data.')).toBeInTheDocument()
   })
 
   it('keeps to the writing rules', () => {

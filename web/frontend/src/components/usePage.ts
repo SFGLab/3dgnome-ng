@@ -8,7 +8,7 @@ const KEY = 'gnome3d.rows'
 
 export type Page<T> = { rows: T[]; at: number; total: number; size: number; go: (at: number) => void; setSize: (size: number) => void }
 
-/** The reader's last choice of rows per page, kept in the browser. */
+/** Returns the last choice of rows per page of the reader, kept in the browser. */
 function remembered(fallback: number): number {
   try {
     const n = Number(localStorage.getItem(KEY))
@@ -18,8 +18,10 @@ function remembered(fallback: number): number {
   }
 }
 
-/** One page of rows. `reset` changes when a filter or sort does and sends the table back to
- * its first page, as a change of the rows per page does. */
+/**
+ * Returns one page of rows. `reset` changes with a filter or a sort and sends the table back to its
+ * first page, as a change of the rows per page does.
+ */
 export function usePage<T>(all: T[], reset: unknown = null, size = PAGE): Page<T> {
   const [at, setAt] = useState(0)
   const [rows, setRows] = useState(() => remembered(size))

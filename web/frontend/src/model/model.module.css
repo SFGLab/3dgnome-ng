@@ -1,0 +1,992 @@
+.model-page :global(.reading).model-form {
+  max-width: 860px;
+  gap: 18px;
+}
+
+:global(.step) {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+:global(.reading) .step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.step-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.cell-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cell-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.cell-card[aria-checked='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.cell-card.own {
+  border-style: dashed;
+  border-color: var(--faint);
+}
+
+.cell-card.own[aria-checked='true'] {
+  border-color: var(--accent);
+}
+
+/* The own data card is the last card. As the first card of a row it takes the whole row. */
+.cell-card.own:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.cell-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cell-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.chip {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.catalog-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.region-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.region-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.region-input:global(.error) {
+  border-color: #C2410C;
+}
+
+.region-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 14px var(--font);
+  outline: none;
+}
+
+.region-field {
+  position: relative;
+}
+
+/* The genes that match the typed text, over the content below the field. */
+.gene-options {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  /* About seven genes are seen and the rest scroll. */
+  max-height: 252px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.gene-options li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gene-options li.active {
+  background: var(--accent-soft);
+}
+
+.gene-name {
+  font-weight: 600;
+}
+
+.gene-place {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.resolved {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.model-side :global(.eyebrow) {
+  margin-top: 10px;
+}
+
+.example-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A tag too long to share the line with the title goes below it. */
+.example-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 8px;
+}
+
+.example-gene {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.example-cell {
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.example-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+:global(.side-panel) a:global(.recent-job) {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+}
+
+.recent-region {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.recent-state {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.retention {
+  margin: 12px 10px 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+@media (max-width: 960px) {
+  .cell-types {
+    grid-template-columns: 1fr;
+  }
+}
+
+.loop-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border-radius: 8px;
+}
+
+.loop-preview[aria-busy='true'] {
+  height: 150px;
+  background: var(--panel);
+  border-radius: 8px;
+}
+
+.arc {
+  fill: none;
+  stroke-width: 1.5;
+  opacity: 0.75;
+}
+
+.arc:global(.ctcf) {
+  stroke: var(--ctcf);
+}
+
+.arc.rnapii {
+  stroke: var(--rnapii);
+}
+
+.arc.faint {
+  opacity: 0.15;
+}
+
+.axis {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+/* The region as a box over the loops, its two edges sliders. */
+/* A region longer than a job takes has the colour of an error on its box, its edges and the line
+   under the loops. */
+.loop-preview.too-long {
+  --region: #A11B12;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .loop-preview.too-long {
+    --region: #F2A29C;
+  }
+}
+
+:root[data-theme='dark'] .loop-preview.too-long {
+  --region: #F2A29C;
+}
+
+.region-box {
+  fill: color-mix(in srgb, var(--region, var(--accent)) 12%, transparent);
+}
+
+.region-box.movable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.region-box.movable:active {
+  cursor: grabbing;
+}
+
+.region-edge {
+  stroke: var(--region, var(--accent));
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.region-handle {
+  fill: var(--surface);
+  stroke: var(--region, var(--accent));
+  stroke-width: 1.5;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.region-handle:hover,
+.region-handle:focus-visible {
+  fill: var(--accent-soft);
+  outline: none;
+}
+
+.preview-span {
+  margin-left: auto;
+  font-family: var(--mono);
+}
+
+.preview-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.preview-hint.too-long {
+  color: var(--region);
+}
+
+.preview-hint.too-long :global(.link-button) {
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+.gene-tick {
+  stroke: var(--faint);
+}
+
+.gene-tick.named {
+  stroke: var(--promoter);
+  stroke-width: 2;
+}
+
+.gene-label {
+  fill: var(--ink);
+  font: 600 10px var(--font);
+}
+
+.side-label {
+  fill: var(--muted);
+  font: 10px var(--font);
+}
+
+.preview-key {
+  display: flex;
+  gap: 16px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key-line {
+  width: 14px;
+  height: 2px;
+}
+
+.key-line:global(.ctcf) {
+  background: var(--ctcf);
+}
+
+.key-line.rnapii {
+  background: var(--rnapii);
+}
+
+.options {
+  display: grid;
+  gap: 10px;
+}
+
+.options:global(.two) {
+  grid-template-columns: 1fr 1fr;
+}
+
+.options.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.option[aria-checked='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.option:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.radio-dot {
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border: 1.5px solid var(--faint);
+  border-radius: 50%;
+  background: var(--bg);
+}
+
+.option[aria-checked='true'] .radio-dot {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 4px, var(--bg) 4.5px);
+}
+
+.option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.option-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.option:global(.card) .option-title {
+  font-size: 13px;
+}
+
+.option-desc,
+.option-reason {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.option-reason {
+  color: #B45309;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* Opens the dialog with the sample's variants and what each does to the loops. */
+.preview-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: 500 13px var(--font);
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+
+.preview-button svg:first-child {
+  color: var(--accent);
+}
+
+.preview-button .chevron {
+  color: var(--muted);
+  transition: transform 120ms;
+}
+
+.preview-button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.preview-button:hover .chevron {
+  color: var(--accent);
+  transform: translateX(2px);
+}
+
+/* The call set's label is long and the haplotype is one word. */
+.variants .fields {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(7.5rem, 0.8fr);
+}
+
+.upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.upload input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.upload.chosen {
+  border-style: solid;
+  color: var(--ink);
+  cursor: default;
+}
+
+:global(.icon-button) {
+  margin-left: auto;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* The line over the form with the job that filled it. */
+.filled-from {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #FFF4DC;
+  color: #6B4A00;
+  font-size: 12px;
+}
+
+@media (max-width: 960px) {
+  .options:global(.two),
+  .options.three,
+  .fields,
+  .variants .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fields:global(.two) {
+  grid-template-columns: 1fr 2fr;
+}
+
+:global(.settings) {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.settings-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.changed-badge,
+.badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #FFF4DC;
+  color: #6B4A00;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.settings-actions {
+  display: inline-flex;
+  gap: 14px;
+}
+
+.settings-actions button,
+.settings-actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 12px var(--font);
+  cursor: pointer;
+}
+
+.settings-actions button:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+.settings-actions input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.refused {
+  margin: 0;
+  padding: 8px 14px 8px 30px;
+  background: #FFF4DC;
+  color: #6B4A00;
+  font-size: 12px;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 300px;
+}
+
+.tree-pane {
+  padding: 10px;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--faint);
+}
+
+.filter input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 12px var(--font);
+  outline: none;
+}
+
+.tree-pane ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:global(.node) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 12px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+:global(.node):global(.open) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+:global(.node) .badge {
+  margin-left: auto;
+}
+
+.leaf {
+  padding: 3px 8px 3px 28px;
+  color: var(--muted);
+  font: 11px var(--mono);
+}
+
+.setting-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 18px;
+}
+
+.pane-head h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pane-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setting-key {
+  flex: 1;
+  font: 600 12px var(--mono);
+}
+
+:global(.reset) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font: 11px var(--font);
+  cursor: pointer;
+}
+
+.value-box {
+  width: 90px;
+  padding: 5px 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font: 12px var(--mono);
+}
+
+/* A choice grows with its longest option. */
+select.value-box {
+  flex: none;
+  width: auto;
+  min-width: 90px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.setting.changed .value-box {
+  border-color: #D9A400;
+}
+
+.setting:not(:has(select)) .value-box {
+  align-self: flex-end;
+  margin-top: -28px;
+}
+
+.slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 18px;
+  touch-action: none;
+  user-select: none;
+}
+
+.slider-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.slider-range {
+  position: absolute;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.slider-thumb {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--faint);
+}
+
+.setting-meaning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 960px) {
+  .panes,
+  .fields:global(.two) {
+    grid-template-columns: 1fr;
+  }
+  .tree-pane {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.submit-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #FFFFFF;
+  font: 600 14px var(--font);
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.timing {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.own-summary {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.own-summary :global(.link-button) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.loops-of {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.loops-of select {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.sample-facts {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sample-facts :global(.link-button) {
+  display: inline;
+  font: inherit;
+}
+
+/* The uploaded expression table under the cards. */
+.upload.own-table {
+  font-size: 13px;
+}
+
+.own-table :global(.link-button) {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.own-table :global(.icon-button) {
+  margin-left: 6px;
+}

@@ -1,4 +1,4 @@
-# The engines of the workers on the NVIDIA MPS daemon of the host. Use with docker-compose.yml:
+# The engines of the workers on the NVIDIA MPS daemon of the host. Use with docker-compose.yml.
 #   nvidia-cuda-mps-control -d          # on the host, once
 #   docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
 # The workers share the IPC namespace of the host and the pipe directory of the daemon, /tmp/nvidia-

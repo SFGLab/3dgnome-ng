@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { Better, ChartKey, type Direction, type Series } from './BarChart'
-import './barchart.css'
-import './linechart.css'
+import { scoped } from '../lib/css'
+import sheet1 from './barchart.module.css'
+import sheet2 from './linechart.module.css'
+
+const cn = scoped(sheet1, sheet2)
 
 export type Point = { x: number; seconds: number; region: string; beads: number }
 export type Line = { series: Series; name: string; points: Point[] }
@@ -16,7 +19,7 @@ const TIME_TICKS: [number, string][] = [
   [3600, '1 h'],
 ]
 
-/** Seconds as the reader says them, seconds under a minute and minutes above. */
+/** Returns seconds in the words of a reader, seconds under a minute and minutes above. */
 function duration(seconds: number): string {
   return seconds < 60 ? `${seconds.toFixed(seconds < 10 ? 1 : 0)} s` : `${(seconds / 60).toFixed(1)} min`
 }
@@ -62,41 +65,41 @@ export function LineChart({
   return (
     <figure className="bar-chart line-chart" aria-label={title}>
       <figcaption>
-        <span className="chart-head">
+        <span className={cn('chart-head')}>
           <span className="chart-title">{title}</span>
           {better && <Better dir={better} />}
         </span>
         <span className="chart-sub">{subtitle}</span>
       </figcaption>
       <ChartKey series={lines.map((l) => l.series)} label={`Key of ${title}`} />
-      <div className="line-plot">
+      <div className={cn('line-plot')}>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${title}, values in the table below`}>
           {TIME_TICKS.filter(([t]) => t >= y0 && t <= y1).map(([t, label]) => (
             <g key={t}>
-              <line className="grid" x1={PAD.left} x2={W - PAD.right} y1={py(t)} y2={py(t)} />
-              <text className="tick" x={PAD.left - 6} y={py(t) + 3.5} textAnchor="end">
+              <line className={cn('grid')} x1={PAD.left} x2={W - PAD.right} y1={py(t)} y2={py(t)} />
+              <text className={cn('tick')} x={PAD.left - 6} y={py(t) + 3.5} textAnchor="end">
                 {label}
               </text>
             </g>
           ))}
           {decades(x0, x1).map((x) => (
-            <text key={x} className="tick" x={px(x)} y={H - PAD.bottom + 14} textAnchor="middle">
+            <text key={x} className={cn('tick')} x={px(x)} y={H - PAD.bottom + 14} textAnchor="middle">
               {xTick(x)}
             </text>
           ))}
-          <line className="axis" x1={PAD.left} x2={W - PAD.right} y1={H - PAD.bottom} y2={H - PAD.bottom} />
-          <text className="tick" x={(PAD.left + W - PAD.right) / 2} y={H - 4} textAnchor="middle">
+          <line className={cn('axis')} x1={PAD.left} x2={W - PAD.right} y1={H - PAD.bottom} y2={H - PAD.bottom} />
+          <text className={cn('tick')} x={(PAD.left + W - PAD.right) / 2} y={H - 4} textAnchor="middle">
             {xLabel}
           </text>
           {lines.map((l) => (
-            <polyline key={l.series} className={`line ${l.series}`} points={l.points.map((p) => `${px(p.x)},${py(p.seconds)}`).join(' ')} />
+            <polyline key={l.series} className={cn(`line ${l.series}`)} points={l.points.map((p) => `${px(p.x)},${py(p.seconds)}`).join(' ')} />
           ))}
           {lines.map((l) =>
             l.points.map((p) => (
               <g key={`${l.series}-${p.x}`}>
-                <circle className={`dot ${l.series}`} cx={px(p.x)} cy={py(p.seconds)} r={hot?.point === p ? 5 : 3.5} />
+                <circle className={cn(`dot ${l.series}`)} cx={px(p.x)} cy={py(p.seconds)} r={hot?.point === p ? 5 : 3.5} />
                 <circle
-                  className="hit"
+                  className={cn('hit')}
                   cx={px(p.x)}
                   cy={py(p.seconds)}
                   r={11}
@@ -111,13 +114,14 @@ export function LineChart({
             )),
           )}
           {ends.map(({ l, y }) => {
-            // Names sit in one column right of the plot. A line that ends short of it gets a leader.
+            // The names are in one column right of the plot. A line that
+            // ends short of it gets a leader.
             const last = l.points[l.points.length - 1]
             const edge = W - PAD.right + 6
             return (
               <g key={l.series}>
-                {px(last.x) < edge - 12 && <line className="leader" x1={px(last.x) + 6} y1={py(last.seconds)} x2={edge} y2={y} />}
-                <text className="end-label" x={edge + 3} y={y + 3.5}>
+                {px(last.x) < edge - 12 && <line className={cn('leader')} x1={px(last.x) + 6} y1={py(last.seconds)} x2={edge} y2={y} />}
+                <text className={cn('end-label')} x={edge + 3} y={y + 3.5}>
                   {l.name}
                 </text>
               </g>
@@ -126,13 +130,13 @@ export function LineChart({
         </svg>
         {hot && (
           <div
-            className="line-tip"
+            className={cn('line-tip')}
             role="status"
             style={{ left: `${(px(hot.point.x) / W) * 100}%`, top: `${(py(hot.point.seconds) / H) * 100}%` }}
           >
             <strong>{duration(hot.point.seconds)}</strong>
             <span>
-              <i className={`swatch ${hot.line.series}`} />
+              <i className={cn(`swatch ${hot.line.series}`)} />
               {hot.line.name}
             </span>
             <span>
@@ -141,7 +145,7 @@ export function LineChart({
           </div>
         )}
       </div>
-      <details className="line-table">
+      <details className={cn('line-table')}>
         <summary>Table</summary>
         <table>
           <thead>

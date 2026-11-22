@@ -1,22 +1,27 @@
-"""Contact maps of a job, ICE balancing and the stratum adjusted correlation.
-
-    pytest web/tests/test_contacts.py
-"""
+"""Contact maps of a job, ICE balancing and the stratum adjusted correlation."""
 
 from __future__ import annotations
 
+import gzip
+import json
 import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import pandas as pd
 import pytest
 from fixture import make_data
 
 from gnome3d_web.contacts import (
+    MAX_BINS,
+    bins_for,
+    coarsest_fit,
+    hic_map,
     ice,
     loop_enrichment,
+    loop_map,
     median_bond,
     model_map,
     multimm_map,
@@ -27,8 +32,19 @@ from gnome3d_web.contacts import (
 )
 
 
+def square(once: list[list[float]]) -> np.ndarray:
+    """Returns the whole map of an answer, which holds each pair of bins once, row i from column i on."""
+    n = len(once)
+    m = np.zeros((n, n))
+    for i, row in enumerate(once):
+        m[i, i:] = row
+        m[i:, i] = row
+    return m
+
+
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
-    """legacy/validation/metrics/hic.py _scc, copied: whole diagonals weighted by length and both spreads."""
+    """Computes the stratum adjusted correlation of the validation battery, from whole diagonals weighted by
+    length and both spreads."""
     num = den = 0.0
     for dd in range(1, min(max_sep_bins, A.shape[0] - 1) + 1):
         a, b = np.diagonal(A, dd), np.diagonal(B, dd)
@@ -136,7 +152,35 @@ def test_the_multimm_map_is_1_d_1_3_of_bin_centroids_in_units_of_the_median(sums
     assert abs(median_bond([np.array([[0.0, 0, 0], [1.0, 0, 0], [3.0, 0, 0], [4.0, 0, 0]])]) - 1.0) < 1e-12, "the median bond of a chain"
 
 
-def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_path: Path) -> None:
+def test_every_kind_of_map_is_symmetric(sums_and_rng: SimpleNamespace) -> None:
+    rng = np.random.default_rng(3)
+    pos = [rng.normal(size=(40, 3)) * 3 for _ in range(3)]
+    mids = np.arange(40) * 25_000 + 12_500
+    sing = pd.DataFrame({0: "chr1", 1: rng.integers(0, 1_000_000, 300), 2: 0, 3: "chr1", 4: rng.integers(0, 1_000_000, 300), 5: 0, 6: rng.integers(1, 9, 300)})
+    half = rng.random((30, 30))
+    maps = {
+        "the model as 1/(d+1)^3": multimm_map(pos, mids, 0, 1_000_000, 50_000),
+        "the model as counted contacts": model_map(pos, mids, 0, 1_000_000, 50_000),
+        "the contacts of a BEDPE": hic_map(sing, "chr1", 0, 1_000_000, 50_000),
+        "the loops": loop_map([(120_000, 480_000, 7), (300_000, 910_000, 3)], 0, 1_000_000, 50_000),
+        "a map on bins of its own": window_map(half + half.T, 0, 8_192, 0, 240_000, 25_000),
+    }
+    for name, m in maps.items():
+        assert m.sum() > 0 and np.allclose(m, m.T), f"{name} is symmetric and one half of it is the whole map"
+        assert np.allclose(ice(m), ice(m).T), f"{name} stays symmetric when balanced"
+
+
+def test_the_longest_job_fits_a_map_at_25_kb() -> None:
+    longest = 20_000_000
+    # A start off the grid of the bins adds a bin. Insertions add their bases to the region.
+    for start, extra in ((120_184_079, 0), (120_184_079, 5_253), (0, 0), (37_615_000, 500_000)):
+        n = len(bins_for(start, start + longest + extra, 25_000))
+        assert n <= MAX_BINS, f"a job of {longest + extra:,} bp from {start:,} has {n} bins at 25 kb, over {MAX_BINS}"
+        assert coarsest_fit(start, start + longest + extra) <= 25_000, "the finest fit of the longest job is 25 kb or finer"
+    assert coarsest_fit(0, 40_000_000) == 50_000, "a window of 40 Mb fits at 50 kb"
+
+
+def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     d = str(tmp_path)
     root = Path(d)
     make_data(root / "data")
@@ -153,6 +197,7 @@ def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_
     r = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model", "norm": "raw"}).json()
     n = len(r["bins"])
     assert n == 120 and len(r["upper"]) == n and len(r["lower"][0]) == n and r["bins"][1] - r["bins"][0] == 25000, "the endpoint returns two square maps on the bins of the resolution: " + str(n)
+    assert [len(row) for row in r["upper"]] == list(range(n, 0, -1)) and [len(row) for row in r["lower"]] == list(range(n, 0, -1)), "each map holds each pair of bins once, row i from column i on"
     assert r["upper_label"].startswith("Hi-C") and "2 structures" in r["lower_label"] and "1/(d+1)" in r["lower_label"], "the halves are labelled: " + str((r["upper_label"], r["lower_label"]))
     assert "Hi-C of GMX" in r["scc_about"] and "1/(d+1)" in r["scc_about"] and "raw" in r["scc_about"], "the agreement names the two halves it compares: " + str(r.get("scc_about"))
     assert "rank" in r and (r["rank"] is None or -1 <= r["rank"] <= 1) and "ranked" in r["rank_about"] and "balanced" in r["rank_about"] and isinstance(r["rank_reach"], int), "the rank agreement comes with what it compares: " + str(r.get("rank_about"))
@@ -165,14 +210,14 @@ def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_
     assert battery["scc"] == counted["scc"] and "validation battery" in battery["scc_about"], "Hi-C against the counted model is the battery's number, whatever the display: " + str(battery.get("scc_about"))
 
     lp = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "loops_ctcf", "lower": "model", "norm": "raw"}).json()
-    up = np.array(lp["upper"])
+    up = square(lp["upper"])
     assert up.sum() > 0 and "CTCF loops" in lp["upper_label"], "a loop half bins each CTCF loop at its anchors: " + str(lp.get("upper_label", lp))
 
     lp_ice = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "loops_ctcf", "lower": "model", "norm": "ice"}).json()
     assert lp_ice["upper"] == lp["upper"], "a loop half is never balanced: " + "ice changed the loop half"
     assert isinstance(lp.get("loop_enrichment"), float), "with loops on one side the card has the enrichment: " + str(lp.get("loop_enrichment"))
 
-    from gnome3d_web import explore as ex
+    from gnome3d_web.results import contact_view as ex
 
     reads: list[tuple] = []
 
@@ -181,7 +226,7 @@ def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_
         b0 = np.arange(start - start % res, end, res)
         return b0[:-1], b0[1:], np.full(len(b0) - 1, 7)
 
-    ex._read_deep = fake
+    monkeypatch.setattr(ex, "_read_deep", fake)
     job = root / "results" / "jobs" / url.split("/")[-1]
     deep = ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
     ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
@@ -189,6 +234,17 @@ def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_
     assert len(reads) == 1 and reads[0][1:3] == (0, 3000000), "a deep map is read once per resolution over the job's region and windows are cut from it: " + str(reads)
     assert "4DN deep map" in deep["upper_label"] and "4DN deep map" in deep["scc_about"], "the Hi-C half names the deep map: " + str(deep["upper_label"])
     assert r["scc"] is None or -1 <= r["scc"] <= 1, "the agreement is a number or null: " + str(r["scc"])
+
+    # The answer is gzipped for a client that takes gzip and plain for one that does not.
+    ask = {"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model", "norm": "raw"}
+    plain = c.get(f"/api{url}/contacts", params=ask, headers={"Accept-Encoding": "identity"})
+    assert "content-encoding" not in plain.headers and plain.json() == r, "a client that takes no gzip gets the answer plain: " + str(dict(plain.headers))
+    with c.stream("GET", f"/api{url}/contacts", params=ask, headers={"Accept-Encoding": "gzip, deflate"}) as zipped:
+        sent = b"".join(zipped.iter_raw())
+    assert zipped.headers["content-encoding"] == "gzip" and zipped.headers["vary"] == "Accept-Encoding", "a client that takes gzip gets gzip: " + str(dict(zipped.headers))
+    assert zipped.headers["content-type"] == "application/json", "the answer is still JSON: " + zipped.headers["content-type"]
+    assert json.loads(gzip.decompress(sent)) == r, "the gzipped answer holds the same maps"
+    assert len(sent) < len(plain.content) / 2, f"the gzipped answer is under half of the plain one: {len(sent)} against {len(plain.content)}"
 
     bad = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 2000, "upper": "hic", "lower": "model"})
     assert bad.status_code == 400 and "5 kb" in bad.json()["error"], "too many bins is a 400 naming a resolution that fits: " + bad.text

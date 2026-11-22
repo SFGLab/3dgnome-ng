@@ -1,10 +1,7 @@
-"""Contact maps by link: range requests, the window of an .mcool read over HTTP, the refusals and
-the thinning to the density of the hosted maps.
+"""Contact maps by link. The tests cover range requests, the window of an .mcool read over HTTP, the
+refusals and the thinning to the density of the hosted maps.
 
-    pytest web/tests/test_remote.py
-
-A .hic link is checked by hand against a public 4DN file. There is no writer for a
-.hic fixture.
+A .hic link is checked by hand against a public 4DN file. There is no writer for a .hic fixture.
 """
 
 from __future__ import annotations
@@ -24,8 +21,8 @@ from fixture import make_data
 
 
 def serve(root: Path, ranges: bool, html: bool = False, head: bool = True, slow: float = 0.0) -> tuple[ThreadingHTTPServer, str]:
-    """A file server on a free port that answers range requests, or answers every request whole.
-    Without head it refuses HEAD requests, as an S3 link signed for GET does."""
+    """Starts a file server on a free port that answers range requests, or answers every request
+    whole. Without head it refuses HEAD requests, as an S3 link signed for GET does."""
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: object) -> None:
@@ -89,7 +86,7 @@ def serve(root: Path, ranges: bool, html: bool = False, head: bool = True, slow:
 
 
 def write_mcool(singletons: Path, out: Path) -> None:
-    """The fixture's contact pairs as a multi resolution cooler at 5 and 25 kb."""
+    """Writes the contact pairs of the fixture as a multi resolution cooler at 5 and 25 kb."""
     import cooler
 
     t = pd.read_csv(singletons, sep="\t", header=None)
@@ -124,11 +121,11 @@ def shared(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
     return SimpleNamespace(remote=remote, url=url, size=size, url_whole=url_whole, data=data, root=root, url_signed=url_signed, url_page=url_page, url_slow=url_slow, with_ranges=with_ranges, whole=whole, page=page, signed=signed, slow=slow)
 
 
-def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespace) -> None:
+def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     remote, url, size, url_whole = shared.remote, shared.url, shared.size, shared.url_whole
-    assert remote.check_range(f"{url}/test.mcool") == size, "a server with range requests gives the file size"
+    assert remote.probe(f"{url}/test.mcool", allow_private=True)[0] == size, "a server with range requests gives the file size"
     try:
-        remote.check_range(f"{url_whole}/test.mcool")
+        remote.probe(f"{url_whole}/test.mcool", allow_private=True)
         assert False, "a server without range requests is refused"
     except remote.RemoteError as e:
         assert "does not answer range requests" in str(e) and "Local .hic file" in e.fix, "a server without range requests is refused: " + f"{e} {e.fix}"
@@ -138,11 +135,9 @@ def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespac
     assert size_seen == size and final == f"{url}/test.mcool", "a redirect is followed to the file it names: " + str(final)
     seen: list[str] = []
     real_resolve = remote._resolve
-    remote._resolve = lambda host, p: seen.append(host) or real_resolve(host, p)
-    try:
+    with monkeypatch.context() as m:
+        m.setattr(remote, "_resolve", lambda host, p: seen.append(host) or real_resolve(host, p))
         remote.probe(hop.replace("127.0.0.1", "localhost"), allow_private=True)
-    finally:
-        remote._resolve = real_resolve
     assert seen == ["localhost", "localhost"], "every connection, the redirect's too, resolves through the checked resolver: " + str(seen)
     try:
         remote.probe(hop.replace("127.0.0.1", "localhost", 1), allow_private=False)
@@ -151,15 +146,16 @@ def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespac
         assert "private address" in str(e), "a private address is refused at connect: " + str(e)
 
 
-def test_thinning_keeps_the_target_total_never_above_a_count(shared: SimpleNamespace) -> None:
-    remote = shared.remote
-    thinned = remote.thin(np.array([500, 300, 200, 0]), 100, seed=7)
+def test_thinning_keeps_the_target_total_never_above_a_count() -> None:
+    from gnome3d_web.density import thin
+
+    thinned = thin(np.array([500, 300, 200, 0]), 100, seed=7)
     assert thinned.sum() == 100 and bool((thinned <= [500, 300, 200, 0]).all()), "thinning keeps the target total, never above a count: " + str(thinned)
-    assert (remote.thin(np.array([500, 300, 200]), 100, seed=7) == remote.thin(np.array([500, 300, 200]), 100, seed=7)).all(), "thinning is the same for the same seed"
-    assert (remote.thin(np.array([3, 4]), 100, seed=1) == [3, 4]).all(), "a map under the target keeps every contact"
+    assert (thin(np.array([500, 300, 200]), 100, seed=7) == thin(np.array([500, 300, 200]), 100, seed=7)).all(), "thinning is the same for the same seed"
+    assert (thin(np.array([3, 4]), 100, seed=1) == [3, 4]).all(), "a map under the target keeps every contact"
 
 
-def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace) -> None:
+def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     data, root, url, size, url_signed, url_whole, url_page, url_slow, remote, with_ranges, whole, page, signed, slow = shared.data, shared.root, shared.url, shared.size, shared.url_signed, shared.url_whole, shared.url_page, shared.url_slow, shared.remote, shared.with_ranges, shared.whole, shared.page, shared.signed, shared.slow
     os.environ.update(
         DATA_DIR=str(data), RESULTS_DIR=str(root / "results"), QUEUE="inline", FRONTEND_DIST=str(root / "missing"), LINK_ALLOW_PRIVATE="1",
@@ -181,9 +177,9 @@ def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace) -> Non
     assert j["summary"].startswith("Resolutions from 5 kb to 25 kb, 25 kb is used."), "the summary names the resolutions and the one used: " + str(j["summary"])
     assert "30 contacts in chr1:0-1,000,000 are read" in j["summary"], "the summary counts the contacts read in the window: " + str(j["summary"])
     stored = root / "results" / "uploads" / j["id"]
-    from gnome3d_web import owndata
+    from gnome3d_web.uploads import store as upload_store
 
-    pairs = pd.read_csv(owndata.data_file(stored), sep="\t", header=None)
+    pairs = pd.read_csv(upload_store.data_file(stored), sep="\t", header=None)
     assert len(pairs) == 10 and set(pairs[2] - pairs[1]) == {25_000} and int(pairs[6].sum()) == 30, "the window's off diagonal bin pairs are stored at 25 kb: " + str(pairs.to_string())
 
     r = link(f"{url_signed}/test.mcool")
@@ -226,11 +222,9 @@ def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace) -> Non
     port = url.rsplit(":", 1)[1]
     answers_dns = iter([["8.8.8.8"]])
     real = remote._resolve
-    remote._resolve = lambda host, p: next(answers_dns, ["127.0.0.1"]) if host == "rebind.test" else real(host, p)
-    try:
+    with monkeypatch.context() as m:
+        m.setattr(remote, "_resolve", lambda host, p: next(answers_dns, ["127.0.0.1"]) if host == "rebind.test" else real(host, p))
         r = link(f"http://rebind.test:{port}/test.mcool", client=strict)
-    finally:
-        remote._resolve = real
     assert r.status_code == 400 and "private" in r.json()["error"], "a name that resolves public at the check and private at the read is refused: " + r.text
     for srv in (with_ranges, whole, page, signed, slow):
         srv.shutdown()

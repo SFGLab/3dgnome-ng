@@ -1,0 +1,90 @@
+.example-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.example-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.example-item:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.example-item:disabled {
+  cursor: progress;
+}
+
+/* An example reads the same in the list of this page and beside the form. A tag too long to share
+   the line with the title goes below it. */
+.example-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 8px;
+}
+
+.example-gene {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.example-cell {
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.example-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.example-item .example-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.example-item .example-gene {
+  font-weight: 600;
+}
+
+.example-item .example-cell,
+.example-item .example-desc {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.example-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+/* These pages have no side panel and the reading column takes the left gutter itself. */
+:global(.doc-page).examples-page {
+  padding-left: 48px;
+}
+
+@media (max-width: 900px) {
+  :global(.doc-page).examples-page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

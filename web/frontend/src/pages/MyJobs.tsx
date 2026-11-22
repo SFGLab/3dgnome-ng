@@ -1,19 +1,15 @@
-import { useQueries } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api, type JobStatus } from '../api'
-import { useRecentJobs } from '../model/useRecentJobs'
+import { useJobStates } from '../myjobs/useJobStates'
+import { useRecentJobs } from '../myjobs/useRecentJobs'
 import { ROUTES } from '../routes'
-import { SyncPanel } from '../sync/SyncPanel'
-import { syncState, useSyncStatus } from '../sync/sync'
+import { SyncPanel } from '../myjobs/SyncPanel'
+import { syncState, useSyncStatus } from '../myjobs/sync'
 import '../styles/doc.css'
-import './myjobs.css'
+import { scoped } from '../lib/css'
+import sheet from './myjobs.module.css'
 
-function stateText(s: JobStatus | undefined): string {
-  if (!s) return ''
-  if (s.state === 'running' && s.stage) return `running, ${s.stage} stage`
-  return s.state
-}
+const cn = scoped(sheet)
 
 const when = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -23,11 +19,9 @@ export function MyJobs() {
   const [params, setParams] = useSearchParams()
   useSyncStatus()
   const sync = syncState()
-  const statuses = useQueries({
-    queries: jobs.map((j) => ({ queryKey: ['status', j.url], queryFn: () => api.status(j.url), refetchInterval: 15000, retry: false })),
-  })
+  const states = useJobStates(jobs)
   return (
-    <div className="doc-page my-jobs">
+    <div className={cn('doc-page my-jobs')}>
       <div className="reading">
         <header className="page-head">
           <h1>My jobs</h1>
@@ -39,14 +33,14 @@ export function MyJobs() {
         </header>
         <SyncPanel initialCode={params.get('sync') ?? ''} onCodeUsed={() => setParams({}, { replace: true })} />
         {jobs.length === 0 ? (
-          <div className="no-jobs">
+          <div className={cn('no-jobs')}>
             <p>You have no jobs in this browser yet.</p>
             <Link className="button primary" to={ROUTES.model}>
               Model a region <ArrowRight size={16} aria-hidden />
             </Link>
           </div>
         ) : (
-          <table className="jobs-table">
+          <table className={cn('jobs-table')}>
             <thead>
               <tr>
                 <th>Job</th>
@@ -61,10 +55,10 @@ export function MyJobs() {
                     <Link to={j.url} reloadDocument>
                       {j.name || j.label}
                     </Link>
-                    {j.name && <span className="job-label">{j.label}</span>}
-                    {sync && !sync.private && j.url.startsWith('/p/') && <span className="job-label">private, on this computer only</span>}
+                    {j.name && <span className={cn('job-label')}>{j.label}</span>}
+                    {sync && !sync.private && j.url.startsWith('/p/') && <span className={cn('job-label')}>private, on this computer only</span>}
                   </td>
-                  <td>{statuses[i]?.isError ? 'removed or not found' : stateText(statuses[i]?.data)}</td>
+                  <td>{states[i]?.missing ? 'removed or not found' : states[i]?.text}</td>
                   <td>{when.format(j.at)}</td>
                 </tr>
               ))}

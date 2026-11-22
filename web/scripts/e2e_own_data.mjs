@@ -1,4 +1,4 @@
-// The own data dialogs end to end through a running site: a job with own loops of two factors
+// The own data dialogs end to end through a running site. The steps are a job with own loops of two factors
 // and contacts from a local .hic, a job with an uploaded VCF and its variants table and a job
 // with contacts by link and your own cell type with listed loops and enhancers. Each step screenshots its dialog at 1440 px and prints the job's url.
 //
@@ -66,7 +66,8 @@ if (which === 'own') {
   await click('.dialog-foot button', 'Apply')
   await structures(5)
 } else if (which === 'owncell') {
-  // Your own cell type: H1ESC CTCF loops, contacts by link to a 4DN file in its bucket, GM12878 enhancers.
+  // Your own cell type with H1ESC CTCF loops, contacts by link to a 4DN file
+  // in its bucket and GM12878 enhancers.
   await region('TNFRSF8')
   await click('button[role=radio]', 'Your own data')
   await click('button[role=tab]', 'Contacts')

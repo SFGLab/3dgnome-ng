@@ -1,4 +1,9 @@
-import './barchart.css'
+import { scoped } from '../lib/css'
+import sheet from './barchart.module.css'
+
+const cn = scoped(sheet)
+
+
 
 export type Series = 'original' | 'ctcf' | 'rnapii' | 'cudammc' | 'multimm'
 export type Bar = { series: Series; value: number | null; label: string }
@@ -17,7 +22,7 @@ export type Direction = 'higher' | 'lower'
 /** The direction that counts as better on a measure, as an arrow and a few words. */
 export function Better({ dir, text }: { dir: Direction; text?: string }) {
   return (
-    <span className="better" data-testid="better">
+    <span className={cn('better')} data-testid="better">
       <span aria-hidden="true">{dir === 'higher' ? '↑' : '↓'}</span> {text ?? `${dir} is better`}
     </span>
   )
@@ -29,22 +34,22 @@ export function BarChart({ title, subtitle, groups, better }: { title: string; s
   return (
     <figure className="bar-chart" aria-label={title}>
       <figcaption>
-        <span className="chart-head">
+        <span className={cn('chart-head')}>
           <span className="chart-title">{title}</span>
           {better && <Better dir={better} />}
         </span>
         <span className="chart-sub">{subtitle}</span>
       </figcaption>
       {groups.map((g) => (
-        <div key={g.name} className="bar-group">
-          {g.name && <span className="group-name">{g.name}</span>}
+        <div key={g.name} className={cn('bar-group')}>
+          {g.name && <span className={cn('group-name')}>{g.name}</span>}
           {g.bars.map((b, i) => (
-            <div key={i} className="bar-row" title={`${SERIES_NAME[b.series]}: ${b.label}`}>
+            <div key={i} className={cn('bar-row')} title={`${SERIES_NAME[b.series]}: ${b.label}`}>
               <span
-                className={`bar ${b.series}${b.value === null ? ' placeholder' : ''}`}
+                className={cn(`bar ${b.series}${b.value === null ? ' placeholder' : ''}`)}
                 style={{ width: b.value === null ? '45%' : `${(b.value / max) * 82}%` }}
               />
-              <span className={b.value === null ? 'bar-value muted' : 'bar-value'} data-testid="bar-value">
+              <span className={cn(b.value === null ? 'bar-value muted' : 'bar-value')} data-testid="bar-value">
                 {b.label}
               </span>
             </div>
@@ -60,10 +65,10 @@ const MODEL_SERIES: Series[] = ['original', 'ctcf', 'rnapii']
 /** The key of the three kinds of model, or of the series given. */
 export function ChartKey({ series = MODEL_SERIES, label = 'Key' }: { series?: Series[]; label?: string }) {
   return (
-    <ul className="chart-key" aria-label={label}>
+    <ul className={cn('chart-key')} aria-label={label}>
       {series.map((s) => (
         <li key={s}>
-          <span className={`swatch ${s}`} />
+          <span className={cn(`swatch ${s}`)} />
           {SERIES_NAME[s]}
         </li>
       ))}

@@ -41,20 +41,20 @@ def cross(a: V, b: V) -> V:
     return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
 
 
-#: Drawing units per bead unit, the same for every drawing.
+# Drawing units per bead unit, the same for every drawing.
 SCALE = 40.0
-#: Depth steps of a drawing, the farthest first.
+# Depth steps of a drawing, the farthest first.
 LAYERS = 6
-#: A bead this close to a marked bead on the drawing and nearer the viewer hides it, in bead units.
+# A bead this close to a marked bead on the drawing and nearer the viewer hides it, in bead units.
 HIDES = 1.6
-#: Beads either side of a marked bead that belong to its mark.
+# Beads either side of a marked bead that belong to its mark.
 REACH = 5
 
 
 def view(points: list[V], ia: int, ib: int) -> tuple[V, V, V]:
-    """Axes of the drawing: right, down and toward the viewer. The first runs from a to b. The
-    turn about it is the one that leaves the fewest beads in front of the two marked beads and
-    among equals the one that spreads the chain between them widest on the drawing."""
+    """Returns the axes of the drawing, which are right, down and toward the viewer. The first runs
+    from a to b. The turn about it is the one that leaves the fewest beads in front of the two marked
+    beads and among equals the one that spreads the chain between them widest on the drawing."""
     e1 = unit(sub(points[ib], points[ia]))
     u = unit(cross(e1, (0.3, 0.5, 0.8)))
     v = cross(e1, u)

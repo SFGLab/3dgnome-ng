@@ -1,0 +1,21 @@
+import { saveBlob } from './download'
+
+/** Saving the rows of a table as a CSV file. */
+
+export type Cell = string | number | null | undefined
+
+/** Returns a cell in the form of CSV, in quotes when it holds a comma, a quote or a line break. */
+const cell = (v: Cell) => {
+  const text = v === null || v === undefined ? '' : String(v)
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+/** Returns the text of a CSV file with a head line and one line for each row. */
+export function csvText(head: string[], rows: Cell[][]): string {
+  return [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n'
+}
+
+/** Saves a table as `<file>.csv`. */
+export function saveCsv(file: string, head: string[], rows: Cell[][]): void {
+  saveBlob(new Blob([csvText(head, rows)], { type: 'text/csv' }), `${file}.csv`)
+}

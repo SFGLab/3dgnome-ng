@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools>=68", "setuptools-scm>=8"]
+# A licence as an SPDX expression needs setuptools 77.
+requires = ["setuptools>=77", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +8,8 @@ name = "gnome3d"
 dynamic = ["version"]
 description = "3D chromatin structure modeling from ChIA-PET loops and Hi-C contacts"
 readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.24.0",

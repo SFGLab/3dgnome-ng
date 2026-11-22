@@ -69,6 +69,12 @@
   font-weight: 700;
 }
 
+.reading section > h3 {
+  margin: 14px 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
 .reading h2 sup.ng {
   --ng: 0.556;
 }

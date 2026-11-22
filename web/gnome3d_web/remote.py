@@ -6,6 +6,9 @@ https, end in .hic, .mcool or .cool and resolve to a public address. Every conne
 the address that was checked, through a local range proxy.
 """
 
+# h5py and hic-straw state the types of their files too loosely for these checks.
+# pyright: reportGeneralTypeIssues=false, reportIndexIssue=false, reportArgumentType=false, reportOperatorIssue=false, reportCallIssue=false
+
 from __future__ import annotations
 
 import functools
@@ -20,13 +23,12 @@ import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import urlparse
 
 import numpy as np
-import pandas as pd
+
+from .density import thin
 
 RES = 25_000
 READ_SECONDS = 120
@@ -57,12 +59,12 @@ def _host(url: str) -> str:
 
 
 def _resolve(host: str, port: int) -> list[str]:
-    """The addresses of a host, in the order the resolver gives them."""
+    """Returns the addresses of a host, in the order the resolver gives them."""
     return [str(i[4][0]) for i in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)]
 
 
 def _checked(host: str, port: int) -> list[str]:
-    """The addresses of a host, refused if any is private, loopback or link local."""
+    """Returns the addresses of a host. Refuses a host with a private, loopback or link local address."""
     try:
         addrs = _resolve(host, port)
     except OSError as e:
@@ -82,7 +84,7 @@ def _public(url: str) -> None:
 
 
 def _pinned_connect(allow_private: bool):  # noqa: ANN202
-    """A socket.create_connection that resolves once and connects only to checked addresses."""
+    """Connects as socket.create_connection does. It resolves once and connects only to checked addresses."""
 
     def connect(address: tuple[str, int], timeout: float = HEAD_SECONDS, source: object = None) -> socket.socket:
         host, port = address
@@ -131,14 +133,14 @@ class _HTTPSHandler(urllib.request.HTTPSHandler):
 
 
 def _opener(allow_private: bool) -> urllib.request.OpenerDirector:
-    """An opener whose every connection, redirects included, goes to a checked address."""
+    """Returns an opener whose every connection, redirects included, goes to a checked address."""
     return urllib.request.build_opener(_HTTPHandler(allow_private), _HTTPSHandler(allow_private))
 
 
 def check_link(url: str, allow_private: bool) -> str:
     """Refuses a link that is not http or https, not a contact map, or not public. Returns its kind.
 
-    @raises RemoteError naming the problem
+    @raises RemoteError with the problem
     """
     u = urlparse(url)
     if u.scheme not in ("http", "https") or not u.hostname:
@@ -152,8 +154,8 @@ def check_link(url: str, allow_private: bool) -> str:
 
 
 def probe(url: str, allow_private: bool, timeout: float = HEAD_SECONDS) -> tuple[int, str]:
-    """The size of a remote file whose server answers range requests and the address it is
-    served from after redirects.
+    """Returns the size of a remote file whose server answers range requests and the address that
+    serves it after redirects.
 
     @raises RemoteError when a hop is private, or the server answers a web page or the whole file
     """
@@ -183,13 +185,8 @@ def probe(url: str, allow_private: bool, timeout: float = HEAD_SECONDS) -> tuple
         raise RemoteError(f"{_host(url)} cannot be reached.", "Check the link and try again.") from e
 
 
-def check_range(url: str, timeout: float = HEAD_SECONDS) -> int:
-    """The size of a remote file whose server answers range requests."""
-    return probe(url, allow_private=True, timeout=timeout)[0]
-
-
 def _chrom_name(names: list[str], chrom: str) -> str:
-    """The file's name for a chromosome, with or without the chr prefix."""
+    """Returns the name of a chromosome in the file, with or without the chr prefix."""
     bare = chrom.removeprefix("chr")
     for n in names:
         if n == chrom or n == bare or n == f"chr{bare}":
@@ -205,7 +202,7 @@ def _no_res(have: list[int]) -> RemoteError:
 
 
 def read_mcool(url: str, chrom: str, start: int, end: int, res: int = RES, size: int | None = None) -> Window:
-    """The window's pixels of a remote .mcool or .cool, read through h5py on an HTTP file. A
+    """Reads the pixels of the window of a remote .mcool or .cool, through h5py on an HTTP file. A
     known size spares the reader its own request for it."""
     import fsspec
     import h5py
@@ -237,7 +234,7 @@ def read_mcool(url: str, chrom: str, start: int, end: int, res: int = RES, size:
 
 
 def read_hic(url: str, chrom: str, start: int, end: int, res: int = RES) -> Window:
-    """The window's observed counts of a remote .hic, read with hic-straw."""
+    """Reads the observed counts of the window of a remote .hic, with hic-straw."""
     import hicstraw
 
     h = hicstraw.HiCFile(url)
@@ -257,9 +254,9 @@ def read_hic(url: str, chrom: str, start: int, end: int, res: int = RES) -> Wind
 
 class _Proxy:
     """A range proxy on the loopback interface for the readers. hic-straw reads through curl and
-    h5py through aiohttp, neither of which this module can make connect to a checked address,
-    so each reads http://127.0.0.1:<port>/<token>/<name> and the proxy fetches the range with
-    the checked opener. A token is valid for one read."""
+    h5py through aiohttp. This module cannot make either connect to a checked address. Each reads
+    http://127.0.0.1:<port>/<token>/<name> and the proxy fetches the range with the checked opener.
+    A token is valid for one read."""
 
     def __init__(self) -> None:
         self.routes: dict[str, tuple[str, bool]] = {}
@@ -286,7 +283,7 @@ class _Proxy:
                 except (RemoteError, OSError, http.client.HTTPException):
                     self.send_error(502)
                     return
-                # A redirect would send the reader past the checked connection; the link was
+                # A redirect would send the reader past the checked connection. The link was
                 # followed to its final address before the read.
                 status = 502 if 300 <= r.status < 400 else r.status
                 self.send_response(status)
@@ -318,8 +315,8 @@ class _Proxy:
         return (u.scheme, u.hostname or "", u.port or (443 if u.scheme == "https" else 80), allow)
 
     def fetch(self, url: str, allow: bool, method: str, headers: dict[str, str]) -> tuple[http.client.HTTPConnection, http.client.HTTPResponse]:
-        """A response for one range, on a kept connection to the host when one is idle. Each new
-        connection goes to a checked address."""
+        """Returns a response for one range, on a kept connection to the host when one is idle. Each
+        new connection goes to a checked address."""
         key = self._key(url, allow)
         u = urlparse(url)
         path = u.path + (f"?{u.query}" if u.query else "")
@@ -348,7 +345,7 @@ class _Proxy:
             self.idle.setdefault(self._key(url, getattr(conn, "allow_private", False)), []).append(conn)
 
     def add(self, url: str, allow_private: bool) -> tuple[str, str]:
-        """A local address that serves `url` and its token."""
+        """Returns a local address that serves `url` and its token."""
         token = secrets.token_urlsafe(16)
         self.routes[token] = (url, allow_private)
         name = urlparse(url).path.rsplit("/", 1)[-1] or "file"
@@ -379,9 +376,9 @@ def _child(kind: str, url: str, chrom: str, start: int, end: int, size: int, out
 
 
 def read_window(url: str, kind: str, chrom: str, start: int, end: int, size: int, allow_private: bool, seconds: float = READ_SECONDS, res: int = RES) -> Window:
-    """The window of a remote map, read in a child process through the local proxy and stopped
-    after the time limit. hic-straw holds the interpreter lock while it waits on the network.
-    In this process it would stall the proxy it reads through."""
+    """Reads the window of a remote map in a child process through the local proxy and stops it
+    after the time limit. hic-straw holds the interpreter lock while it waits on the network. In
+    this process it would stall the proxy it reads through."""
     local, token = _local(url, allow_private)
     ctx = multiprocessing.get_context("spawn")
     recv, send = ctx.Pipe(duplex=False)
@@ -408,38 +405,21 @@ def read_window(url: str, kind: str, chrom: str, start: int, end: int, size: int
     raise RemoteError(f"The file at {_host(url)} could not be read as {kind}.", f"The reader says {answer[1]}.")
 
 
-def thin(counts: np.ndarray, target: int, seed: int) -> np.ndarray:
-    """Counts reduced to a target total by sampling contacts without replacement. A map at or under
-    the target is kept whole."""
-    counts = np.asarray(counts, dtype=np.int64)
-    if counts.sum() <= target:
-        return counts
-    return np.random.default_rng(seed).multivariate_hypergeometric(counts, target)
-
-
-@lru_cache(maxsize=64)
-def hosted_density(singletons: Path, chrom: str) -> float:
-    """Contacts per Mb of a hosted map on one chromosome, its total count over its covered span."""
-    t = pd.read_csv(singletons, sep=r"\s+", header=None, usecols=[0, 3, 5, 6], comment="#")
-    t = t[(t[0] == chrom) & (t[3] == chrom)]
-    if t.empty:
-        t = pd.read_csv(singletons, sep=r"\s+", header=None, usecols=[0, 3, 5, 6], comment="#")
-        t = t[t[0] == t[3]]
-        span = t.groupby(0)[5].max().sum()
-    else:
-        span = t[5].max()
-    return float(t[6].sum()) / max(span / 1e6, 1e-6)
-
-
 def _kb(bp: int) -> str:
     return f"{bp / 1e6:g} Mb" if bp >= 1_000_000 else f"{bp / 1e3:g} kb"
 
 
 def link_window(url: str, chrom: str, start: int, end: int, per_mb: float, density_from: str, allow_private: bool) -> tuple[bytes, int, str]:
-    """Reads the window of a remote map into BEDPE bytes at 25 kb, thinned to per_mb contacts
-    per Mb. Returns the bytes, the file size and the summary.
+    """Reads the window of a remote map into BEDPE bytes at 25 kb, thinned to per_mb contacts per
+    Mb. Returns the bytes, the file size and the summary.
 
-    @param density_from the name of the hosted map the density comes from, for the summary
+    @param url the link
+    @param chrom the chromosome of the window
+    @param start the start of the window in bp
+    @param end the end of the window in bp
+    @param per_mb the contacts per Mb to keep
+    @param density_from the name of the hosted map that gives the density, for the summary
+    @param allow_private true to read a private or loopback address, for tests
     @raises RemoteError with the problem and its fix
     """
     kind = check_link(url, allow_private)
