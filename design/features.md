@@ -78,6 +78,13 @@ last section are dated records and are not rewritten when production moves on. `
   as `score_orientation_full_nb` does. The update `score_orn += 2 * (curr - prev)` is then exact against the full
   score.
 
+- **Orientation term: the vector of an anchor over a stretch of chain.** Since 2026-11-22 the vector runs from the
+  centroid of the three beads before an anchor to the centroid of the three after it, a loop weighs its share of
+  the larger of the sums at its two anchors and the weight of the term is the energy of the six bonds of the
+  stretch each one target too long. The term between the two neighbours of an anchor at a weight of 50 stretched
+  a quarter to a third of the bonds at its sites and is deleted with its key. `design/orientation-term.md` has
+  the traces and the trials.
+
 - **Singletons are filtered by chromosome.** [io.load_singletons](../gnome3d/io.py) keeps a contact when both of its
   chromosomes are in the run. In a run of one region both ends must also be inside the region.
 
@@ -225,7 +232,7 @@ last section are dated records and are not rewritten when production moves on. `
 
   Motivation: at the IB level, EV pushes IBs apart but only nearest-neighbor chain bonds pull them back, so the segment stretches out into a long sausage. The IB tether (small packing factor → tight sphere around the segment centroid) softly holds the chain together while EV still keeps IB spheres from overlapping. At arc / smooth levels, confinement instead acts as a nuclear-like envelope for under-constrained small IBs.
 
-  The packing factor has a physical floor. The sphere diameter is `2 × pf × N^(1/3)` chain bonds, so below `pf ≈ 0.58` a segment of fewer than `(1/(2·pf))³` blocks is asked to fold into a sphere narrower than one of its own bonds, and the layout is then set by where EV and confinement jam rather than by genomic separation. Measured on GM12878 chr1 the block-layout distance exponent is 0.021 at 0.15, 0.214 at 0.75 and 0.297 at 1.0 against 0.285 from the cell line's own Hi-C contact-probability curve (`playground/ps_curve.py`, `playground/ib_confine_ablate.py`).
+  The packing factor has a physical floor. The sphere diameter is `2 × pf × N^(1/3)` chain bonds, so below `pf ≈ 0.58` a segment of fewer than `(1/(2·pf))³` blocks is asked to fold into a sphere narrower than one of its own bonds, and the layout is then set by where EV and confinement jam rather than by genomic separation. Measured on GM12878 chr1 the block-layout distance exponent is 0.021 at 0.15, 0.214 at 0.75 and 0.297 at 1.0 against 0.285 from the cell line's own Hi-C contact-probability curve (`playground/ps_curve.py`, `data/figures/retired/playground/ib_confine_ablate.py`).
 
 - **JAX/CUDA backend** — selected per stage via `mc_executor_<stage> = batch`. ([gnome3d/mc/jax/](../gnome3d/mc/jax/))
 
@@ -274,7 +281,7 @@ last section are dated records and are not rewritten when production moves on. `
     chr1:1-8 Mb 57 s to 6 s at 32, chr1:1-60 Mb 420 s to 125 s at 32 and slower at 64, since
     the kernel's full excluded volume scan is paid once per proposal. Three structures on 60 Mb
     at 32 against 1: every battery number level, MultiMM 0.665 against 0.669. Numba ignores the
-    key. Unit checks in `tests/unit/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
+    key. Unit checks in `tests/unit/test_smooth_levers.py`, sweep in `data/figures/retired/slurm/ensemble/prefetch_sweep.sh`,
     reading and numbers in `design/parallel-mc-and-nn-reading.md`.
   - **The excluded volume and the wall run on a cell grid in the JAX kernel:
     `[simulation_arcs_smooth] jax_grid`, default no, production yes since 2026-09-19, on
@@ -315,7 +322,7 @@ last section are dated records and are not rewritten when production moves on. `
     Several instances that share a card on purpose set the variable in each, adding up to less
     than 1. A process with a smaller pool packs its launches differently, so its structures are
     not bit identical to a run on a free card; at a fixed pool it reproduces. Unit checks in
-    `tests/unit/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
+    `tests/unit/test_gpu_share.py`, two instances on one card in `data/figures/retired/playground/gpu_share_run.py`.
   - **The smooth stage is threaded numba in production since 2026-11-16, and `auto` picks it
     from four workers.** Measured on 36 cores against an RTX 3090 on GM12878 chr1: the stage of
     52 blocks takes 53 to 80 s threaded, 92 s on 8 workers, and 122 to 146 s on the device, and
@@ -464,7 +471,7 @@ last section are dated records and are not rewritten when production moves on. `
   cross block overlaps down four to ten times. The realised exponent runs 1.3 to 1.5 times the
   measured input on every cell, which one correction on the background exponent would absorb;
   not built. The old keys are not read and warn if present. Unit checks in
-  `tests/unit/test_polymer.py` and `tests/unit/test_arc_matrix.py`; `playground/ps_from_singletons.py`
+  `tests/unit/test_polymer.py` and `tests/unit/test_arc_matrix.py`; `data/figures/retired/playground/ps_from_singletons.py`
   fits the exponent on a file by hand. See `design/anchor-placement.md`, option H.
 
   **Tried and rejected, 2026-09-06: every arcless pair on the background.** The realised
@@ -480,7 +487,7 @@ last section are dated records and are not rewritten when production moves on. `
   in three dimensions, so the least squares compromise is a mean field blob. The `1/d` never
   constrained an arcless pair, which is why it did not hit this. The sweep could not see it
   because every isolated block came out at Rg 3.8 whatever the weight. Reverted the same day;
-  the sweep is kept as `playground/background_weight_sweep.py` for the record and the battery
+  the sweep is kept as `data/figures/retired/playground/background_weight_sweep.py` for the record and the battery
   reports the two band exponents from here on. Any future fix for the kink has to be short
   range only, holding pairs under about 100 kb and leaving the long range free.
 
@@ -492,7 +499,7 @@ last section are dated records and are not rewritten when production moves on. `
   weight sits in every kernel beside the cutoff rather than replacing it, so weight zero is
   byte exact against the previous commit. JAX matches numba on a matrix carrying both arcless
   kinds, and the batched driver runs with the background on, both in
-  `tests/unit/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`. Production since
+  `tests/unit/test_arc_matrix.py`. Swept in `data/figures/retired/playground/short_range_sweep.py`. Production since
   2026-09-07 at weight 0.1: with it the anchors sit on the input curve on all three cells,
   within blocks and across them. Weights 0.3 and 1.0 pull the closest pairs closer and cost
   Hi-C at every step.
@@ -642,7 +649,7 @@ last section are dated records and are not rewritten when production moves on. `
   pull in, since beyond a few megabases the expectation is under a count and nothing is ever
   significantly below it; the within block pairs carry the correlation and the across block
   pairs the shrinkage, and weakening the pull loses both together. Removed the same day.
-  Tables in `design/validation-2026-09.md`; `playground/far_pairs_from_map.py` measures what a
+  Tables in `design/validation-2026-09.md`; `data/figures/retired/playground/far_pairs_from_map.py` measures what a
   map holds.
 
 - **A contact term in the block layout: `[simulation_ib] heatmap_weight`, default 0.**
@@ -761,7 +768,7 @@ last section are dated records and are not rewritten when production moves on. `
   sits near 1e-6 with no plateau; the energy at 800 is 1.7 percent above the value at 8,000, at
   2,400 under one percent. The tolerance is L-BFGS-B's own `ftol`, so at zero the options are
   unchanged and the parity gate holds. `GNOME3D_ARCS_TRACE` names a file that receives every
-  evaluation's energy, which is how the value was chosen, `playground/trace_analysis.py`.
+  evaluation's energy, which is how the value was chosen, `data/figures/retired/playground/trace_analysis.py`.
 
   The annealer is kept by decision, 2026-09-06, not as a leftover. The solver's justification
   is a funnel landscape measured on a few real blocks. A dataset or an energy change that
@@ -847,7 +854,7 @@ last section are dated records and are not rewritten when production moves on. `
   0.033 to 0.043, cuts overlaps five to seven times within blocks and three to four across at
   the same Rg, and flattens the short band exponent from 0.33 to 0.21; the cap adds a few
   percent fewer overlaps and nothing else. Unit checks in `tests/unit/test_smooth_levers.py`;
-  three cell arms in `slurm/ensemble/overlap_levers.sh`.
+  three cell arms in `data/figures/retired/slurm/ensemble/overlap_levers.sh`.
 
   **Tried and dropped, 2026-11-13: a law spring on bead pairs in the smooth stage.** Traced on a
   web job, GM12878 chr1:20-25 Mb with CTCF and RNAPII loops, the squares in the contact map are
@@ -858,8 +865,8 @@ last section are dated records and are not rewritten when production moves on. `
   0.366 to 0.243, MultiMM 0.671 to 0.630 and 0.613 to 0.545, the 20 to 100 kb contact exponent
   0.31 to 0.47. A spring at the mean distance removes the fluctuations contacts come from. A
   wider range was worse and 2 Mb compressed the block, as the all pairs springs did. The smooth
-  wall tripled. Removed the same day; `playground/trace_square_blocks.py`,
-  `playground/law_spring_readout.py` and `slurm/ensemble/law_spring_trial.sh` are the record.
+  wall tripled. Removed the same day; `data/figures/retired/playground/trace_square_blocks.py`,
+  `playground/law_spring_readout.py` and `data/figures/retired/slurm/ensemble/law_spring_trial.sh` are the record.
 
   **Tried and dropped, 2026-11-13: a gap start that follows the law.** Under `start = law` each
   subanchor took the clear candidate whose distances to the beads 2 to 128 places behind it best
@@ -870,8 +877,8 @@ last section are dated records and are not rewritten when production moves on. `
   times, across blocks on chr1 11.7 to 20.5 per thousand. Gaps ended at about 1.2 of the law,
   since the smooth stage holds bonds and nothing holds a gap's interior, so its size is the
   start's. Without the hard wall overlaps rose tenfold, and with the subanchor heat term SCC
-  went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
-  `slurm/ensemble/gap_start_overnight.sh` and `playground/square_blocks/gapnight/` are the record.
+  went negative. Removed the same day; `data/figures/retired/slurm/ensemble/law_start_trial.sh`,
+  `data/figures/retired/slurm/ensemble/gap_start_overnight.sh` and `data/figures/square_blocks/gapnight/` are the record.
 
   **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, measured 2026-11-14
   and left opt in.** ([pipeline/ib/maxent.py](../gnome3d/pipeline/ib/maxent.py)) Both dropped
@@ -885,8 +892,8 @@ last section are dated records and are not rewritten when production moves on. `
   motion variogram. The draw comes from the problem's seed. `line` and `coil` are unchanged.
   On three cells, three 5 Mb regions and chr1 it lost Pearson by 0.01 to 0.05 against the coil
   with SCC level and the distance exponent nearer Hi-C. The smooth stage widens the drawn gaps to
-  1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
-  `playground/square_blocks/gapme/` are the record.
+  1.2 of the law, where the coil ends under it. `data/figures/retired/slurm/ensemble/gap_maxent_trial.sh` and
+  `data/figures/square_blocks/gapme/` are the record.
   Unit checks in `tests/unit/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
 
 - **Long range in the arcs stage: `[excluded_volume] arcs_repulsion = no`, `[springs]
@@ -915,6 +922,113 @@ last section are dated records and are not rewritten when production moves on. `
   arm they raise Spearman and lower pooled SCC 0.01 to 0.04 on three cells, since a correlation
   scores an empty hole's zeros against any filled level, while their contacts follow Hi-C's from
   pair to pair. `design/gap-fill.md` has every arm.
+
+- **Uniform chain with loops on contact beads: `[main] uniform_chain = yes`, default no, under
+  measurement since 2026-11-19.** ([pipeline/ib/spans.py](../gnome3d/pipeline/ib/spans.py) `densify_uniform`,
+  [pipeline/ib/nodes.py](../gnome3d/pipeline/ib/nodes.py), [skeleton.py](../gnome3d/skeleton.py) `solve_nodes`,
+  [mc/numba/arcs_solver.py](../gnome3d/mc/numba/arcs_solver.py) `reach_energy_grad`)
+  `design/uniform-chain.md` has the rules of the model, the decisions and the stages of the build.
+  The default chain has one bead per anchor of any width and one bead per kilobase between
+  anchors. In the GM12878 anchor file 88 percent of consecutive anchors overlap and 42 percent are
+  nested. The median width is 1.4 kb and 1.2 percent are over 10 kb. With `overlap_anchor_strict`
+  off the densify stage fills each overlap with subanchors. On chr1 108.5 to 111 Mb the beads of
+  the default chain cover 2,823 kb over 2,431 kb of sequence. The output is sorted by start and 62
+  rows of that region leave the chain order. A viewer then draws bonds of 3 to 7 beads between
+  beads of different runs near a nested anchor of 27 kb.
+
+  The uniform chain divides the span of a block, from the start of its first anchor to the end of
+  its last, into beads of equal width, one per `target_bp_per_subanchor`. Every base is in one
+  bead and the sorted output is the chain. The span of an anchor is the run of beads whose
+  midpoints are in its range. Each end of a kept loop is at one bead of the span of its anchor,
+  drawn per conformation with equal chance. The distinct contact beads of a chromosome are the
+  nodes of the joint arcs solve. The strengths of the loops on one pair of nodes add and go
+  through the law once. Consecutive nodes of a block are held within the chain between them by
+  the reach term, and the excluded volume of the solve acts at the radius of a bead. The nodes
+  are the fixed beads of the smooth stage and the sites of the orientation term, with the
+  orientation of the anchor of the CTCF loop with the most PETs. The relaxation holds the nodes.
+  An output bead under a span has the kind anchor. The numba and the JAX smooth kernels run the
+  chain unchanged. A run with the setting off is byte identical to 298685c, by
+  `playground/parity_dump.py`.
+
+  With `use_contact_background` and `[data] contact_map` a pair of nodes without a loop reads the
+  Hi-C cell that holds its two beads at `[springs] contact_resolution`,
+  [pipeline/ib/cells.py](../gnome3d/pipeline/ib/cells.py), under the Poisson test of
+  `contact_background_z`. The anchor contact map and `use_anchor_heatmap` do not reach the nodes.
+
+  The smooth stage keeps the centre of mass of a node, the bead before it and the bead after it,
+  by the decision of 2026-11-20. Its setting `anchor_centre` and the fixed node of the uniform
+  chain were removed. The rule: the node moves with its two neighbours taking minus half of its move each, or
+  a neighbour moves with the other neighbour taking minus its move, `step_delta_nb` in
+  [mc/numba/terms.py](../gnome3d/mc/numba/terms.py). The three single moves sum to the change of
+  the whole move and the running score equals the full energy, with the orientation term. The
+  JAX kernel does not have the move.
+
+  `[springs] contact_resolution_max` reads a pair at the finest resolution whose cell can be
+  tested, and `[springs] gyration_min_bp` starts the gyration windows under 100 kb.
+  `design/uniform-chain.md` has every trial of the night of 2026-11-19 and
+  `design/figures/uniform-2026-11-19/summary.md` one table of every arm.
+
+  A third arm of the orientation term, `[motif_orientation] bond_limit`, refused a move of a bead
+  beside an orientation site when it left a bond of that bead longer than the limit. In the trial
+  of the rules it gained no score and raised the close pairs by a fifth. It was removed on
+  2026-11-20.
+
+  Stage 1 on GM12878 chr1 108.5 to 111 Mb, one structure, 154 nodes from 379 loops of 267 anchors,
+  bonds before the relaxation:
+
+  | arm | bonds over 2 beads | bonds over 3 beads | longest bond | pairs under 0.7 beads |
+  |---|---|---|---|---|
+  | as built | 212 | 89 | 8.90 | 183 |
+  | orientation term off | 23 | 0 | 2.99 | 141 |
+  | hard wall off | 60 | 6 | 3.89 | 1,740 |
+
+  The distance of two consecutive nodes over the chain between them has a median of 0.93 and a
+  95th percentile of 1.15. Of the 76 pairs one bond apart 55 are over 1.02. After the relaxation
+  the as built arm has 301 bonds over 2 beads and 30 pairs under 0.7 beads, and the arm without
+  the orientation term 79 bonds over 2 beads.
+
+  The first build of 2026-11-19, commits 9d8b59f and a898a0e, held the centroid of each span at the
+  arcs position of its anchor with a soft term of the smooth stage and is replaced.
+  `design/uniform-chain.md` has its trial. The measurements below are of the default chain and of
+  that first build.
+
+  First measurement, one structure of GM12878 chr1 108.5 to 111 Mb at production settings, bonds
+  in chain order after the relaxation, before the nodes were merged:
+
+  | chain | beads | sequence in beads | bonds over 2 beads | bonds over 3 beads | 95th percentile bond | radius of gyration |
+  |---|---|---|---|---|---|---|
+  | default | 2,369 | 2,823 kb | 295 | 131 | 3.20 | 7.4 |
+  | uniform | 2,483 | 2,483 kb | 159 | 44 | 2.16 | 7.3 |
+
+  Trace of the long bonds, 2026-11-19, the same region and one structure per arm, bonds before
+  the relaxation:
+
+  | arm | bonds over 2 beads | bonds over 3 beads | bond beside an anchor, median | pairs under 0.7 beads |
+  |---|---|---|---|---|
+  | default chain | 243 | 117 | 2.48 | 66 |
+  | default chain, orientation term off | 52 | 3 | 1.11 | 61 |
+  | default chain, hard wall off | 103 | 25 | 1.77 | 970 |
+  | uniform chain, nodes merged, span weight 1.0 | 167 | 58 | | 67 |
+  | uniform chain, nodes merged, span weight 0.1 | 121 | 38 | | 47 |
+  | the same, orientation term off | 46 | 0 | | 67 |
+  | the same, hard wall off | 13 | 2 | | 1,593 |
+
+  - The orientation term stretches the bonds beside an oriented anchor on both chains. Its weight
+    is 50 and a bond has 0.1.
+  - The hard wall keeps a stretched bond in place. Off, the bonds recover and the overlaps
+    return.
+  - The relaxation adds 40 to 60 bonds over 2 beads on either chain. It moves free beads and
+    holds the anchor beads.
+  - Before the merge 256 pairs of anchors with one knot had homes a median of 1.16 beads apart,
+    held by the background spring at the floor of the law, one bead. Merged, they share a home.
+  - Nodes one bead apart on the chain have homes a median of 1.5 to 1.7 beads apart. No term of
+    the arcs stage holds chain neighbours within one bond. The arcs excluded volume radius at
+    0.7 and 1.0 beads does not change it. Open.
+  - The span weight was not tuned. At 1.0 the offset of a centroid from its home has a median of
+    0.71 beads, at 0.1 of 1.12 and with the orientation term off of 0.57.
+
+  Unit checks in `tests/unit/test_uniform_chain.py`, `tests/unit/test_contact_nodes.py` and
+  `tests/integration/test_uniform_pipeline.py`.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](../gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)

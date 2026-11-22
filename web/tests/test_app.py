@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -88,6 +89,30 @@ def test_hicdiffusion_without_its_setup_is_refused_naming_it(form: Any, site: Si
     c = site.c
     r = c.post("/api/jobs", data={**form, "region": "chr1:0-2000000", "background": "hicdiffusion"})
     assert r.status_code == 400 and "HICDIFFUSION_DIR" in r.json()["error"], "HiCDiffusion without its setup is refused naming it: " + r.text
+
+
+def test_the_uniform_chain_is_refused_until_config_json_turns_it_on(form: Any, site: SimpleNamespace) -> None:
+    c, root = site.c, site.root
+    r = c.post("/api/jobs", data={**form, "chain": "uniform"})
+    assert r.status_code == 400 and r.json()["field"] == "chain" and "not turned on" in r.json()["error"], "off unless config.json turns it on: " + r.text
+    r = c.post("/api/jobs", data={**form, "chain": "beads"})
+    assert r.status_code == 400 and "anchors or uniform" in r.json()["error"], "an unknown chain is refused with the two it takes: " + r.text
+    config = root / "data" / "config.json"
+    config.write_text('{"features": {"uniform_chain": true}}')
+    try:
+        on = site.TestClient(site.create_app())
+        for key, value, said in (("holes.use_hole_beads", "yes", "stretches without loops"), ("simulation_arcs.solver", "mc", "lbfgs")):
+            r = on.post("/api/jobs", data={**form, "chain": "uniform", "overrides": json.dumps({key: value})})
+            assert r.status_code == 400 and r.json()["field"] == "overrides" and said in r.json()["error"], f"{key} = {value} is refused with its reason: " + r.text
+        r = on.post("/api/jobs", data={**form, "chain": "uniform", "overrides": json.dumps({"springs.squeeze_constant": "0.5"})})
+        assert r.status_code == 201, "a job on the chain of one bead per kilobase is taken, with a setting of its own: " + r.text
+        job = r.json()["url"]
+        stated = on.get("/api" + job + "/summary").json()["request"]
+        assert stated["chain"] == "uniform", "the job states its chain: " + str(stated)
+        plain = on.post("/api/jobs", data=form)
+        assert plain.status_code == 201 and plain.json()["url"] != job, "the chain of loop anchors is another job"
+    finally:
+        config.unlink()
 
 
 def test_a_valid_request_answers_with_its_job(form: Any, site: SimpleNamespace) -> None:

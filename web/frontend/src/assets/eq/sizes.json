@@ -58,5 +58,37 @@
  "t_gyration": [
   128,
   35
+ ],
+ "loop_kept": [
+  102,
+  32
+ ],
+ "node_radius": [
+  235,
+  35
+ ],
+ "reach": [
+  405,
+  41
+ ],
+ "cell_test": [
+  503,
+  37
+ ],
+ "cell_target": [
+  333,
+  44
+ ],
+ "stretch_pairs": [
+  463,
+  32
+ ],
+ "bond_two": [
+  491,
+  34
+ ],
+ "node_move": [
+  464,
+  31
  ]
 }

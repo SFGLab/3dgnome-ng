@@ -71,6 +71,13 @@ three compare routes. Each plot has a title and ticks on its two axes and a key 
 volcano plot has every gene of the test in the background, on a grid of 0.2 by 0.5 with each
 cell once.
 
+The Method page describes the two chains by phase where the site offers the uniform chain. Section 3 has the
+beads of each chain. The anchor phase and the chain phase each give the terms both chains share, then a table
+with a column for each chain and the equations of the uniform chain. Without the feature the page has no
+section on the two chains, no table and no rule of the uniform chain, and its sections and figures are
+numbered without them. The equations are drawn by `web/design/render_equations.py`; their TeX for a screen
+reader is `src/assets/eq/tex.json`.
+
 The title page has two rows of examples. The first is the TNFRSF8 comparison over two columns
 with the contact map. The second is the GSTM1 deletion with the comparison of VPS13D in GM12878
 and H1ESC over two columns. `web/scripts/make_previews.py` draws each from its finished job, the

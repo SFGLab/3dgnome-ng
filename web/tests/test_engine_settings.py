@@ -34,10 +34,10 @@ def refused(raw: dict[str, str]) -> str:
     return ""
 
 
-def test_settings_md_has_186_settings() -> None:
+def test_settings_md_has_190_settings() -> None:
     rows = read_settings_md(ROOT / "SETTINGS.md")
     by = {(r.section, r.key): r for r in rows}
-    assert len(rows) == 186, "SETTINGS.md has 186 settings: " + str(len(rows))
+    assert len(rows) == 190, "SETTINGS.md has 190 settings: " + str(len(rows))
     assert ("distance", "polymer_exponent") in by, "polymer_exponent is in [distance]"
     missing = [f"{e.section}.{e.key}" for group in EDITABLE.values() for e in group if (e.section, e.key) not in by]
     assert not missing, "every editable setting is in SETTINGS.md with its section: " + str(missing)
@@ -106,3 +106,21 @@ def test_the_order_of_the_overrides_does_not_change_the_key(after_and_before_and
     c = JobRequest(cell_type="GMX", region="chr1:0-2000000", factors="CTCF", overrides={"distance.polymer_exponent": "0.31", "main.noise_smooth": "2"})
     assert request_key(a, cat) == request_key(b, cat), "the order of the overrides does not change the key"
     assert request_key(a, cat) != request_key(c, cat), "a changed value changes the key"
+
+
+def test_the_schema_of_the_uniform_chain_has_its_values_and_no_setting_the_engine_refuses(tmp_path: Path) -> None:
+    from gnome3d_web.engine.settings import UNIFORM_KEYS, schema
+
+    config = tmp_path / "config.ini"
+    config.write_text("[springs]\nsqueeze_constant = 0.1\nloop_dropout = no\n[holes]\nuse_hole_beads = yes\n[simulation_arcs]\nsolver = lbfgs\n")
+
+    def rows(chain: str) -> dict[str, dict]:
+        return {f"{s['section']}.{s['key']}": s for g in schema(config, chain) for s in g["settings"]}
+
+    anchors, uniform = rows("anchors"), rows("uniform")
+    assert anchors["springs.squeeze_constant"]["server"] == "0.1" and anchors["holes.use_hole_beads"]["server"] == "yes", "loop anchors show the config of the cell type"
+    assert uniform["springs.squeeze_constant"]["server"] == UNIFORM_KEYS["springs.squeeze_constant"] == "1.0", "the uniform chain shows the value a job gets"
+    assert uniform["springs.loop_dropout"]["server"] == "yes", "its loops are kept by their strength"
+    assert not [k for k in uniform if k.startswith("holes.")], "it has no beads for stretches without loops"
+    assert uniform["simulation_arcs.solver"]["choices"] == ["lbfgs"] and anchors["simulation_arcs.solver"]["choices"] == ["mc", "lbfgs"], "it offers the solver alone"
+    assert "Stretches without loops" not in [g["name"] for g in schema(config, "uniform")], "a group without a setting is left out"

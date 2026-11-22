@@ -49,13 +49,13 @@ class Settings:
     data_anchor_activity: str
     data_anchor_contacts: str
     data_contact_map: str
+    data_components: str
 
     # ---- template ----
 
     # ---- motif orientation ----
     use_ctcf_motif: bool
     motifs_symmetric: bool
-    motif_weight: float
 
     # ---- anchor heatmap ----
     use_anchor_heatmap: bool
@@ -94,12 +94,14 @@ class Settings:
     loop_contact: bool
     factory_weight: float
     gyration_weight: float
+    gyration_min_bp: int
     arcs_repulsion: bool
     factory_radius: float
     background_range_bp: int
     spring_squeeze_arcs: float
     use_contact_background: bool
     contact_background_z: float
+    contact_resolution: int
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -161,6 +163,7 @@ class Settings:
     exclusion_skip_neighbors: int
     mc_neighbour_grid: bool
     exclusion_radius_arcs: float
+    exclusion_arcs_chain_radius: str
     arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
     exclusion_radius_heatmap: float
@@ -237,6 +240,7 @@ class Settings:
     # ---- overlapping-anchor handling (densification) ----
     overlap_anchor_strict: bool
     drop_zero_length_subanchors: bool
+    uniform_chain: bool
 
     # ---- dynamic loop density ----
     use_dynamic_loop_density: bool
@@ -291,11 +295,11 @@ class Settings:
         self.data_anchor_activity = ""
         self.data_anchor_contacts = ""
         self.data_contact_map = ""
+        self.data_components = ""
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
         self.motifs_symmetric = True
-        self.motif_weight = 1.0
 
         # ---- anchor heatmap ----
         self.use_anchor_heatmap = False
@@ -331,6 +335,7 @@ class Settings:
         self.loop_contact = False
         self.factory_weight = 0.0
         self.gyration_weight = 0.0
+        self.gyration_min_bp = 0
         self.arcs_repulsion = True
         self.factory_radius = 2.0
         self.background_weight = 0.0
@@ -338,6 +343,7 @@ class Settings:
         self.spring_squeeze_arcs = 1.0
         self.use_contact_background = False
         self.contact_background_z = 0.0
+        self.contact_resolution = 5000
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -398,6 +404,7 @@ class Settings:
         self.exclusion_skip_neighbors = 1
         self.mc_neighbour_grid = True
         self.exclusion_radius_arcs = 0.0
+        self.exclusion_arcs_chain_radius = "none"
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
@@ -475,6 +482,7 @@ class Settings:
         # ---- overlapping-anchor handling ----
         self.overlap_anchor_strict = False
         self.drop_zero_length_subanchors = False
+        self.uniform_chain = False
 
         # ---- dynamic loop density ----
         self.use_dynamic_loop_density = False
@@ -609,6 +617,7 @@ class Settings:
         self.data_anchor_activity = gets("data", "anchor_activity", self.data_anchor_activity)
         self.data_anchor_contacts = gets("data", "anchor_contacts", self.data_anchor_contacts)
         self.data_contact_map = gets("data", "contact_map", self.data_contact_map)
+        self.data_components = gets("data", "components", self.data_components)
 
         # [template]
 
@@ -635,6 +644,7 @@ class Settings:
         )
         self.background_weight = getf("springs", "background_weight", self.background_weight)
         self.gyration_weight = getf("springs", "gyration_weight", self.gyration_weight)
+        self.gyration_min_bp = geti("springs", "gyration_min_bp", self.gyration_min_bp)
         self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
@@ -645,6 +655,7 @@ class Settings:
         self.contact_background_z = getf(
             "springs", "contact_background_z", self.contact_background_z
         )
+        self.contact_resolution = geti("springs", "contact_resolution", self.contact_resolution)
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
 
@@ -652,7 +663,9 @@ class Settings:
         self.use_ctcf_motif = getb(
             "motif_orientation", "use_motif_orientation", self.use_ctcf_motif
         )
-        self.motif_weight = getf("motif_orientation", "weight", self.motif_weight)
+        # The weight of the term is derived from the bonds since 2026-11-22. Configs still hold
+        # the key.
+        ignore("motif_orientation", "weight")
         self.motifs_symmetric = getb("motif_orientation", "symmetric_motifs", self.motifs_symmetric)
 
         # [anchor_heatmap]
@@ -792,6 +805,14 @@ class Settings:
         self.exclusion_radius_arcs = getf(
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
         )
+        self.exclusion_arcs_chain_radius = gets(
+            "excluded_volume", "arcs_chain_radius", self.exclusion_arcs_chain_radius
+        )
+        if self.exclusion_arcs_chain_radius not in ("none", "sum"):
+            raise ValueError(
+                "[excluded_volume] arcs_chain_radius must be none or sum, got"
+                f" {self.exclusion_arcs_chain_radius!r}"
+            )
         self.arcs_repulsion_cutoff_factor = getf(
             "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
         )
@@ -937,6 +958,7 @@ class Settings:
         self.drop_zero_length_subanchors = getb(
             "main", "drop_zero_length_subanchors", self.drop_zero_length_subanchors
         )
+        self.uniform_chain = getb("main", "uniform_chain", self.uniform_chain)
 
         # [main]
         self.use_dynamic_loop_density = getb(
@@ -957,6 +979,19 @@ class Settings:
         self.smooth_anchor_cap = getf(
             "simulation_arcs_smooth", "anchor_cap", self.smooth_anchor_cap
         )
+        if self.uniform_chain and self.smooth_anchor_cap > 0.0:
+            raise ValueError(
+                "[main] uniform_chain is on with [simulation_arcs_smooth] anchor_cap above zero."
+                " A node of the uniform chain moves with its two neighbours, which is one rule"
+                " for the fixed beads of the smooth stage, and anchor_cap is another. Set"
+                " anchor_cap to 0."
+            )
+        if self.exclusion_arcs_chain_radius != "none" and not self.uniform_chain:
+            raise ValueError(
+                "[excluded_volume] arcs_chain_radius is set and [main] uniform_chain is off. The"
+                " radius from the chain is stated on the nodes of the uniform chain. Set"
+                " arcs_chain_radius to none or uniform_chain to yes."
+            )
         self.smooth_start = gets("simulation_arcs_smooth", "start", self.smooth_start)
         self.smooth_prefetch = geti("simulation_arcs_smooth", "prefetch", self.smooth_prefetch)
         if self.smooth_prefetch < 1:

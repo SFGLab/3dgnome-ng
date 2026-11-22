@@ -21,6 +21,8 @@ from ..expression import Source
 
 FACTOR_CHOICES = ("CTCF", "RNAPII", "CTCF+RNAPII")
 BACKGROUNDS = ("hic", "hicdiffusion", "none")
+# The chain of a model: loop anchors with the chromatin between them, or one bead per kilobase.
+CHAINS = ("anchors", "uniform")
 
 
 @lru_cache(maxsize=16)

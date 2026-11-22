@@ -3,10 +3,18 @@ r"""Renders the figures of section 2 of the Method page, blocks and target dista
     python web/design/render_method.py tables data playground/derived/ps_curve.csv web/design/method_data
     python web/design/render_method.py figures web/design/method_data web/design/images
 
+    python web/design/render_method.py uniform-tables data web/design/method_data
+
 `tables` reads the GM12878 inputs of production and the contact probability table of three cell
 lines from `playground/ps_curve.py`. It writes the small tables the figures plot. `figures`
 draws `method_blocks.png`, `method_exponent.png`, `method_default.png`, `method_loops.png` and
 `method_hic.png` of section 2 and `method_anchor_terms.png` of section 3 from those tables alone.
+
+`uniform-tables` writes the tables of section 5, the chain of one bead per kilobase: the beads
+of two example anchors on both chains, the strength of the loops of the region and the kind of
+target of every pair of nodes of one structure. It reads the contact map of the cell line under
+`data/_hic/`. `figures` draws `method_uniform_anchor.png`, `method_uniform_loops.png` and
+`method_uniform_targets.png` from them.
 """
 
 from __future__ import annotations
@@ -158,6 +166,143 @@ def anchor_tables(data_root: str, out: Path) -> dict[str, int]:
         "anchors": len(mids), "pairs": int(k.size), "loop": int((k == 1).sum()), "background": int((k == 2).sum()),
         "hic": int((k == 3).sum()), "none": int((k == 0).sum()), "windows": int(member.shape[0]), "range_bp": rng,
     }
+
+
+# The example anchors of section 5, by block and place in the block of the region: one anchor of 3 kb
+# with three loops, and two anchors that overlap by 2 kb.
+OTHER = "#b0afa9"
+SINGLE = (1, [3])
+OVERLAP = (1, [7, 8])
+FLANK = 4_000
+
+
+def uniform_tables(data_root: str, out: Path) -> None:
+    """Writes the tables of section 5 as a job on the region with the chain of one bead per
+    kilobase builds them."""
+    import gnome3d.skeleton as skeleton
+    from gnome3d.data import ContactData
+    from gnome3d.hierarchy import Level
+    from gnome3d.io import parse_region
+    from gnome3d.pipeline.coarse import build as cb
+    from gnome3d.pipeline.ib.densify import densify
+    from gnome3d.pipeline.ib.nodes import draw_ends
+    from gnome3d.pipeline.ib.spans import anchor_spans, grid_edges
+    from gnome3d.production import settings_for_cell
+    from gnome3d.simulate import simulate
+
+    root = str(Path(data_root).resolve())
+    region = parse_region(f"{CHROM}:{REGION[0]}-{REGION[1]}")
+    plain = settings_for_cell(CELL, root)
+    s = settings_for_cell(CELL, root, uniform=True)
+    data = ContactData.from_files(s, [CHROM], region)
+    state = cb.build_state(s, data, [CHROM], region)
+    cl = state.clusters
+    arcs = state.arcs.get(CHROM, [])
+    ibs = [c for c in cl if c.level == Level.INTERACTION_BLOCK and len(c.children) > 1]
+    law = s.polymer_law()
+
+    def example(block: int, picks: list[int]) -> dict[str, object]:
+        ids = list(ibs[block].children)
+        genomic = [(cl[a].start, cl[a].end, cl[a].genomic_pos) for a in ids]
+        lo_w = min(genomic[k][0] for k in picks) - FLANK
+        hi_w = max(genomic[k][1] for k in picks) + FLANK
+        _pos, fixed, starts, ends, *_rest = densify(np.zeros((len(ids), 3), dtype=np.float32), genomic, plain)
+        default = [
+            {"start": int(a), "end": int(b), "anchor": bool(f)}
+            for a, b, f in zip(starts, ends, fixed, strict=True)
+            if b > lo_w and a < hi_w
+        ]
+        edges = grid_edges(genomic, int(s.target_bp_per_subanchor))
+        lo, hi, _knot = anchor_spans(genomic, edges)
+        beads = [
+            {
+                "start": int(edges[i]),
+                "end": int(edges[i + 1]),
+                "anchors": [n for n, k in enumerate(picks) if lo[k] <= i < hi[k]],
+                "covered": bool(((lo <= i) & (i < hi)).any()),
+            }
+            for i in range(len(edges) - 1)
+            if edges[i + 1] > lo_w and edges[i] < hi_w
+        ]
+        first = next(i for i in range(len(edges) - 1) if edges[i + 1] > lo_w)
+        loops = []
+        for n, k in enumerate(picks):
+            for arc_i in cl[ids[k]].arcs:
+                arc = arcs[arc_i]
+                other = arc.end if arc.start == ids[k] else arc.start
+                loops.append({"anchor": n, "side": 1 if cl[other].genomic_pos > genomic[k][2] else -1, "pets": int(arc.score)})
+        pair = np.array([[picks[lp["anchor"]], picks[lp["anchor"]]] for lp in loops], dtype=np.int32)
+        draws = [
+            [int(b) - first for b in draw_ends(lo, hi, pair, np.random.default_rng(seed))[:, 0]] for seed in (1, 2)
+        ]
+        return {
+            "window": [int(lo_w), int(hi_w)],
+            "anchors": [{"start": int(genomic[k][0]), "end": int(genomic[k][1])} for k in picks],
+            "default": default,
+            "uniform": beads,
+            "loops": loops,
+            "draws": draws,
+        }
+
+    (out / "uniform_anchors.json").write_text(json.dumps({"single": example(*SINGLE), "overlap": example(*OVERLAP)}, indent=1) + "\n")
+
+    rows = []
+    for ib in ibs:
+        for a in ib.children:
+            for arc_i in cl[a].arcs:
+                arc = arcs[arc_i]
+                if arc.start != a:
+                    continue
+                span = abs(cl[arc.end].genomic_pos - cl[arc.start].genomic_pos)
+                q = float(law.arc_strength(int(arc.score), int(span), int(arc.factor)))
+                rows.append((int(span), int(arc.score), q, q / (q + float(s.loop_dropout_scale))))
+    pd.DataFrame(rows, columns=["span", "pets", "strength", "kept"]).to_csv(out / "uniform_loops.csv", index=False)
+
+    # The kinds of the targets of one structure, read where the node solve builds its matrix.
+    seen: dict[str, np.ndarray] = {}
+    wrapped = {name: getattr(skeleton, name) for name in ("node_targets", "hold_by_cells", "hold_loci")}
+
+    def keep(name: str):  # noqa: ANN202
+        def call(*args, **kw):  # noqa: ANN002, ANN003, ANN202
+            got = wrapped[name](*args, **kw)
+            if name == "node_targets":
+                seen["mid"] = np.array(args[0].mid, dtype=np.int64)
+                seen["block"] = np.array(args[0].block, dtype=np.int64)
+            seen.setdefault(name, np.array(got, dtype=np.float64))
+            return got
+
+        return call
+
+    for name in wrapped:
+        setattr(skeleton, name, keep(name))
+    try:
+        simulate(s, data, [CHROM], 1, region=region)
+    finally:
+        for name, fn in wrapped.items():
+            setattr(skeleton, name, fn)
+    first, cells, loci = seen["node_targets"], seen["hold_by_cells"], seen["hold_loci"]
+    mid = seen["mid"]
+    sep = np.abs(mid[:, None] - mid[None, :]).astype(np.float64)
+    bg = np.maximum(1.0, (np.maximum(sep, 1.0) / max(int(law.s0_bp), 1)) ** law.nu)
+    # 1 a loop, 2 the background under the range, 3 an enriched cell, 4 a depleted cell, 5 the
+    # background between two stretches of 100 kb, 0 no target.
+    kind = np.zeros(first.shape, dtype=np.int64)
+    kind[first > 0] = 1
+    kind[(first <= -1) & (first == cells)] = 2
+    moved = cells != first
+    kind[moved & (-cells < bg)] = 3
+    kind[moved & (-cells >= bg)] = 4
+    kind[loci != cells] = 5
+    np.fill_diagonal(kind, -1)
+    pd.DataFrame(kind).to_csv(out / "uniform_pairs.csv", index=False, header=False)
+    pd.DataFrame({"mid": mid, "block": seen["block"]}).to_csv(out / "uniform_nodes.csv", index=False)
+    iu = np.triu_indices(len(mid), 1)
+    k = kind[iu]
+    counts = {name: int((k == code).sum()) for code, name in enumerate(("none", "loop", "background", "enriched", "depleted", "stretches"))}
+    fits = json.loads((out / "fits.json").read_text())
+    fits["uniform_pairs"] = {"nodes": len(mid), "pairs": int(k.size), **counts}
+    (out / "fits.json").write_text(json.dumps(fits, indent=1) + "\n")
+    print(fits["uniform_pairs"])
 
 
 # Figures
@@ -509,9 +654,187 @@ def anchor_terms(tab: Path, out: Path) -> None:
     save(fig, out / "method_anchor_terms.png")
 
 
+def _loop_stub(ax: plt.Axes, x: float, y: float, side: int, reach: float, rise: float, colour: str) -> None:
+    """Draws the start of a loop that leaves `x` upwards to one side and runs out of the panel."""
+    from matplotlib.patches import PathPatch
+    from matplotlib.path import Path as MplPath
+
+    verts = [(x, y), (x, y + rise), (x + side * reach * 0.45, y + rise * 1.25), (x + side * reach, y + rise * 1.25)]
+    ax.add_patch(PathPatch(MplPath(verts, [MplPath.MOVETO, MplPath.CURVE4, MplPath.CURVE4, MplPath.CURVE4]), fc="none", ec=colour, lw=1.3))
+
+
+def uniform_anchor(tab: Path, out: Path) -> None:
+    """Draws one anchor and two overlapping anchors as the data give them, as the beads of the
+    chain of loop anchors and as the beads of the chain of one bead per kilobase in two structures."""
+    from matplotlib.lines import Line2D
+
+    both = json.loads((tab / "uniform_anchors.json").read_text())
+    tints = [BLUE, "#eb6834"]
+    edge = "#c9c8c3"
+    fig, axes = plt.subplots(1, 2, figsize=(WIDTH, 4.7))
+    rows = ["anchor in the data", "loop anchors\nand segments", "one bead per kb,\nstructure 1", "one bead per kb,\nstructure 2"]
+    for ax, key, tag in zip(axes, ("single", "overlap"), ("a", "b"), strict=True):
+        w0, w1 = both[key]["window"]
+        ax.set_xlim(0, (w1 - w0) / 1e3)
+        ax.set_ylim(-0.5, 3.6)
+        ax.set_yticks([3.0, 2.0, 1.0, 0.0])
+        ax.set_yticklabels(rows if tag == "a" else [""] * 4, fontsize=8.5)
+        ax.tick_params(axis="y", length=0)
+        ax.tick_params(axis="x", labelsize=8.5)
+        ax.set_xlabel(f"kb from {w0 / 1e6:.3f} Mb on chromosome 1", fontsize=9.5)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+        title = "one anchor of 3 kb with three loops" if key == "single" else "two anchors that overlap"
+        ax.set_title(title, fontsize=9.5, color=INK, pad=6)
+        letter(ax, tag)
+    fig.tight_layout(w_pad=1.6, rect=(0, 0.1, 1, 1))
+    fig.canvas.draw()
+    # A bead is a circle on the page. Its size comes from the scale of the panel with the longer window.
+    per_kb = min(ax.get_window_extent().width * 72 / fig.dpi / ax.get_xlim()[1] for ax in axes)
+    size = 0.84 * per_kb
+    for ax, key in zip(axes, ("single", "overlap"), strict=True):
+        e = both[key]
+        w0, w1 = e["window"]
+        span = (w1 - w0) / 1e3
+        top = size / 2 / (ax.get_window_extent().height * 72 / fig.dpi / 4.1)
+        two = len(e["anchors"]) > 1
+
+        def x(v: float, w0: int = w0) -> float:
+            return (v - w0) / 1e3
+
+        def centre(b: dict, x=x) -> float:  # noqa: ANN001
+            return (x(b["start"]) + x(b["end"])) / 2
+
+        def bead(at: float, y: float, fill: str, line: str, ax: plt.Axes = ax, span: float = span) -> None:
+            if 0.0 <= at <= span:
+                ax.plot([at], [y], marker="o", ms=size, color=fill, mec=line, mew=0.8, zorder=4, clip_on=False)
+
+        def dna(a: dict, y: float, n: int, ax: plt.Axes = ax, x=x, top: float = top) -> None:  # noqa: ANN001
+            ax.add_patch(plt.Rectangle((x(a["start"]), y - top - 0.1 - 0.07 * n), x(a["end"]) - x(a["start"]), 0.045, fc=tints[n], ec="none"))
+
+        # The anchors as the data give them, one bar each.
+        for n, a in enumerate(e["anchors"]):
+            y = 3.0 + (0.16 if n == 0 else -0.16) * two
+            ax.add_patch(plt.Rectangle((x(a["start"]), y - 0.11), x(a["end"]) - x(a["start"]), 0.22, fc=tints[n], ec="none"))
+        for i, lp in enumerate(e["loops"]):
+            a = e["anchors"][lp["anchor"]]
+            y = 3.0 + (0.16 if lp["anchor"] == 0 else -0.16) * two
+            _loop_stub(ax, centre(a) + 0.25 * lp["side"], y + 0.11, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
+        # The chain of loop anchors: an anchor is one bead, with the DNA it covers as a bar under it.
+        picked = {(a["start"], a["end"]): n for n, a in enumerate(e["anchors"])}
+        ax.plot([centre(b) for b in e["default"]], [2.0] * len(e["default"]), color=edge, lw=1.6, zorder=2)
+        for b in e["default"]:
+            n = picked.get((b["start"], b["end"]))
+            if n is not None:
+                bead(centre(b), 2.0, tints[n], "white")
+                dna(b, 2.0, n)
+            else:
+                bead(centre(b), 2.0, OTHER if b["anchor"] else PALE, "white")
+        for i, lp in enumerate(e["loops"]):
+            a = e["anchors"][lp["anchor"]]
+            _loop_stub(ax, centre(a), 2.0 + top, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
+        # The chain of one bead per kilobase in two structures: a loop ends on one bead of its anchor.
+        for row, draw in zip((1.0, 0.0), e["draws"], strict=True):
+            ax.plot([centre(b) for b in e["uniform"]], [row] * len(e["uniform"]), color=edge, lw=1.6, zorder=2)
+            ends = {bead_of: lp["anchor"] for lp, bead_of in zip(e["loops"], draw, strict=True)}
+            for k, b in enumerate(e["uniform"]):
+                owners = b["anchors"]
+                if k in ends:
+                    bead(centre(b), row, tints[ends[k]], "white")
+                elif owners:
+                    bead(centre(b), row, WASH, MID)
+                else:
+                    bead(centre(b), row, OTHER if b["covered"] else GAP, "white" if b["covered"] else edge)
+            for n, a in enumerate(e["anchors"]):
+                dna(a, row, n)
+            for i, (lp, bead_of) in enumerate(zip(e["loops"], draw, strict=True)):
+                _loop_stub(ax, centre(e["uniform"][bead_of]), row + top, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
+    key_size = 7.5
+    handles = [
+        Line2D([], [], marker="o", ls="", ms=key_size, color=BLUE, mec="white", label="bead with the end of a loop"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=WASH, mec=MID, label="bead inside the anchor, no loop end"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=PALE, mec="white", label="bead between two anchors, loop anchors chain"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=GAP, mec=edge, label="bead outside the anchor, one bead per kb"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=OTHER, mec="white", label="bead of another anchor"),
+        Line2D([], [], color=BLUE, lw=3, label="DNA of the anchor"),
+    ]
+    fig.legend(handles=handles, frameon=False, fontsize=8.5, loc="lower center", ncol=2, handlelength=1.4, columnspacing=2.2)
+    save(fig, out / "method_uniform_anchor.png")
+
+
+def uniform_nodes(tab: Path, out: Path) -> None:
+    """Draws the share of the structures that keep a loop against its strength and the kind of
+    target of every pair of nodes of one structure of the region."""
+    from matplotlib.colors import ListedColormap
+    from matplotlib.patches import Patch
+
+    loops = pd.read_csv(tab / "uniform_loops.csv")
+    kind = pd.read_csv(tab / "uniform_pairs.csv", header=None).to_numpy()
+    nodes = pd.read_csv(tab / "uniform_nodes.csv")
+    n_of = json.loads((tab / "fits.json").read_text())["uniform_pairs"]
+    n = len(nodes)
+    fig, (left, right) = plt.subplots(1, 2, figsize=(WIDTH, 4.4), gridspec_kw={"width_ratios": [1.0, 1.0]})
+
+    q = np.geomspace(0.05, 30, 200)
+    left.plot(q, q / (q + 1), color=INK, lw=1.4, label="q / (q + 1)")
+    left.scatter(loops.strength, loops.kept, s=22, color=BLUE, alpha=0.75, lw=0, zorder=3, label=f"the {len(loops)} loops of the region")
+    left.axhline(0.5, color="#c9c8c3", lw=0.7, ls=(0, (3, 3)))
+    left.axvline(1.0, color="#c9c8c3", lw=0.7, ls=(0, (3, 3)))
+    left.set_xscale("log")
+    left.set_xticks([0.1, 0.3, 1, 3, 10, 30])
+    left.set_xticklabels(["0.1", "0.3", "1", "3", "10", "30"])
+    left.minorticks_off()
+    left.set_ylim(0, 1.02)
+    left.set_box_aspect(1.0)
+    left.set_anchor("N")
+    left.set_xlabel("strength of the loop, q", fontsize=9.5)
+    left.set_ylabel("share of the structures\nthat keep the loop", fontsize=9.5)
+    left.legend(frameon=False, fontsize=8.5, loc="lower right")
+    left.set_title("loops that a structure keeps", fontsize=9.5, color=INK, pad=6)
+    style(left)
+    letter(left, "a")
+
+    colours = [GAP, BLUE, INK, "#eb6834", "#1baf7a", PALE]
+    right.imshow(np.ma.masked_less(kind, 0), cmap=ListedColormap(colours), vmin=0, vmax=5, interpolation="nearest")
+    for c in np.flatnonzero(np.diff(nodes.block)) + 0.5:
+        right.axhline(c, color="white", lw=1.6)
+        right.axvline(c, color="white", lw=1.6)
+    blocks_seen = sorted(nodes.block.unique())
+    centres = [float(np.flatnonzero(nodes.block == b).mean()) for b in blocks_seen]
+    right.set_xticks(centres)
+    right.set_xticklabels([str(k + 1) for k in range(len(centres))], fontsize=8.5)
+    right.set_yticks(centres)
+    right.set_yticklabels([str(k + 1) for k in range(len(centres))], fontsize=8.5)
+    right.set_xlabel("block", fontsize=9.5)
+    right.set_ylabel("block", fontsize=9.5)
+    right.tick_params(length=0)
+    for side in right.spines.values():
+        side.set_visible(False)
+    right.set_xlim(-0.5, n - 0.5)
+    right.set_ylim(n - 0.5, -0.5)
+    right.set_anchor("N")
+    handles = [
+        Patch(fc=BLUE, label=f"loop, {n_of['loop']} pairs"),
+        Patch(fc=INK, label=f"background under 100 kb, {n_of['background']} pairs"),
+        Patch(fc=PALE, label=f"background between two stretches of 100 kb, {n_of['stretches']} pairs"),
+    ]
+    if n_of["enriched"]:
+        handles.append(Patch(fc="#eb6834", label=f"enriched cell, {n_of['enriched']} pairs"))
+    if n_of["depleted"]:
+        handles.append(Patch(fc="#1baf7a", label=f"depleted cell, {n_of['depleted']} pairs"))
+    handles.append(Patch(fc=GAP, ec="#d9d8d3", label=f"no target, {n_of['none']:,} pairs"))
+    right.legend(handles=handles, frameon=False, fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=1, handlelength=1.2)
+    right.set_title(f"targets of the {n} nodes of one structure, {n_of['pairs']:,} pairs", fontsize=9.5, color=INK, pad=6)
+    letter(right, "b")
+    fig.tight_layout(rect=(0, 0.02, 1, 1), w_pad=2.0)
+    save(fig, out / "method_uniform_nodes.png")
+
+
 def main() -> None:
     if sys.argv[1] == "tables":
         tables(sys.argv[2], sys.argv[3], Path(sys.argv[4]))
+        return
+    if sys.argv[1] == "uniform-tables":
+        uniform_tables(sys.argv[2], Path(sys.argv[3]))
         return
     tab, out = Path(sys.argv[2]), Path(sys.argv[3])
     out.mkdir(parents=True, exist_ok=True)
@@ -521,6 +844,8 @@ def main() -> None:
     loop_targets(tab, out)
     hic_targets(tab, out)
     anchor_terms(tab, out)
+    uniform_anchor(tab, out)
+    uniform_nodes(tab, out)
 
 
 if __name__ == "__main__":

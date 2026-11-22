@@ -1,9 +1,0 @@
-chr1:1-60000000: 5 holes, 4 spanning two bins or more
-  hole 0: 4.07 to 5.51 Mb, 57 bins, 1.00 mapped, raw coverage 0.92 of the median
-  hole 2: 13.24 to 13.60 Mb, 14 bins, 0.64 mapped, raw coverage 0.60 of the median
-  hole 3: 48.50 to 48.68 Mb, 7 bins, 1.00 mapped, raw coverage 0.82 of the median
-  hole 4: 48.87 to 50.35 Mb, 59 bins, 1.00 mapped, raw coverage 0.70 of the median
-  SCC raw / balanced, mapped, no hole 0, no hole 2, no hole 3, no hole 4, no holes
-                          HFFC6_chr1_60mb_prod    0.249/0.180    0.235/0.176    0.246/0.179    0.248/0.180    0.221/0.163    0.198/0.159
-                         HFFC6_chr1_60mb_mxgyr    0.290/0.238    0.279/0.237    0.287/0.237    0.289/0.238    0.267/0.226    0.250/0.225
-                        HFFC6_chr1_60mb_hflank    0.263/0.222    0.259/0.222    0.261/0.221    0.263/0.222    0.252/0.215    0.244/0.216

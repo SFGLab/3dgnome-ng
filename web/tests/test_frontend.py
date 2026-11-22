@@ -64,19 +64,22 @@ def test_returns_the_app(site: SimpleNamespace) -> None:
     assert "FRONTEND-OK" in c.get(job).text, "a job's page is the app"
     assert c.get(job + "/files/ep.tsv").status_code == 200, "a job's file is the server's"
 
-    assert "site-hide" not in c.get("/").text, "no part is hidden by default"
+    assert "site-hide" not in c.get("/").text, "a page without a head carries no flag"
     (dist / "index.html").write_text("<html><head></head><body>FRONTEND-OK</body></html>")
     config = root / "data" / "config.json"
     config.write_text('{"features": {"trios": false, "results": false, "method": true}}')
     flagged = TestClient(create_app())
     r = flagged.get("/")
-    assert '<meta name="site-hide" content="results,trios">' in r.text, "a feature config.json turns off reaches the app in the page: " + r.text[:120]
+    assert '<meta name="site-hide" content="results,trios,uniform_chain">' in r.text, "a feature config.json turns off reaches the app in the page: " + r.text[:120]
     config.write_text('{"features": {"trios": false}}')
     os.utime(config, ns=(1, 1))
-    assert '<meta name="site-hide" content="trios">' in flagged.get("/").text, "an edit of config.json is read without a restart"
+    assert '<meta name="site-hide" content="trios,uniform_chain">' in flagged.get("/").text, "an edit of config.json is read without a restart"
     config.write_text('{"features": {"trois": false}}')
     os.utime(config, ns=(2, 2))
-    assert '<meta name="site-hide" content="trios">' in flagged.get("/").text, "a broken edit keeps the configuration the site had"
+    assert '<meta name="site-hide" content="trios,uniform_chain">' in flagged.get("/").text, "a broken edit keeps the configuration the site had"
+    config.write_text('{"features": {"uniform_chain": true}}')
+    os.utime(config, ns=(3, 3))
+    assert "site-hide" not in flagged.get("/").text, "the choice of the chain is on when config.json turns it on"
     for text, said in (('{"features": {"trois": false}}', "trois"), ('{"features": {"trios": "no"}}', "true or false"), ('{"feature": {}}', "unknown key"), ("{", "not JSON")):
         config.write_text(text)
         try:
@@ -85,7 +88,10 @@ def test_returns_the_app(site: SimpleNamespace) -> None:
         except ValueError as e:
             assert said in str(e), f"a site does not start on a config.json with {said}" + ": " + str(e)
     config.unlink()
-    assert "site-hide" not in TestClient(create_app()).get("/").text, "a site without config.json shows everything"
+    (dist / "index.html").write_text("<html><head></head><body>FRONTEND-OK</body></html>")
+    assert '<meta name="site-hide" content="uniform_chain">' in TestClient(create_app()).get("/").text, (
+        "a site without config.json shows everything but the choice of the chain"
+    )
     (dist / "index.html").write_text("<html><body>FRONTEND-OK</body></html>")
 
     os.environ["FRONTEND_DIST"] = str(root / "missing")

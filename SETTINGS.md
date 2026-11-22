@@ -10,6 +10,22 @@ configs from it with two changes, `mc_executor_jax_bucket_shapes = yes` and `hea
 
 The measurements behind a production value are in `design/features.md`.
 
+## The production config of the uniform chain
+
+`gnome3d.production.CANONICAL_UNIFORM` is the production config of the uniform chain. It is `CANONICAL` with the
+keys below, `gnome3d.production.UNIFORM_CHAIN`. No key sets the value of another: a value that the uniform chain
+needs is a row here. `settings_for_cell(cell, uniform=True)` builds the settings from it, with the largest mcool of
+`<data_root>/_hic/<cell>/` as `[data] contact_map`. Without that file the nodes read no contact cells, with a line in
+the log.
+
+| key | value | measurement |
+|---|---|---|
+| `[main] uniform_chain` | yes | The chain itself. |
+| `[springs] squeeze_constant` | 1.0 | At 0.1 a bond gives way and 33 pairs of beads per thousand are closer than 0.7 of a bond. At 1.0 there are 8, at the same pooled scores. |
+| `[springs] contact_background_z` | 3 | The threshold of the contact cells of `[data] contact_map` at `contact_resolution`, 5 kb. At 2 the pooled SCC is 0.02 higher and Spearman 0.05 lower, on 18 rows of twenty structures. |
+| `[springs] loop_dropout` | yes | 0.046 of raw and 0.035 of balanced pooled SCC over every loop in every conformation. |
+| `[excluded_volume] arcs_chain_radius` | sum | Under the dropout the ends of a region overlap in 39 structures of 360. With the radius of a node from its chain they overlap in 18, Spearman is 0.033 higher and SCC does not change. |
+
 ## [main]
 
 | key | type | default | production | meaning |
@@ -32,6 +48,7 @@ The measurements behind a production value are in `design/features.md`.
 | `noise_ib` | float | 0.5 | 0.5 | Step size of block placement, as a multiple of the mean bond between blocks. |
 | `overlap_anchor_strict` | bool | no | no | Sets the span between two overlapping anchors to zero, which puts the subanchors between them at one point. Off spreads them over the overlap with ranges of nonzero width. |
 | `drop_zero_length_subanchors` | bool | no | yes | Leaves subanchors of zero width out of the output. The chain keeps them. |
+| `uniform_chain` | bool | no | no | Builds each block as one bead per `target_bp_per_subanchor` from the start of its first anchor to the end of its last. Every base of the block is in one bead. Each end of a loop is at one bead of the span of its anchor, drawn per conformation, and those beads are the nodes of the joint arcs solve. In the smooth stage a node moves with the bead before it and the bead after it: the node moves by the draw and its two neighbours by minus half of it each, or a neighbour moves by the draw and the other neighbour by minus it. The centre of mass of the three stays where the arcs stage put it. A node at an end of the chain, beside another node or closer than three beads to the node of the rule before it stays fixed. The numba executors run the smooth stage of the chain, the batch executor refuses it. Not with `anchor_cap`. With `[springs] use_contact_background` and `[data] contact_map` a pair of nodes without a loop is held by its Hi-C cell under the Poisson test of `contact_background_z`, which must be above zero. Needs `[simulation_arcs] scope = chromosome` and `solver = lbfgs`. It refuses hole beads, the boundary stitch and the factory term. `design/uniform-chain.md` has the rules. |
 | `use_dynamic_loop_density` | bool | no | yes | Chooses the subanchor count of each anchor gap to make one chain segment about `target_bp_per_subanchor` long. Off uses `loop_density` for every gap. |
 | `target_bp_per_subanchor` | int | 5000 | 1000 | Genomic length of one chain segment under dynamic density. It is also the bead unit of the distance law. |
 | `min_subanchors_per_arc` | int | 0 | 0 | Lower bound of the count per gap under dynamic density. |
@@ -53,7 +70,8 @@ The measurements behind a production value are in `design/features.md`.
 | `phasing_track` | str |  | Track that fixes the sign of an eigenvector in `compartments`. Without it the side with more loop anchors is A. A file of labels needs none. |
 | `anchor_activity` | str |  | BED with a signal column that gives each anchor an activity for `[factories]`. The signal is the seventh column of a line with seven or more, as in a broadPeak. It is the fourth column otherwise, as in a bedGraph. An anchor gets the largest value of the intervals that overlap it and zero without one. |
 | `anchor_contacts` | str |  | Counts between anchor pairs from a full depth map, an npz from `slurm/ensemble/prep_anchor_contacts.py`. The anchor contact map is built from it in place of the singletons, which still give the exponent fit and the coarse heatmaps. A log line states the share of the anchors of the run that the file holds. |
-| `contact_map` | str |  | A cooler URI at fine resolution, such as an mcool at 1 kb. `start = maxent` takes from it the raw counts between windows of about 10 kb inside each gap. Empty draws the gaps from the law alone. |
+| `contact_map` | str |  | A cooler URI at fine resolution, such as an mcool at 1 kb. `start = maxent` takes from it the raw counts between windows of about 10 kb inside each gap. Empty draws the gaps from the law alone. Under `[main] uniform_chain` a pair of nodes reads its cell of this map at `[springs] contact_resolution`. |
+| `components` | str |  | A track of components per locus, the extension of the compartment track, written by `playground/component_track.py` from the Hi-C map of the cell line: five numbers per locus of 100 kb of a chromosome arm, whose products over two loci estimate the log of their observed over expected count. Under `[main] uniform_chain` one node stands for a locus and a pair of those nodes without a loop, without a contact cell and beyond `background_range_bp` holds the background of the law. With the track it holds the background times `exp(-affinity / 3)`. Empty reads none. |
 
 ## [distance]
 
@@ -91,9 +109,11 @@ squeeze constant for a pair that is too close.
 | `background_weight` | float | 0.0 | 0.1 | Weight of a weak spring in the arcs stage that holds an anchor pair without a loop at the background distance of its separation. It acts on pairs closer than `background_range_bp`. Zero turns it off. |
 | `background_range_bp` | int | 100000 | 100000 | The separation under which a pair without a loop is held at the background. A power law distance matrix can be embedded in three dimensions over a band of separations and not over every pair. |
 | `gyration_weight` | float | 0.0 | 0.1 | Weight of a term of the arcs solver that holds the radius of gyration of every genomic window of anchors at the value of the law. The windows cover the span at every scale from `background_range_bp` upward by doubling, each scale twice with a shift of half a window. The annealer refuses it. |
+| `gyration_min_bp` | int | 0 | 0 | The smallest window of the gyration term, in bp. 0 is `background_range_bp`. A smaller value also holds short windows of four anchors or more at the radius of gyration of the law, which gives the chain between crowded loop beads of a uniform chain its room. Under measurement. |
 | `factor_strength` | str |  |  | A multiplier on the loop strength per cluster file, separated by commas in file order. Empty is 1 for each. At 0 the loops of a factor are held at the background and its anchors stay as beads. |
 | `use_contact_background` | bool | no | yes | Holds a pair without a loop beyond `background_range_bp` at the contact distance of the law, with the same spring, when its contact cell puts it closer than the background. A pair at or below its expected contact gets no spring. Needs `use_anchor_heatmap`. |
 | `contact_background_z` | float | 0.0 | 0.0 | Above zero, the contact background holds a pair without a loop when its count is this many Poisson deviations above or below its expectation and the expectation is above this value squared. The target is `background * ((count + 0.5) / (expected + 0.5)) ^ (-1/3)`, clipped to one bead and to `distance_heatmap_stretching` backgrounds. Zero keeps the rule of `use_contact_background`. |
+| `contact_resolution` | int | 5000 | 5000 | The bin of `[data] contact_map`, in bp, that a pair of nodes of a uniform chain reads. A multi resolution file without that resolution is read at the finest one it holds over it, with a line in the log. The expectation of a cell is the mean count at its separation times the bias of its two bins, the inverse of the balancing weights of the map. A map without weights has a bias of one, with a line in the log. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Bond between blocks in block placement, too far. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Bond between blocks in block placement, too close. |
 
@@ -113,8 +133,7 @@ from a second. The term is in the energy of the solver on both backends. The ann
 
 | key | type | default | production | meaning |
 | --- | --- | --- | --- | --- |
-| `use_motif_orientation` | bool | no | yes | Scores the angle between the CTCF motif vectors of two anchors that a loop joins, in the smooth stage. |
-| `weight` | float | 1.0 | 50.0 | Weight of the term. |
+| `use_motif_orientation` | bool | no | yes | Scores the angle between the CTCF motif vectors of two anchors that a loop joins, in the smooth stage. The vector of an anchor runs from the centroid of the three beads before it to the centroid of the three beads after it. A loop weighs its share of the larger of the sums at its two anchors. The weight of the term is the energy of the six bonds of that stretch each one target too long, `6 * stretch_constant * dist_weight`. `design/orientation-term.md`. |
 | `symmetric_motifs` | bool | yes | yes | Yes scores two motif vectors best when they point the same way. No flips the partner first and opposed vectors score best. |
 
 ## [anchor_heatmap]
@@ -227,7 +246,8 @@ mean bond scale.
 | `apply_to_heatmap` | bool | no | yes | Applies it in the heatmap stages. |
 | `apply_to_ib` | bool | yes | yes | Applies it in block placement. |
 | `skip_neighbors` | int | 1 | 1 | Pairs this close along the chain are exempt. |
-| `radius_arcs` | float | 0.0 | 0.0 | Radius of the arcs stage. 0 derives it. |
+| `radius_arcs` | float | 0.0 | 0.0 | Radius of the arcs stage. 0 derives it. On the uniform chain with `loop_dropout` it is derived from every loop of the chromosome, before the dropout. |
+| `arcs_chain_radius` | str | none | none | The radius of a pair of nodes of the uniform chain from the chain the two nodes stand for, in the arcs solver. A node stands for the chain between the midpoints to its two neighbours, and `f` is that chain over the mean chain of a node of a conformation with every loop, to the power one third. `none` scores every pair at the radius of the stage. `sum` scores a pair at that radius times `(f_i + f_j) / 2`, the distance of two blobs of chain. Under `loop_dropout` fewer nodes stand for more chain each and the excluded volume keeps its push. The energy runs on the host. Needs `[main] uniform_chain`. |
 | `radius_smooth` | float | 0.0 | 0.0 | Radius of the smooth stage. 0 derives it. |
 | `radius_heatmap` | float | 0.0 | 0.0 | Radius of the heatmap stages. 0 derives it. |
 | `radius_ib` | float | 0.0 | 0.0 | Radius of block placement. 0 derives it. A positive value is also the constant centroid radius of the boundary stitch. |

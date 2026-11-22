@@ -1,6 +1,11 @@
 """Writes the ensemble config of each cell line from `gnome3d.production.CANONICAL`.
 
 python slurm/ensemble/make_configs.py
+python slurm/ensemble/make_configs.py --uniform
+
+`--uniform` writes `<cell>_hic_uniform.ini`, the config with the keys of `UNIFORM_CHAIN` and the
+contact cells from half a of the deep map of the cell line, `data/_hic_half/a/<cell>.mcool` of
+`playground/thin_cooler.py --chromosomes`.
 """
 
 import argparse
@@ -11,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from gnome3d.production import CANONICAL, cell_data_section  # noqa: E402
+from gnome3d.production import CANONICAL, UNIFORM_CHAIN, cell_data_section  # noqa: E402
 
 CELLS = ["GM12878", "H1ESC", "HFFC6"]
 BINSIZE = 25000
@@ -63,6 +68,7 @@ def main() -> None:
         default=None,
         help="override [excluded_volume] weight; names the file accordingly",
     )
+    ap.add_argument("--uniform", action="store_true", help="write the configs of the uniform chain")
     args = ap.parse_args()
 
     out_dir = Path(__file__).resolve().parent
@@ -70,6 +76,12 @@ def main() -> None:
         cfg = build(cell, args.singletons, args.ev_weight)
         tag = "" if args.ev_weight is None else f"_ev{args.ev_weight:g}".replace(".", "p")
         path = out_dir / f"{cell.lower()}_{args.singletons}_arcs{tag}.ini"
+        if args.uniform:
+            for section, keys in UNIFORM_CHAIN.items():
+                for key, value in keys.items():
+                    cfg[section][key] = str(value)
+            cfg["data"]["contact_map"] = f"data/_hic_half/a/{cell}.mcool::/resolutions/5000"
+            path = out_dir / f"{cell.lower()}_{args.singletons}_uniform{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(cell=cell, singletons=args.singletons))
             cfg.write(fh)

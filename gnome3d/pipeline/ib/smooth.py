@@ -44,8 +44,8 @@ def _expand_orientations(
 def _assemble_beads(
     final_pos: F32Array, fixed: BoolArray, starts: list[int], ends: list[int], s: Settings
 ) -> list[BeadOut]:
-    """Builds the BeadOut list. With `drop_zero_length_subanchors` the subanchors of zero
-    length are left out.
+    """Builds the BeadOut list. `fixed` marks the beads of kind anchor. With
+    `drop_zero_length_subanchors` the subanchors of zero length are left out.
     """
     drop_zero = s.drop_zero_length_subanchors
     return [
@@ -60,6 +60,23 @@ def _assemble_beads(
         for i in range(len(final_pos))
         if not (drop_zero and not bool(fixed[i]) and starts[i] == ends[i])
     ]
+
+
+def centre_beads(fixed: BoolArray) -> BoolArray:
+    """Returns the nodes of a uniform chain that move in the smooth stage, each with the bead
+    before it and the bead after it.
+
+    Such a bead is not at an end of the chain, neither of its neighbours is fixed and it is three
+    beads or more from the bead of the rule before it. No bead then belongs to two of them.
+    """
+    n = int(fixed.shape[0])
+    out: BoolArray = np.zeros(n, dtype=np.bool_)
+    last = -3
+    for b in np.flatnonzero(fixed):
+        if 1 <= b <= n - 2 and not fixed[b - 1] and not fixed[b + 1] and b - last >= 3:
+            out[b] = True
+            last = int(b)
+    return out
 
 
 def run_smooth_batch(expanded: list[Problem], s: Settings) -> list[Result]:
@@ -146,6 +163,8 @@ def _run(problem: Problem) -> Result:
     heat = problem["heat_dist"]
     comp = problem["compartment"]
 
+    centre = problem["centre"]
+
     seed_rng(seed)
     mc_numba.seed_numba(seed)
 
@@ -155,7 +174,7 @@ def _run(problem: Problem) -> Result:
         pos_run: F32Array = best_pos.copy()
         add_movable_noise_inplace(pos_run, fixed, step)
         score = mc_numba.mc_smooth_numba(
-            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp
+            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp, centre=centre
         )
         if score < best_score or best_score < 0.0:
             best_score = score
@@ -220,6 +239,7 @@ class SmoothStage:
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
             "compartment": st.bead_compartment,
+            "centre": centre_beads(st.fixed) if st.settings.uniform_chain else None,
             "bead_starts": st.bead_starts,
             "bead_ends": st.bead_ends,
             "chrom": st.chrom,
@@ -229,6 +249,8 @@ class SmoothStage:
         st = inputs[0]
         assert isinstance(st, Densified)
         _score, final_pos = result
-        beads = _assemble_beads(final_pos, st.fixed, st.bead_starts, st.bead_ends, st.settings)
+        # On a uniform chain a bead under an anchor has the kind anchor in every conformation.
+        kind = st.fixed if st.covered is None else st.covered
+        beads = _assemble_beads(final_pos, kind, st.bead_starts, st.bead_ends, st.settings)
         base: dict[str, Any] = {**vars(st), "heat_dist": getattr(st, "heat_dist", None)}
         return Smoothed(**base, final_pos=final_pos, beads=beads)

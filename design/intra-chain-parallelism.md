@@ -142,7 +142,7 @@ above and one because the fixture dropped the orientation term entirely. A harne
 has to reproduce production behaviour before it can be believed: the current one converges in one
 round where the real pipeline runs eighty three to a hundred and three on the same region.
 
-`playground/trapping_spread.py` runs the spread measurement, on blocks from `capture_arcs.py`.
+`data/figures/retired/playground/trapping_spread.py` runs the spread measurement, on blocks from `capture_arcs.py`.
 
 ## Options, cheapest first
 

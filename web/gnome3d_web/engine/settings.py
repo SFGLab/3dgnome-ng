@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from gnome3d.production import UNIFORM_CHAIN
+
 from .shapes import SettingGroup
 
 SETTINGS_MD = Path(__file__).resolve().parents[3] / "SETTINGS.md"
@@ -22,6 +24,28 @@ _FALSE = {"no", "false", "0", "off"}
 
 class OverrideError(ValueError):
     """A setting change the form does not accept, with the key and the allowed values."""
+
+
+# The keys of the chain of one bead per kilobase, those of the production config of the engine.
+# The beads of a stretch without loops belong to the chain of loop anchors and are off.
+UNIFORM_KEYS: dict[str, str] = {
+    **{f"{section}.{key}": str(value) for section, keys in UNIFORM_CHAIN.items() for key, value in keys.items()},
+    "holes.use_hole_beads": "no",
+}
+# The values of the form that the engine refuses on that chain, each with its reason.
+UNIFORM_REFUSED: dict[tuple[str, str], str] = {
+    ("holes.use_hole_beads", "yes"): "the chain of one bead per kilobase has a bead on every kilobase and takes no beads for stretches without loops",
+    ("simulation_arcs.solver", "mc"): "the chain of one bead per kilobase places its loop ends with the solver lbfgs",
+}
+
+
+def uniform_clash(overrides: dict[str, str]) -> str:
+    """Returns the message for the first setting change that the chain of one bead per kilobase
+    does not take, or an empty text."""
+    for (key, value), reason in UNIFORM_REFUSED.items():
+        if overrides.get(key) == value:
+            return f"{key} = {value}: {reason}. Leave the setting at its default or pick the chain of loop anchors."
+    return ""
 
 
 @dataclass(frozen=True)
@@ -61,7 +85,6 @@ EDITABLE: dict[str, list[Editable]] = {
         _n("springs", "stretch_constant", 0.01, 1, 0.01),
         _n("springs", "squeeze_constant", 0.01, 1, 0.01),
         _n("springs", "arc_weight_exponent", 0, 2, 0.1),
-        _n("motif_orientation", "weight", 0, 200, 1),
         _c("springs", "loop_dropout"),
         _c("springs", "loop_contact"),
     ],
@@ -114,7 +137,6 @@ HELP: dict[str, str] = {
     "springs.stretch_constant": "Stiffness of the bond between neighbouring beads once it is stretched past its target length.",
     "springs.squeeze_constant": "Stiffness of the bond between neighbouring beads once it is shorter than its target length.",
     "springs.arc_weight_exponent": "Makes strong loops stiffer. The spring of a loop is multiplied by its strength to this power. 0 gives every loop the same spring.",
-    "motif_orientation.weight": "Weight of the term that folds a CTCF loop by the directions of its two motifs, a hairpin for motifs that face each other. 0 turns it off.",
     "springs.loop_dropout": "Each structure keeps a loop with a probability that grows with the strength of the loop. A strong loop is then present in more structures of the ensemble than a weak one. Off, every structure has every loop.",
     "springs.loop_contact": "A loop that a structure keeps brings its two anchors into contact, in place of a distance set by its strength. Meant for use with loop_dropout.",
     "springs.background_weight": "Strength of a weak spring that holds two nearby anchors without a loop at the distance the law gives for their separation. 0 turns it off.",
@@ -253,18 +275,29 @@ def parse_ini(text: str) -> tuple[dict[str, str], list[str]]:
     return ok, refused
 
 
-def schema(cell_config: Path) -> list[SettingGroup]:
-    """Returns the editable settings in groups, each with its type, default, the value of the config
-    of the cell type, its range or choices and the text of `HELP`."""
+def schema(cell_config: Path, chain: str = "anchors") -> list[SettingGroup]:
+    """Returns the editable settings in groups, each with its type, default, the value a job gets
+    without a change, its range or choices and the text of `HELP`.
+
+    That value is the one of the config of the cell type, and on the chain uniform the one of
+    `UNIFORM_KEYS` where it has the key. On that chain a choice that the engine refuses is left
+    out, and a setting with no choice left is left out with it."""
     rows = {(r.section, r.key): r for r in read_settings_md()}
     cp = configparser.ConfigParser(interpolation=None)
     cp.read(cell_config)
+    uniform = chain == "uniform"
     groups = []
     for name, items in EDITABLE.items():
         settings = []
         for e in items:
             r = rows[(e.section, e.key)]
+            dotted = f"{e.section}.{e.key}"
+            if uniform and e.section == "holes":
+                continue
             server = cp.get(e.section, e.key, fallback=r.default)
+            if uniform:
+                server = UNIFORM_KEYS.get(dotted, server)
+            choices = [c for c in e.choices if not (uniform and (dotted, c) in UNIFORM_REFUSED)] if e.choices else None
             if e.choices == BOOLEAN:
                 server = "yes" if server.lower() in _TRUE else "no"
             settings.append(
@@ -277,9 +310,10 @@ def schema(cell_config: Path) -> list[SettingGroup]:
                     "lo": e.lo,
                     "hi": e.hi,
                     "step": e.step,
-                    "choices": list(e.choices) if e.choices else None,
-                    "meaning": HELP[f"{e.section}.{e.key}"],
+                    "choices": choices,
+                    "meaning": HELP[dotted],
                 }
             )
-        groups.append({"name": name, "settings": settings})
+        if settings:
+            groups.append({"name": name, "settings": settings})
     return groups

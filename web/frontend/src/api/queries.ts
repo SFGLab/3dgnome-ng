@@ -16,7 +16,7 @@ export const asked = {
   region: (cell: string, text: string) => queryOptions<Region, ApiError>({ queryKey: ['region', cell, text], queryFn: () => api.region(cell, text) }),
   geneHits: (cell: string, text: string) => queryOptions({ queryKey: ['gene-hits', cell, text], queryFn: () => api.genes(cell, text) }),
   preview: (cell: string, span: string) => queryOptions({ queryKey: ['preview', cell, span], queryFn: () => api.preview(cell, span) }),
-  settings: (cell: string) => queryOptions({ queryKey: ['settings', cell], queryFn: () => api.settings(cell) }),
+  settings: (cell: string, chain = 'anchors') => queryOptions({ queryKey: ['settings', cell, chain], queryFn: () => api.settings(cell, chain) }),
   sampleTable: (set: string) => queryOptions({ queryKey: ['sample-table', set], queryFn: () => api.sampleTable(set) }),
   expression: (cell: string, svSet: string, sample: string) => queryOptions({ queryKey: ['expression', cell, svSet, sample], queryFn: () => api.expression(cell, svSet, sample) }),
   variants: (fields: Record<string, string>) => queryOptions({ queryKey: ['sv-check', fields], queryFn: () => api.variants(fields) }),

@@ -115,7 +115,7 @@ def run_job(
             cond = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra)
             hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
             hic = cond, region.start
-        inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
+        inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own, req.chain)
         # The table of an upload is in the job from the request on. A hosted table is read here,
         # from the place the catalog gives its source.
         if req.expression and req.expression.get("source") != expression.UPLOAD:

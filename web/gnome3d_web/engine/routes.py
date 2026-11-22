@@ -14,8 +14,8 @@ router = APIRouter(responses=REFUSALS)
 
 
 @router.get("/api/settings", response_model=list[SettingGroup])
-def api_settings(site: Here, cell: str) -> JSONResponse:
-    return JSONResponse(schema(site.cell(cell).path("config")))
+def api_settings(site: Here, cell: str, chain: str = "anchors") -> JSONResponse:
+    return JSONResponse(schema(site.cell(cell).path("config"), chain))
 
 
 @router.post("/api/settings/ini", response_model=IniOverrides)

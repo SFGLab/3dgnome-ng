@@ -16,7 +16,7 @@ battery. The old code is under `legacy/` and is not developed.
 gnome3d/            the model
   simulate.py       entry points: simulate, run_region, run_genome
   cli.py            the gnome3d command
-  production.py     the production configuration, CANONICAL and settings_for_cell
+  production.py     the production configurations, CANONICAL, CANONICAL_UNIFORM and settings_for_cell
   settings.py       the loader of every config key
   data.py io.py     input data and file formats
   polymer.py        the distance law and its fits
@@ -129,14 +129,21 @@ Run pytest before a commit that touches `gnome3d/`.
 ### Byte exactness gate
 
 `playground/parity_dump.py` reconstructs one region and dumps every bead. Run it at the previous commit and on the
-working tree with the same executor settings and compare the two files exactly.
+working tree with the same executor settings and compare the two files exactly. `--uniform` dumps the uniform chain
+on the production config.
 
 ```bash
 git worktree add --detach /tmp/g3d_head HEAD
-ln -s "$PWD/data" /tmp/g3d_head/data
 python playground/parity_dump.py /tmp/g3d_head head.npz
 python playground/parity_dump.py "$PWD"       wip.npz
+python playground/parity_dump.py --uniform /tmp/g3d_head head_uniform.npz
+python playground/parity_dump.py --uniform "$PWD"       wip_uniform.npz
 ```
+
+A worktree has its own `data/` with the files that git tracks. The first two runs read those files. The runs with
+`--uniform` read `data/` of the directory they are started in, for both trees. A gate that reads the `data/` of each
+tree compares two inputs: the worktree lacks the Hi-C singletons and fits another exponent. Compare the line
+`polymer law` of the two logs before the bytes.
 
 ### Battery
 
@@ -201,11 +208,16 @@ note under `design/` states hardware by its model.
 
 ## Records
 
-- `SETTINGS.md` and `gnome3d/production.py` state what holds now.
+- `SETTINGS.md` and `gnome3d/production.py` state what holds now, for the default chain and the uniform chain.
 - `design/features.md` has every feature with its settings, its code and its measurements.
+- `design/figures/` has the figures of a trial and the tables a note cites. The tables per row and the run logs of a
+  trial are in `data/figures/` under the same folder names, outside git.
+- The scripts, queues and configs of a finished trial are in `data/figures/retired/` under their earlier paths,
+  outside git. `playground/` and `slurm/ensemble/` hold the scripts in use.
 - `design/anchor-placement.md` has the distance law, the placement of anchors and the end passes.
 - `design/gap-fill.md` has the gaps, the maximum entropy start, the hole beads and the long range.
 - `design/ab-compartments.md` has the compartment term and the steps that build its track.
+- `design/orientation-term.md` has the orientation term of the smooth stage, its trace and its open design.
 - `design/kernel-performance.md`, `design/parallel-mc-and-nn-reading.md` and `design/intra-chain-parallelism.md` have
   the performance work.
 - `design/algorithm-improvements.md` has the arcs solver.

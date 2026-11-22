@@ -1,3 +1,0 @@
-  map                          models   0  loops   2010  APA 4.729
-  HG00732_C_60mb               models  10  loops   2010  APA 1.331
-  HG00732_R_60mb               models  10  loops   2010  APA 2.085

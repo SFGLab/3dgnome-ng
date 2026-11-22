@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -22,7 +22,7 @@ from gnome3d.mc.numba.terms import (
     init_heat_nb,
     init_smooth_nb,
 )
-from gnome3d.types import I32Array, I64Array
+from gnome3d.types import I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -126,7 +126,6 @@ def mc_ib_numba(
         nbr_indices=dummy_i32(),
         nbr_weights=np.zeros(1, dtype=np.float64),
         anchor_orn=np.zeros((1, 3), dtype=np.float64),
-        bead_to_anchor_k=cast(I32Array, np.full(n, -1, dtype=np.int32)),
         motif_weight=0.0,
         motifs_symmetric=True,
         use_excl=use_excl,

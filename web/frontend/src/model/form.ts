@@ -6,6 +6,8 @@ import { type UploadResult } from '../api'
 /** The state of the Model a region form. The cell type own means the job reads only uploads. */
 export type Factors = 'CTCF' | 'RNAPII' | 'CTCF+RNAPII'
 export type Background = 'hic' | 'hicdiffusion' | 'none'
+/** The chain of a model: loop anchors with the chromatin between them, or one bead per kilobase. */
+export type Chain = 'anchors' | 'uniform'
 
 export type FormState = {
   cell: string
@@ -16,6 +18,7 @@ export type FormState = {
   haplotype: 0 | 1
   vcfUpload: UploadResult | null
   background: Background
+  chain: Chain
   /** The id of the hosted expression source of the job, own for the table of the own data, empty for none. */
   expression: string
   structures: number
@@ -33,6 +36,7 @@ export const EMPTY_FORM: FormState = {
   haplotype: 0,
   vcfUpload: null,
   background: 'hic',
+  chain: 'anchors',
   expression: '',
   structures: 100,
   name: '',

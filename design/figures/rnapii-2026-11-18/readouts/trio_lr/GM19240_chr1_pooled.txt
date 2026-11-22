@@ -1,4 +1,0 @@
-chr1, pooled ensemble against Hi-C at 25000 bp, 1291 unmapped bins
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
-                                GM19240_C_chr1  10   0.372   0.223   0.527   0.243   0.222   0.407                     0.493    0.329    0.091
-                                GM19240_R_chr1  10   0.380   0.226   0.539   0.252   0.224   0.397                     0.505    0.313    0.096

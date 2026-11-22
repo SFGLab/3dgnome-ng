@@ -1,4 +1,0 @@
-chr1:20000000-25000000, pooled ensemble against Hi-C at 25000 bp, 0 unmapped bins
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC
-           GM12878_chr1_20000000_25000000_prod   5   0.650   0.519   0.180   0.734   0.525   0.200                     0.180    0.200
-           GM12878_chr1_20000000_25000000_rw10   5   0.650   0.518   0.182   0.734   0.524   0.201                     0.182    0.201

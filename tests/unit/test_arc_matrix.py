@@ -11,7 +11,7 @@ from gnome3d.mc.numba.terms import (
     init_arcs_nb,
 )
 from gnome3d.pipeline.coarse.build import (
-    _active_arcs,
+    active_arcs,
     add_contact_background,
     arc_expected_matrix,
     repulsion_range,
@@ -68,7 +68,7 @@ def test_two_factors() -> None:
     state = SimpleNamespace(
         clusters=clusters, arcs={"chr1": [arc(0, 2, 3, 0), arc(0, 2, 40, 1), arc(0, 2, 0, -1)]}, s=s
     )
-    got_mids, got = _active_arcs(state, [0, 1, 2], "chr1")
+    got_mids, got = active_arcs(state, [0, 1, 2], "chr1")
     assert got == [(0, 2, 3, 0), (0, 2, 40, 1)], (
         "the summary arc is left out of the active arcs: " + str(got)
     )

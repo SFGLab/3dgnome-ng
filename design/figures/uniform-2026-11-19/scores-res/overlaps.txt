@@ -1,0 +1,16 @@
+pairs under 0.7 model units per thousand beads: every pair | pairs not next to each other in the file | bond median | beads
+GM12878_chr1_10000000_15000000 | prod:   10.9    1.3 1.07 2597 | node_c5k_centre:   31.9    3.0 1.04 3025 | ctr_c2k:   24.9    2.8 1.04 3025 | ctr_c10k:   26.5    4.0 1.03 3025 | ctr_c25k:   27.1    1.9 1.03 3025 | ctr_c5k_z2:   31.3    2.3 1.04 3025 | ctr_c5k_z4:   29.1    3.8 1.03 3025 | ctr_nocells:   27.2    3.7 1.04 3025
+GM12878_chr1_20000000_25000000 | prod:   21.6    5.8 1.11 4268 | node_c5k_centre:   47.4    5.4 1.05 4893 | ctr_c2k:   64.7   14.9 1.06 4893 | ctr_c10k:   39.6    3.8 1.04 4893 | ctr_c25k:   37.2    2.5 1.04 4893 | ctr_c5k_z2:   56.4    7.6 1.05 4893 | ctr_c5k_z4:   58.9    7.1 1.05 4893 | ctr_nocells:   61.4   15.0 1.06 4893
+H1ESC_chr1_10000000_15000000 | prod:    3.9    0.9 1.05 2823 | node_c5k_centre:   29.4    6.1 1.02 3900 | ctr_c2k:   29.8    7.3 1.02 3900 | ctr_c10k:   26.1    2.5 1.02 3900 | ctr_c25k:   28.5    2.4 1.02 3900 | ctr_c5k_z2:   31.1    4.1 1.02 3900 | ctr_c5k_z4:   31.9    6.9 1.02 3900 | ctr_nocells:   30.2    7.5 1.02 3900
+H1ESC_chr1_20000000_25000000 | prod:   12.2    4.5 1.07 4233 | node_c5k_centre:   37.6    5.2 1.04 4836 | ctr_c2k:   43.2    8.7 1.05 4836 | ctr_c10k:   43.3    5.3 1.04 4836 | ctr_c25k:   27.7    2.2 1.04 4836 | ctr_c5k_z2:   34.0    3.5 1.04 4836 | ctr_c5k_z4:   48.3    9.3 1.05 4836 | ctr_nocells:   43.5    8.4 1.04 4836
+HFFC6_chr1_10000000_15000000 | prod:    5.4    0.5 1.07 3301 | node_c5k_centre:   22.8    2.7 1.02 4565 | ctr_c2k:   23.7    5.2 1.02 4565 | ctr_c10k:   16.3    2.4 1.02 4565 | ctr_c25k:   15.5    2.3 1.02 4565 | ctr_c5k_z2:   15.8    2.1 1.02 4565 | ctr_c5k_z4:   22.0    3.9 1.02 4565 | ctr_nocells:   22.3    4.5 1.02 4565
+HFFC6_chr1_20000000_25000000 | prod:    7.0    2.6 1.04 4684 | node_c5k_centre:   26.9    3.5 1.04 4832 | ctr_c2k:   34.2    5.3 1.04 4832 | ctr_c10k:   26.3    2.5 1.04 4832 | ctr_c25k:   17.4    1.5 1.03 4832 | ctr_c5k_z2:   24.1    2.5 1.03 4832 | ctr_c5k_z4:   37.2    6.2 1.03 4832 | ctr_nocells:   34.6    6.0 1.04 4832
+mean over the rows
+  prod                           10.2    2.6
+  node_c5k_centre                32.7    4.3
+  ctr_c2k                        36.8    7.4
+  ctr_c10k                       29.7    3.4
+  ctr_c25k                       25.6    2.1
+  ctr_c5k_z2                     32.1    3.7
+  ctr_c5k_z4                     37.9    6.2
+  ctr_nocells                    36.5    7.5

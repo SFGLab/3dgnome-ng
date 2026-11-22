@@ -1,7 +1,8 @@
 """The arcs energy and its gradient on the device, for the solver.
 
 This is the energy of `gnome3d.mc.numba.arcs_solver.arcs_energy_grad`, term for term,
-evaluated in row chunks in float32. The rows are summed in float64 on the host. The two agree
+evaluated in row chunks in float32, with the factory term, the gyration term and the reach term
+of the same module. The rows are summed in float64 on the host. The two agree
 to about 1e-6 relative. The 64 bit mode of JAX is process wide and changes the integer draws of
 the smooth kernel. It is not used.
 """
@@ -12,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from gnome3d.types import F32Array, F64Array
+from gnome3d.types import F32Array, F64Array, I32Array
 
 CHUNK_ROWS = 256
 
@@ -26,9 +27,20 @@ class DeviceArcsEnergy:
         The target matrix. `exp[j, i]` is the entry the CPU kernel reads for the pair (i, j).
     args
         The scalar parameters of `arcs_energy_grad` after `exp`, in its order.
+    w
+        The weight of each arc spring, None for one.
+    node_f
+        The factor of each anchor for the excluded volume radius of a pair,
+        `excl_r0 * (node_f[i] + node_f[j]) / 2`. None scores every pair at `excl_r0`.
     """
 
-    def __init__(self, exp: F64Array, args: tuple[Any, ...], w: F32Array | None = None) -> None:
+    def __init__(
+        self,
+        exp: F64Array,
+        args: tuple[Any, ...],
+        w: F32Array | None = None,
+        node_f: F64Array | None = None,
+    ) -> None:
         import jax
 
         from gnome3d.mc.jax.util import jax_is_available
@@ -52,6 +64,11 @@ class DeviceArcsEnergy:
             else jnp.zeros((1, 1), dtype=jnp.float32)
         )
         idx_all = jnp.arange(n, dtype=jnp.int32)
+        use_f = node_f is not None
+        f_host: F32Array = np.ascontiguousarray(
+            node_f if node_f is not None else np.ones(1), dtype=np.float32
+        )
+        f_all: Any = jnp.asarray(f_host)  # pyright: ignore[reportUnknownMemberType]
         centre = jnp.asarray(np.array([cx, cy, cz], dtype=np.float32))
         use_excl = excl_w > 0.0
 
@@ -93,10 +110,11 @@ class DeviceArcsEnergy:
             w = jnp.where(is_bg, w_bg, jnp.where(rep_on, w_rep, jnp.where(is_spr, w_spr, 0.0)))
             if use_excl:
                 sep = jnp.abs(idx_all - i)
-                ex_on = jnp.logical_and(d < excl_r0, sep > excl_skip)
-                u = (excl_r0 - d) / excl_r0
+                r0: Any = excl_r0 * 0.5 * (f_all[i] + f_all) if use_f else excl_r0
+                ex_on = jnp.logical_and(d < r0, sep > excl_skip)
+                u = (r0 - d) / r0
                 ener = ener + jnp.where(ex_on, excl_w * u * u, 0.0)
-                w = w + jnp.where(ex_on, -4.0 * excl_w * u / (excl_r0 * dd), 0.0)
+                w = w + jnp.where(ex_on, -4.0 * excl_w * u / (r0 * dd), 0.0)
             other = idx_all != i
             ener = jnp.where(other, ener, 0.0)
             w = jnp.where(other, w, 0.0)
@@ -211,3 +229,117 @@ class DeviceFactoryEnergy:
 
         ei, g = self._fn(jnp.asarray(x, dtype=jnp.float32))
         return float(np.asarray(ei, dtype=np.float64).sum()), np.asarray(g, dtype=np.float64)
+
+
+def _on_device(a: Any, dtype: Any) -> Any:
+    """Returns a host array on the device with the given type."""
+    import jax.numpy as jnp
+
+    return jnp.asarray(np.ascontiguousarray(a, dtype=dtype))  # pyright: ignore[reportUnknownMemberType]
+
+
+class DeviceGyrationEnergy:
+    """The gyration term of `gyration_energy_grad` on the device, as a callable on flattened
+    positions.
+
+    The radius of gyration of a window is taken about the centroid of the window, which keeps the
+    precision of float32 on a chromosome. The windows are summed in float64 on the host.
+
+    Parameters
+    ----------
+    member
+        The sparse window by anchor matrix of `gyration_windows`.
+    count, target
+        The anchor count of each window and its target radius.
+    weight
+        `gyration_weight`.
+    """
+
+    def __init__(self, member: Any, count: F64Array, target: F64Array, weight: float) -> None:
+        import jax
+
+        from gnome3d.mc.jax.util import jax_is_available
+
+        jax_is_available()
+        import jax.numpy as jnp
+        from jax.ops import segment_sum
+
+        coo = member.tocoo()
+        n_win, n = (int(v) for v in member.shape)
+        self.n = n
+        win = _on_device(coo.row, np.int32)
+        node = _on_device(coo.col, np.int32)
+        cnt = _on_device(count, np.float32)
+        tgt = _on_device(target, np.float32)
+        w = float(weight)
+
+        def energy_grad(x: Any) -> tuple[Any, Any]:
+            pos = x.reshape(n, 3)
+            cen = segment_sum(pos[node], win, num_segments=n_win) / cnt[:, None]
+            off = pos[node] - cen[win]
+            msq = segment_sum(jnp.sum(off * off, axis=1), win, num_segments=n_win) / cnt
+            rg = jnp.sqrt(jnp.maximum(msq, 1e-12))
+            rel = rg / tgt - 1.0
+            coef = 2.0 * w * rel / (tgt * rg)
+            g = segment_sum(coef[win][:, None] * off, node, num_segments=n)
+            return w * cnt * rel * rel, g.reshape(-1)
+
+        self._fn: Any = jax.jit(energy_grad)  # pyright: ignore[reportUnknownMemberType]
+
+    def __call__(self, x: F64Array) -> tuple[float, F64Array]:
+        ew, g = self._fn(_on_device(x, np.float32))
+        return float(np.asarray(ew, dtype=np.float64).sum()), np.asarray(g, dtype=np.float64)
+
+
+class DeviceReachEnergy:
+    """The reach term of `reach_energy_grad` on the device, as a callable on flattened positions.
+
+    The pairs are summed in float64 on the host.
+
+    Parameters
+    ----------
+    pair_i, pair_j
+        The two nodes of each pair.
+    length
+        The length of chain between the two nodes of each pair.
+    weight
+        The weight of a loop spring.
+    """
+
+    def __init__(
+        self, n: int, pair_i: I32Array, pair_j: I32Array, length: F64Array, weight: float
+    ) -> None:
+        import jax
+
+        from gnome3d.mc.jax.util import jax_is_available
+
+        jax_is_available()
+        import jax.numpy as jnp
+        from jax.ops import segment_sum
+
+        self.n = int(n)
+        n_nodes = int(n)
+        pi = _on_device(pair_i, np.int32)
+        pj = _on_device(pair_j, np.int32)
+        reach = _on_device(length, np.float32)
+        w = float(weight)
+
+        def energy_grad(x: Any) -> tuple[Any, Any]:
+            pos = x.reshape(n_nodes, 3)
+            diff = pos[pi] - pos[pj]
+            d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+            beyond = d > reach
+            rel = (d - reach) / reach
+            ek = jnp.where(beyond, w * rel * rel, 0.0)
+            coef = jnp.where(beyond, 2.0 * w * rel / (reach * jnp.maximum(d, 1e-10)), 0.0)
+            pull = coef[:, None] * diff
+            g = segment_sum(pull, pi, num_segments=n_nodes) - segment_sum(
+                pull, pj, num_segments=n_nodes
+            )
+            return ek, g.reshape(-1)
+
+        self._fn: Any = jax.jit(energy_grad)  # pyright: ignore[reportUnknownMemberType]
+
+    def __call__(self, x: F64Array) -> tuple[float, F64Array]:
+        ek, g = self._fn(_on_device(x, np.float32))
+        return float(np.asarray(ek, dtype=np.float64).sum()), np.asarray(g, dtype=np.float64)

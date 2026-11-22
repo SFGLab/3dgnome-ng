@@ -387,3 +387,23 @@ img.equation {
   background: #FFFFFF;
   border-radius: 4px;
 }
+
+/* A rule of one chain under a heading of both chains. */
+.reading section h4 {
+  margin: 16px 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* The table of the two chains: the rule, then a column for each chain. A cell over both columns holds for both. */
+.doc-table.compare {
+  table-layout: fixed;
+}
+
+.doc-table.compare th:first-child {
+  width: 26%;
+}
+
+.doc-table.compare td.both {
+  text-align: center;
+}

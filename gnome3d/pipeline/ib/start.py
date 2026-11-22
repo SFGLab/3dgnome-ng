@@ -5,6 +5,11 @@ puts them on a random bridge, a walk from one anchor at the bond targets, pulled
 other. Each bead takes a candidate of twenty draws that is clear of the beads placed in its
 gap. The compact rule takes the clear candidate nearest the midpoint of the gap. Only the
 beads of one gap and its two anchors count for clearance.
+
+The beads before the first anchor of a chain and after the last are a tail. A tail is a walk from
+its anchor at the bond targets. Each bead takes the clear candidate nearest the anchor under the
+compact rule and the first clear one otherwise. A chain without an anchor is two tails from its
+middle bead.
 """
 
 from __future__ import annotations
@@ -144,6 +149,59 @@ def _bridge(
     return out
 
 
+@njit(cache=True)
+def _tail_nb(
+    a: F64Array, targets: F64Array, r_avoid: float, normals: F64Array, compact: bool
+) -> F64Array:
+    """Returns the positions of the m beads of a tail that leaves the bead at `a`. `targets` are
+    the m bonds in the order of the walk and `normals[j, k]` is the k-th draw of bead j.
+    """
+    m = targets.shape[0]
+    out = np.zeros((m, 3), dtype=np.float64)
+    pts = np.zeros((m + 1, 3), dtype=np.float64)
+    pts[0] = a
+    n_pts = 1
+    cur = a.copy()
+    cand = np.zeros(3, dtype=np.float64)
+    best = np.zeros(3, dtype=np.float64)
+    for j in range(m):
+        length = targets[j]
+        best_gap = -1.0
+        best_key = np.inf
+        for k in range(normals.shape[1]):
+            u0, u1, u2 = normals[j, k, 0], normals[j, k, 1], normals[j, k, 2]
+            un = np.sqrt(u0 * u0 + u1 * u1 + u2 * u2)
+            cand[0] = cur[0] + u0 / un * length
+            cand[1] = cur[1] + u1 / un * length
+            cand[2] = cur[2] + u2 / un * length
+            gap = np.inf
+            for q in range(n_pts):
+                dx = pts[q, 0] - cand[0]
+                dy = pts[q, 1] - cand[1]
+                dz = pts[q, 2] - cand[2]
+                g = np.sqrt(dx * dx + dy * dy + dz * dz)
+                if g < gap:
+                    gap = g
+            if gap >= r_avoid:
+                cx = cand[0] - a[0]
+                cy = cand[1] - a[1]
+                cz = cand[2] - a[2]
+                key = np.sqrt(cx * cx + cy * cy + cz * cz)
+                if key < best_key:
+                    best_key = key
+                    best[:] = cand
+                    if not compact:
+                        break
+            elif best_key == np.inf and gap > best_gap:
+                best_gap = gap
+                best[:] = cand
+        cur[:] = best
+        out[j] = cur
+        pts[n_pts] = cur
+        n_pts += 1
+    return out
+
+
 def coil_start(
     pos: F32Array,
     fixed: BoolArray,
@@ -152,7 +210,8 @@ def coil_start(
     rng: np.random.Generator,
     rule: str = "compact",
 ) -> F32Array:
-    """Returns the chain with the subanchors of every gap on a bridge between its anchors.
+    """Returns the chain with the subanchors of every gap on a bridge between its anchors and
+    every tail on a walk from its anchor.
 
     Parameters
     ----------
@@ -183,4 +242,16 @@ def coil_start(
             out[a + 1 : b] = _bridge_compact_nb(out[a], out[b], d[a:b], float(r_avoid), normals)
         else:
             out[a + 1 : b] = _bridge(out[a], out[b], d[a:b], r_avoid, rng, rule)
+    n = out.shape[0]
+    compact = rule == "compact"
+    # The draws of the tails follow the draws of every gap.
+    first = int(anchors[0]) if anchors.size else (n - 1) // 2
+    last = int(anchors[-1]) if anchors.size else first
+    if last < n - 1:
+        normals = rng.normal(size=(n - 1 - last, _DRAWS, 3))
+        out[last + 1 :] = _tail_nb(out[last], d[last:], float(r_avoid), normals, compact)
+    if first > 0:
+        normals = rng.normal(size=(first, _DRAWS, 3))
+        back = np.ascontiguousarray(d[:first][::-1])
+        out[:first] = _tail_nb(out[first], back, float(r_avoid), normals, compact)[::-1]
     return out.astype(np.float32)

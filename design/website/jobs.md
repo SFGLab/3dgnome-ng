@@ -89,3 +89,26 @@ to the server.
 Checked 2026-11-12 through the page: an own data job with CTCF and RNAPII loops and contacts
 read from a local .hic, a job with an uploaded HGSVC VCF and a job with contacts by link to
 ENCODE ENCFF718AWL.hic, 37 GB, whose 2 Mb window read in about 9 s.
+
+## The chain of a job
+
+A request has the field `chain`, `anchors` or `uniform`. `anchors` is the chain of loop anchors with
+the chromatin between them and the value of a request without the field. `uniform` is one bead
+per kilobase, the config `CANONICAL_UNIFORM` of the engine.
+
+- The key of a request on `anchors` is the key it had before the field existed. `uniform` is in
+  the key.
+- `build_inputs` gives a job on `uniform` the keys `UNIFORM_KEYS` of
+  `web/gnome3d_web/engine/settings.py`: those of `UNIFORM_CHAIN` of `gnome3d/production.py` and
+  `holes.use_hole_beads = no`. The changes of the form are written after them.
+- The contact cells of the chain are read from the map of the cell type under the Hi-C background
+  alone. With structural variants, with own contacts, with a HiCDiffusion background and with no
+  background the job has no `contact_map` and the chain has no contact cells.
+- `GET /api/settings?cell=..&chain=uniform` answers the settings with the values a job on that
+  chain gets, without the group of the beads for stretches without loops and with the solver
+  `lbfgs` alone. A request that still asks for one of them is refused at its settings with the
+  reason, `uniform_clash`.
+- The site offers the chain when `features.uniform_chain` of `config.json` is on,
+  `design/website/settings.md`.
+- An example asks for the uniform chain on a site that offers it and for loop anchors on a site that does
+  not, `model/request.ts::fromExample`. The drawings of the title page are made from the jobs of the examples.

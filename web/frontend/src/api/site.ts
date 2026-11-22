@@ -11,7 +11,7 @@ export const api = {
     call<{ columns: string[]; rows: string[][] }>(`/api/sv_sets/${encodeURIComponent(set)}/samples`).then((t) =>
       t.rows.map((r) => Object.fromEntries(t.columns.map((c, i) => [c, r[i] ?? ''])) as SampleRow),
     ),
-  settings: (cell: string) => call<SettingGroup[]>(`/api/settings?${q({ cell })}`),
+  settings: (cell: string, chain = 'anchors') => call<SettingGroup[]>(`/api/settings?${q({ cell, chain })}`),
   expression: (cell: string, svSet: string, sample: string) =>
     call<{ options: ExpressionOption[] }>(`/api/expression?${q({ cell, sv_set: svSet, sample })}`).then((r) => r.options),
   parseIni: (file: File) => call<{ overrides: Record<string, string>; refused: string[] }>('/api/settings/ini', posted({ file })),

@@ -1,0 +1,24 @@
+mean distance of the end megabases in bonds | smallest | structures over 300 pairs between them
+GM12878_chr1_10000000_15000000 | prod:  17.9  10.6 0/20 | c_prod_nohic:  16.7   9.9 0/20 | c_lock:  17.1   7.8 1/20 | c_lock_nocells:  15.3   4.9 0/20
+GM12878_chr1_150000000_155000000 | prod:  18.1  14.6 0/20 | c_prod_nohic:  17.1  12.5 0/20 | c_lock:  17.3  12.5 0/20 | c_lock_nocells:  17.9  13.6 0/20
+GM12878_chr1_200000000_205000000 | prod:  17.7  11.9 0/20 | c_prod_nohic:  16.9  12.2 0/20 | c_lock:  17.2  11.2 0/20 | c_lock_nocells:  16.1  10.1 0/20
+GM12878_chr1_20000000_25000000 | prod:  17.6  12.7 0/20 | c_prod_nohic:  15.7   9.4 0/20 | c_lock:  16.8  10.8 0/20 | c_lock_nocells:  15.6   8.6 0/20
+GM12878_chr1_35000000_40000000 | prod:  17.3  12.6 0/20 | c_prod_nohic:  16.4  10.3 0/20 | c_lock:  15.8  11.4 0/20 | c_lock_nocells:  17.6  12.2 0/20
+GM12878_chr1_60000000_65000000 | prod:  16.4  13.8 0/20 | c_prod_nohic:  14.2   8.3 0/20 | c_lock:  16.0   9.0 1/20 | c_lock_nocells:  16.5   9.8 0/20
+H1ESC_chr1_10000000_15000000 | prod:  32.0  23.1 0/20 | c_prod_nohic:  29.6  19.1 0/20 | c_lock:  31.5  27.3 0/20 | c_lock_nocells:  30.9  17.8 0/20
+H1ESC_chr1_150000000_155000000 | prod:  22.7  17.8 0/20 | c_prod_nohic:  21.0  13.2 0/20 | c_lock:  21.4  14.4 0/20 | c_lock_nocells:  21.4  15.1 0/20
+H1ESC_chr1_200000000_205000000 | prod:  25.5  17.6 0/20 | c_prod_nohic:  25.1  17.1 0/20 | c_lock:  23.1  11.7 0/20 | c_lock_nocells:  23.6  14.2 0/20
+H1ESC_chr1_20000000_25000000 | prod:  21.0  14.0 0/20 | c_prod_nohic:  22.9  15.9 0/20 | c_lock:  22.0  14.1 0/20 | c_lock_nocells:  21.3   8.8 0/20
+H1ESC_chr1_35000000_40000000 | prod:  22.6  18.7 0/20 | c_prod_nohic:  22.2  13.9 0/20 | c_lock:  24.0  17.6 0/20 | c_lock_nocells:  24.7  15.9 0/20
+H1ESC_chr1_60000000_65000000 | prod:  22.4  14.0 0/20 | c_prod_nohic:  22.6  11.8 0/20 | c_lock:  21.2   7.7 0/20 | c_lock_nocells:  22.2   8.9 0/20
+HFFC6_chr1_10000000_15000000 | prod:  34.8  26.1 0/20 | c_prod_nohic:  35.5  28.9 0/20 | c_lock:  34.7  26.7 0/20 | c_lock_nocells:  35.5  24.1 0/20
+HFFC6_chr1_150000000_155000000 | prod:  31.2  24.6 0/20 | c_prod_nohic:  32.9  19.3 0/20 | c_lock:  31.2  20.1 0/20 | c_lock_nocells:  31.8  20.9 0/20
+HFFC6_chr1_200000000_205000000 | prod:  33.5  25.5 0/20 | c_prod_nohic:  36.7  23.0 0/20 | c_lock:  34.5  22.1 0/20 | c_lock_nocells:  31.3   9.7 0/20
+HFFC6_chr1_20000000_25000000 | prod:  30.1  22.4 0/20 | c_prod_nohic:  31.8  24.9 0/20 | c_lock:  32.5  23.7 0/20 | c_lock_nocells:  31.9  22.6 0/20
+HFFC6_chr1_35000000_40000000 | prod:  27.8  20.9 0/20 | c_prod_nohic:  31.4  17.1 0/20 | c_lock:  31.0  20.1 0/20 | c_lock_nocells:  30.2  19.1 0/20
+HFFC6_chr1_60000000_65000000 | prod:  36.1  30.5 0/20 | c_prod_nohic:  37.3  29.6 0/20 | c_lock:  31.9  24.2 0/20 | c_lock_nocells:  31.2  17.5 0/20
+over the rows
+  prod                          24.7  10.6 0/360
+  c_prod_nohic                  24.8   8.3 0/360
+  c_lock                        24.4   7.7 2/360
+  c_lock_nocells                24.2   4.9 0/360

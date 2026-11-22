@@ -1,8 +1,10 @@
 """The production configuration, as a dict, with no .ini file.
 
-`CANONICAL` holds every modelling section. `settings_for_cell("GM12878")` returns a `Settings`
-built from it with the data section of that cell line. `SETTINGS.md` documents each key and its
-production column is this dict.
+`CANONICAL` holds every modelling section of the default chain. `CANONICAL_UNIFORM` is the
+production configuration of the uniform chain, `CANONICAL` with the keys of `UNIFORM_CHAIN`.
+`settings_for_cell("GM12878")` returns a `Settings` built from one of the two with the data
+section of that cell line. `SETTINGS.md` documents each key. Its production column is
+`CANONICAL` and it lists the keys of `UNIFORM_CHAIN`.
 """
 
 from __future__ import annotations
@@ -37,7 +39,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "min_subanchors_per_arc": 0,
         "max_subanchors_per_arc": 100,
     },
-    "motif_orientation": {"use_motif_orientation": "yes", "weight": 50.0},
+    "motif_orientation": {"use_motif_orientation": "yes"},
     "anchor_heatmap": {"use_anchor_heatmap": "yes", "heatmap_influence": 0.1},
     "subanchor_heatmap": {
         # Off. It pulls bonds under their target on deep Hi-C and is skipped on shallow Hi-C.
@@ -173,6 +175,37 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
 }
 
+# The keys of the production configuration of the uniform chain that differ from `CANONICAL`.
+UNIFORM_CHAIN: dict[str, dict[str, object]] = {
+    "main": {"uniform_chain": "yes"},
+    "springs": {
+        # At 0.1 a bond gives way and 33 pairs of beads per thousand are closer than 0.7 of a
+        # bond. At 1.0 there are 8, design/uniform-chain.md.
+        "squeeze_constant": 1.0,
+        # The threshold of the contact cells. At 2 the pooled SCC is 0.02 higher and Spearman
+        # 0.05 lower.
+        "contact_background_z": 3,
+        # 0.046 of raw and 0.035 of balanced SCC over every loop in every conformation.
+        "loop_dropout": "yes",
+    },
+    # Under the dropout fewer nodes stand for more chain each. The radius of a node from its
+    # chain keeps the ends of a region apart, 18 structures of 360 against 39.
+    "excluded_volume": {"arcs_chain_radius": "sum"},
+}
+
+
+def with_keys(
+    base: dict[str, dict[str, object]], keys: dict[str, dict[str, object]]
+) -> dict[str, dict[str, object]]:
+    """Returns a deep copy of a configuration with the given keys set."""
+    out = copy.deepcopy(base)
+    for section, kv in keys.items():
+        out.setdefault(section, {}).update(kv)
+    return out
+
+
+CANONICAL_UNIFORM: dict[str, dict[str, object]] = with_keys(CANONICAL, UNIFORM_CHAIN)
+
 # `stop_condition_steps` of each stage by quality.
 _QUALITY_STEPS = {"fast": 1000, "balanced": 5000, "full": 50000}
 
@@ -195,19 +228,33 @@ def cell_data_section(cell: str, data_root: str = "data") -> dict[str, object]:
     }
 
 
+def cell_contact_map(cell: str, data_root: str = "data") -> str:
+    """Returns the cooler URI of the contact map of a cell line, the largest mcool of
+    `<data_root>/_hic/<cell>/`, or an empty string without one.
+    """
+    maps = sorted((Path(data_root) / "_hic" / cell).glob("*.mcool"), key=lambda f: f.stat().st_size)
+    return f"{maps[-1].resolve()}::/resolutions/1000" if maps else ""
+
+
 def settings_for_cell(
     cell: str,
     data_root: str = "data",
     quality: str | None = None,
     overrides: dict[str, dict[str, object]] | None = None,
+    uniform: bool = False,
 ) -> Settings:
-    """Builds the Settings of a cell line from `CANONICAL` and the conventional data paths.
+    """Builds the Settings of a cell line from a production configuration and the conventional
+    data paths.
 
     `quality` is fast, balanced or full and sets the `stop_condition_steps` of each stage. None is
-    full. `overrides` is merged on top as {section: {key: value}}.
+    full. `overrides` is merged on top as {section: {key: value}}. `uniform` takes
+    `CANONICAL_UNIFORM`, the configuration of the uniform chain, in place of `CANONICAL`, with
+    the contact map of the cell line, whose cells the nodes of the uniform chain read.
     """
-    params = copy.deepcopy(CANONICAL)
+    params = copy.deepcopy(CANONICAL_UNIFORM if uniform else CANONICAL)
     params["data"] = cell_data_section(cell, data_root)
+    if uniform:
+        params["data"]["contact_map"] = cell_contact_map(cell, data_root)
 
     if quality and quality in _QUALITY_STEPS and quality != "full":
         steps = _QUALITY_STEPS[quality]
@@ -217,8 +264,7 @@ def settings_for_cell(
         params["simulation_ib"]["stop_condition_steps"] = steps
 
     if overrides:
-        for section, kv in overrides.items():
-            params.setdefault(section, {}).update(kv)
+        params = with_keys(params, overrides)
 
     return Settings.from_dict(params)
 

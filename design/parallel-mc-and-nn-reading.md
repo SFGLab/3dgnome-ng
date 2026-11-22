@@ -175,7 +175,7 @@ is of three kinds.
 
 ## The acceptance profile, measured 2026-09-19
 
-`playground/accept_profile.py` on GM12878 chr1:1-8 Mb, five blocks of 48 to 2,011 beads, the
+`data/figures/retired/playground/accept_profile.py` on GM12878 chr1:1-8 Mb, five blocks of 48 to 2,011 beads, the
 numba kernel from each block's own seed, 186 rounds of 50,000 proposals. Share of rounds by
 acceptance: 0.35 under 0.1 percent, 0.58 between 0.1 and 1 percent, 0.08 between 1 and 10
 percent, none above. Only the first round of a block accepts 5 to 8 percent; the median round
@@ -245,7 +245,7 @@ Decided 2026-09-17. Both passes were built when every block's arcs were solved a
 joint solve has since removed the defect the stitch was built for, and the stitch's centroid
 excluded volume, one term per block pair at the two radii of gyration added, is an inflation
 force on a compact chromosome whose blocks interdigitate. The relaxation runs windowed at one
-in production and is probably close to null. `slurm/ensemble/assemble_ablation.sh` runs four
+in production and is probably close to null. `data/figures/retired/slurm/ensemble/assemble_ablation.sh` runs four
 arms on GM12878 chr1:1-60 Mb, production, stitch off, relaxation off, neither, three structures
 each, then the battery and the boundary report. If neither holds Hi-C and the boundary ratio
 at a smaller Rg, both passes are deleted per the project rule. Only then the kernel work.

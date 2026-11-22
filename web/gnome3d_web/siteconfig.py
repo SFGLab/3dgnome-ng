@@ -1,10 +1,13 @@
 """The configuration of the site, `config.json` beside the catalog.
 
-    {"features": {"results": true, "method": true, "trios": false},
+    {"features": {"results": true, "method": true, "trios": false, "uniform_chain": true},
      "limits": {"region_mb": 20, "hicdiffusion_mb": 2}}
 
 `results` and `method` are the two pages with their links and `trios` is the nine people on
 the Results page with their RNA-seq in the form. A feature the file leaves out is on.
+`uniform_chain` is the choice of the chain on the form, with one bead per kilobase as the chain
+the form opens with. It is off unless the file turns it on, and a job is then built on loop
+anchors.
 
 `region_mb` is the longest region a job may cover and `hicdiffusion_mb` the longest region a
 job with a HiCDiffusion background may cover, both in Mb. A limit the file leaves out keeps the
@@ -24,7 +27,9 @@ from personal3d.hicdiffusion import SIZE as HICDIFFUSION_WINDOW
 log = logging.getLogger(__name__)
 
 # The parts of the site a feature flag can turn off.
-FEATURES = ("results", "method", "trios")
+FEATURES = ("results", "method", "trios", "uniform_chain")
+# The features that are off unless the file turns them on.
+OFF_UNLESS_SET = ("uniform_chain",)
 # The limits of a job the file can set, two lengths in Mb.
 LIMITS = ("region_mb", "hicdiffusion_mb")
 
@@ -34,7 +39,8 @@ class ConfigError(ValueError):
 
 
 def _all_on() -> dict[str, bool]:
-    return dict.fromkeys(FEATURES, True)
+    """The features of a site without a file: every one on but those of `OFF_UNLESS_SET`."""
+    return {f: f not in OFF_UNLESS_SET for f in FEATURES}
 
 
 @dataclass(frozen=True)

@@ -26,7 +26,7 @@ below.
 - This repository. The engine, the two factor loader (`[data] clusters` takes several files,
   `[data] factors` names them), the validation battery (`playground/validation_battery.py`,
   `playground/saddle_offline.py`), the GM12878 RNAPII prep (`playground/rnapii/prep_gm12878.py`,
-  `anchor_union.py`) and the arm scripts (`slurm/ensemble/rnapii_arms.sh`,
+  `anchor_union.py`) and the arm scripts (`data/figures/retired/slurm/ensemble/rnapii_arms.sh`,
   `rnapii_strength_arms.sh`).
 - The summary arc fix, commit `75bedc1`, only on `origin/triosformer-expression`. Before it a
   pair joined by both a CTCF and an RNAPII loop was held at the background, 406 strong pairs
@@ -337,9 +337,9 @@ manifest format is in that script's docstring.
 
 ## Results, 2026-11-12
 
-chr1, the battery and pile-ups on chr1:1-60 Mb, ten conformations per arm. Figures and every
-readout table in `design/figures/rnapii-2026-11-12/` (`figures/rnapii_main`, `figures/rnapii_grid`,
-`readouts/`). Each claim names its yardstick.
+chr1, the battery and pile-ups on chr1:1-60 Mb, ten conformations per arm. The figures are in
+`design/figures/rnapii-2026-11-12/` (`figures/rnapii_main`, `figures/rnapii_grid`) and every readout table in
+`data/figures/rnapii-2026-11-12/readouts/`, outside git. Each claim names its yardstick.
 
 **Large scale structure, bulk Hi-C at 25 kb.** SCC, E C R M:
 

@@ -15,8 +15,8 @@ import numpy as np
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
-from gnome3d.mc.numba.terms import NO_W, njit
-from gnome3d.types import F32Array, F64Array, I64Array
+from gnome3d.mc.numba.terms import NO_F64, NO_W, njit
+from gnome3d.types import F32Array, F64Array, I32Array, I64Array
 from gnome3d.util import blas_threads
 
 if TYPE_CHECKING:
@@ -44,10 +44,14 @@ def arcs_energy_grad(
     excl_skip: int,
     use_w: bool = False,
     arc_w: F32Array = NO_W,
+    use_f: bool = False,
+    node_f: F64Array = NO_F64,
 ) -> tuple[float, F64Array]:
     """Returns the arcs energy of a structure and its gradient, for a flattened `(3N,)` vector.
 
-    With `use_w` the constant of each arc spring is scaled by `arc_w[j, i]`.
+    With `use_w` the constant of each arc spring is scaled by `arc_w[j, i]`. With `use_f` the
+    excluded volume of a pair acts at `excl_r0 * (node_f[i] + node_f[j]) / 2`, the radius of a
+    pair of nodes from the chain the two stand for.
 
     The arc term sums unordered pairs. Each pair is visited from both ends with half its energy
     and its whole gradient. The excluded volume sums ordered pairs, with a whole energy and a
@@ -105,14 +109,17 @@ def arcs_energy_grad(
                 gi0 += w * dx
                 gi1 += w * dy
                 gi2 += w * dz
-            if excl_w > 0.0 and d < excl_r0:
+            r0 = excl_r0
+            if use_f:
+                r0 = excl_r0 * 0.5 * (node_f[i] + node_f[j])
+            if excl_w > 0.0 and d < r0:
                 sep = i - j
                 if sep < 0:
                     sep = -sep
                 if sep > excl_skip:
-                    u = (excl_r0 - d) / excl_r0
+                    u = (r0 - d) / r0
                     ei += excl_w * u * u
-                    w = -4.0 * excl_w * u / (excl_r0 * dd)
+                    w = -4.0 * excl_w * u / (r0 * dd)
                     gi0 += w * dx
                     gi1 += w * dy
                     gi2 += w * dz
@@ -249,6 +256,41 @@ def gyration_energy_grad(
     return e, g.reshape(-1)
 
 
+@njit(cache=True, fastmath=True, nogil=True)
+def reach_energy_grad(
+    x: F64Array, pair_i: I32Array, pair_j: I32Array, length: F64Array, weight: float
+) -> tuple[float, F64Array]:
+    """Returns the reach energy and its gradient.
+
+    Pair k of nodes has `length[k]` of chain between its two beads. It has no energy up to that
+    distance and `weight * ((d - length) / length)^2` beyond, the form of a loop spring.
+    """
+    n = x.shape[0] // 3
+    pos = x.reshape(n, 3)
+    g = np.zeros((n, 3))
+    energy = 0.0
+    for k in range(pair_i.shape[0]):
+        i = pair_i[k]
+        j = pair_j[k]
+        dx = pos[i, 0] - pos[j, 0]
+        dy = pos[i, 1] - pos[j, 1]
+        dz = pos[i, 2] - pos[j, 2]
+        d = np.sqrt(dx * dx + dy * dy + dz * dz)
+        reach = length[k]
+        if d <= reach:
+            continue
+        rel = (d - reach) / reach
+        energy += weight * rel * rel
+        w = 2.0 * weight * rel / (reach * d)
+        g[i, 0] += w * dx
+        g[i, 1] += w * dy
+        g[i, 2] += w * dz
+        g[j, 0] -= w * dx
+        g[j, 1] -= w * dy
+        g[j, 2] -= w * dz
+    return energy, g.reshape(-1)
+
+
 def solve_arcs(
     pos: F32Array,
     exp_dist: F64Array,
@@ -258,13 +300,21 @@ def solve_arcs(
     arc_w: F32Array | None = None,
     activity: F32Array | None = None,
     mids: I64Array | None = None,
+    reach: tuple[I32Array, I32Array, F64Array] | None = None,
+    share: F64Array | None = None,
 ) -> tuple[float, F32Array]:
     """Minimises the arcs energy from `pos`. Returns `(energy, positions)`.
 
-    `backend` is the place of the energy evaluation, `numba` on the CPU or `jax` on the device.
+    `backend` is the place of the evaluation of the energy and of every term added to it,
+    `numba` on the CPU or `jax` on the device.
     The minimiser runs on the host. `arc_w` is the spring weight of each arc pair, None for one.
     `activity` is the activity of each anchor for the factory term, None for no term. `mids` are
-    the genomic midpoints of the anchors, which the gyration term needs.
+    the genomic midpoints of the anchors, which the gyration term needs. `reach` is the pairs of
+    nodes of a uniform chain and the length of chain between each, for the reach term at the
+    weight of a loop spring. `share` is the chain each node stands for over the mean chain of a
+    node. Under `[excluded_volume] arcs_chain_radius = sum`, with `f = share ^ (1/3)`, the
+    excluded volume of a pair acts at the radius of the stage times `(f_i + f_j) / 2`, the
+    distance of two blobs of chain.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -311,6 +361,14 @@ def solve_arcs(
         excl_w,
         excl_skip,
     )
+    node_f: F64Array | None = None
+    if excl_w > 0.0 and s.exclusion_arcs_chain_radius != "none":
+        if share is None:
+            raise ValueError(
+                "[excluded_volume] arcs_chain_radius needs the chain of each node, which the"
+                " node solve of [main] uniform_chain gives. Set arcs_chain_radius to none."
+            )
+        node_f = np.ascontiguousarray(np.cbrt(np.asarray(share, dtype=np.float64)))
     n_it = int(s.arcs_solver_iters if iters is None else iters)
     if backend not in ("numba", "jax"):
         raise ValueError(f"solver backend must be numba or jax, got {backend!r}")
@@ -324,7 +382,7 @@ def solve_arcs(
             DeviceFactoryEnergy,
         )
 
-        base_dev: Any = DeviceArcsEnergy(exp64, args[1:], arc_w)
+        base_dev: Any = DeviceArcsEnergy(exp64, args[1:], arc_w, node_f)
         fun: Any = base_dev
         fun_args: tuple[Any, ...] = ()
         if act64 is not None:
@@ -341,6 +399,9 @@ def solve_arcs(
         fun_args = (
             args if arc_w is None else (*args, True, np.ascontiguousarray(arc_w, dtype=np.float32))
         )
+        if node_f is not None:
+            weights = NO_W if arc_w is None else np.ascontiguousarray(arc_w, dtype=np.float32)
+            fun_args = (*args, arc_w is not None, weights, True, node_f)
         if act64 is not None:
             base_cpu, base_args = fun, fun_args
 
@@ -355,17 +416,52 @@ def solve_arcs(
     if gyr_w > 0.0:
         if mids is None:
             raise ValueError("[springs] gyration_weight needs the anchors' genomic midpoints")
-        member, count, target = gyration_windows(mids, s.polymer_law(), int(s.background_range_bp))
+        smallest = (
+            int(s.gyration_min_bp) if int(s.gyration_min_bp) > 0 else int(s.background_range_bp)
+        )
+        member, count, target = gyration_windows(mids, s.polymer_law(), smallest)
         base_g, base_g_args = fun, fun_args
+        gyr_dev: Any = None
+        if backend == "jax" and member.shape[0] > 0:
+            from gnome3d.mc.jax.arcs_energy import DeviceGyrationEnergy  # noqa: PLC0415
+
+            gyr_dev = DeviceGyrationEnergy(member, count, target, gyr_w)
 
         def with_gyration(x: Any) -> tuple[float, F64Array]:
             e1, g1 = base_g(x, *base_g_args)
-            e2, g2 = gyration_energy_grad(
-                np.asarray(x, dtype=np.float64), member, count, target, gyr_w
-            )
+            if gyr_dev is not None:
+                e2, g2 = gyr_dev(x)
+            else:
+                e2, g2 = gyration_energy_grad(
+                    np.asarray(x, dtype=np.float64), member, count, target, gyr_w
+                )
             return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
 
         fun = with_gyration
+        fun_args = ()
+    if reach is not None and reach[0].shape[0] > 0:
+        reach_i = np.ascontiguousarray(reach[0], dtype=np.int32)
+        reach_j = np.ascontiguousarray(reach[1], dtype=np.int32)
+        reach_len = np.ascontiguousarray(reach[2], dtype=np.float64)
+        reach_w = float(s.spring_stretch_arcs)
+        base_r, base_r_args = fun, fun_args
+        reach_dev: Any = None
+        if backend == "jax":
+            from gnome3d.mc.jax.arcs_energy import DeviceReachEnergy  # noqa: PLC0415
+
+            reach_dev = DeviceReachEnergy(n, reach_i, reach_j, reach_len, reach_w)
+
+        def with_reach(x: Any) -> tuple[float, F64Array]:
+            e1, g1 = base_r(x, *base_r_args)
+            if reach_dev is not None:
+                e2, g2 = reach_dev(x)
+            else:
+                e2, g2 = reach_energy_grad(
+                    np.asarray(x, dtype=np.float64), reach_i, reach_j, reach_len, reach_w
+                )
+            return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
+
+        fun = with_reach
         fun_args = ()
     if n_it <= 0:
         # No descent. The start is returned as it is.

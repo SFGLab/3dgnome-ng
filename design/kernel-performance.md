@@ -22,16 +22,16 @@ Prefer a real run's own log to a synthetic benchmark. A production log records e
 shape, wall time and step count, which is the same measurement a benchmark tries to reconstruct,
 on the real workload and for free.
 
-`playground/profile_run.py <run.log>` sums the dispatch lines and reports each stage's share plus
-the per launch detail. `playground/launch_width.py <run.log>` breaks the smooth launches down by
+`data/figures/retired/playground/profile_run.py <run.log>` sums the dispatch lines and reports each stage's share plus
+the per launch detail. `data/figures/retired/playground/launch_width.py <run.log>` breaks the smooth launches down by
 how many IBs were in each and reports the cost per step per IB, which is what shows whether the
-launches are wide enough. `playground/relax_profile.py` times the numba local scorers against
+launches are wide enough. `data/figures/retired/playground/relax_profile.py` times the numba local scorers against
 bead count.
 
-`playground/jax_overhead.py` separates a JAX call's fixed cost from its per step cost by timing
+`data/figures/retired/playground/jax_overhead.py` separates a JAX call's fixed cost from its per step cost by timing
 the same shape at several step budgets. Run it before trusting any JAX timing: the fixed cost is
-seconds, so a short benchmark measures it rather than the kernel. `playground/jax_step_cost.py`
-and `playground/jax_batch_cost.py` are the short benchmarks that got this wrong and are kept only
+seconds, so a short benchmark measures it rather than the kernel. `data/figures/retired/playground/jax_step_cost.py`
+and `data/figures/retired/playground/jax_batch_cost.py` are the short benchmarks that got this wrong and are kept only
 so the error stays visible. All of these need a GPU, so they run on the workstation.
 
 ## Where the time goes
@@ -270,7 +270,7 @@ and a tenth of a percent of the other. Far from both means the limit is the depe
 sequential steps: each accept or reject must resolve before the next begins. That agrees with the
 width scan, which found thirty two times the chains for 1.24 times the time.
 
-`playground/jax_roofline.py` reports this. Read its note on `cost_analysis`: XLA does not unroll
+`data/figures/retired/playground/jax_roofline.py` reports this. Read its note on `cost_analysis`: XLA does not unroll
 a `while_loop` over a `fori_loop` for static costing, so its flops and bytes are a small fraction
 of the real work. Measured against a hand count it under-reported by about 128 times, so the
 figures above are analytic rather than from that call.
@@ -316,7 +316,7 @@ one. It works because arcs runs on the CPU, where cutting the per step scan conv
 wall time and there is no latency floor to hide behind.
 
 Read this table with what follows it: the counts are right and the conclusion first drawn from
-them was not. `playground/jax_roofline.py` and the capture script that produced the table both
+them was not. `data/figures/retired/playground/jax_roofline.py` and the capture script that produced the table both
 run in minutes, which is the point. Several of this section's measurements were wrong before they
 were right, each time because a synthetic benchmark measured a fixed cost, used a density no real
 structure has, or answered a different question than the one that mattered. A real run's log did
@@ -517,8 +517,8 @@ already means JAX for every stage, and the solver follows it.
 ### 14. Which stage runs where, 2026-11-16. Smooth threaded, arcs on the device
 
 Measured on 36 cores and an RTX 3090, GM12878 chr1 from 10 Mb, two structures per arm,
-wall clock from the command to the last structure. `slurm/ensemble/executor_crossover.sh`,
-tables in `playground/square_blocks/crossover/`.
+wall clock from the command to the last structure. `data/figures/retired/slurm/ensemble/executor_crossover.sh`,
+tables in `data/figures/square_blocks/crossover/`.
 
 Two costs came first. The maxent fit, the arcs solver and the stitch call scipy's L-BFGS-B,
 which does its vector arithmetic through BLAS between evaluations, and OpenBLAS ran each call

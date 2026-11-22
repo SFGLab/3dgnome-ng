@@ -1,0 +1,40 @@
+GM12878_chr1_20000000_25000000_prod: 5 structures, 4268 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     3.8  0.0330  0.0545     4.5  0.0159  0.0329     5.4  0.0097  0.0192     6.6  0.0039  0.0108     9.3  0.0006  0.0039
+  anchor pairs     3.1  0.0073  0.0891     4.1  0.0022  0.0438     4.9  0.0029  0.0252     6.2  0.0001  0.0132     8.7  0.0000  0.0048
+    subanchors     3.8  0.0328  0.0521     4.6  0.0169  0.0319     5.5  0.0101  0.0188     6.7  0.0041  0.0106     9.4  0.0006  0.0039
+      one hole                       -                       -                       -                       -                       -
+  anchor floor             0.39   0.90             0.46   0.91             0.29   0.85             0.33   0.84             0.34   0.88   1% and median of distance over law, nu 0.344
+GM12878_chr1_20000000_25000000_node_c5k: 5 structures, 4893 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     4.1  0.0267  0.0421     4.9  0.0133  0.0259     6.0  0.0078  0.0145     7.5  0.0028  0.0076    10.2  0.0007  0.0030
+  anchor pairs     3.5  0.0176  0.0687     4.5  0.0064  0.0336     5.6  0.0042  0.0180     7.2  0.0002  0.0083     9.4  0.0011  0.0038
+    subanchors     4.2  0.0269  0.0391     4.9  0.0146  0.0253     6.0  0.0086  0.0144     7.5  0.0032  0.0076    10.3  0.0007  0.0030
+      one hole                       -                       -                       -                       -                       -
+  anchor floor             0.35   0.95             0.34   0.97             0.31   0.94             0.39   0.98             0.26   0.96   1% and median of distance over law, nu 0.344
+GM12878_chr1_20000000_25000000_node_c5k_cap03: 5 structures, 4893 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     4.1  0.0262  0.0426     4.9  0.0138  0.0261     6.0  0.0081  0.0146     7.5  0.0028  0.0076    10.2  0.0007  0.0030
+  anchor pairs     3.5  0.0154  0.0683     4.5  0.0075  0.0333     5.6  0.0051  0.0176     7.3  0.0005  0.0082     9.5  0.0011  0.0038
+    subanchors     4.2  0.0270  0.0397     4.9  0.0152  0.0255     6.0  0.0089  0.0146     7.4  0.0032  0.0076    10.2  0.0007  0.0030
+      one hole                       -                       -                       -                       -                       -
+  anchor floor             0.35   0.95             0.33   0.97             0.30   0.95             0.38   0.99             0.27   0.96   1% and median of distance over law, nu 0.344
+GM12878_chr1_20000000_25000000_node_c5k_cap05: 5 structures, 4893 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     4.1  0.0267  0.0426     4.9  0.0137  0.0260     6.0  0.0077  0.0145     7.5  0.0027  0.0076    10.2  0.0007  0.0030
+  anchor pairs     3.5  0.0130  0.0653     4.5  0.0084  0.0330     5.6  0.0049  0.0176     7.3  0.0004  0.0081     9.5  0.0011  0.0037
+    subanchors     4.2  0.0274  0.0400     4.9  0.0148  0.0255     6.0  0.0083  0.0145     7.5  0.0030  0.0076    10.3  0.0007  0.0030
+      one hole                       -                       -                       -                       -                       -
+  anchor floor             0.36   0.97             0.32   0.97             0.30   0.95             0.39   0.99             0.27   0.96   1% and median of distance over law, nu 0.344
+GM12878_chr1_20000000_25000000_node_c5k_cap10: 5 structures, 4893 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     4.1  0.0263  0.0422     4.9  0.0139  0.0258     6.0  0.0077  0.0144     7.5  0.0028  0.0075    10.3  0.0007  0.0030
+  anchor pairs     3.6  0.0149  0.0596     4.6  0.0092  0.0307     5.7  0.0048  0.0166     7.4  0.0004  0.0079     9.6  0.0010  0.0036
+    subanchors     4.2  0.0273  0.0400     4.9  0.0152  0.0255     6.0  0.0086  0.0145     7.5  0.0032  0.0076    10.3  0.0007  0.0030
+      one hole                       -                       -                       -                       -                       -
+  anchor floor             0.35   1.00             0.31   1.00             0.30   0.97             0.38   0.99             0.27   0.97   1% and median of distance over law, nu 0.344

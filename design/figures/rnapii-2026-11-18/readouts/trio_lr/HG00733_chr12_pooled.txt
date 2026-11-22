@@ -1,4 +1,0 @@
-chr12, pooled ensemble against Hi-C at 25000 bp, 131 unmapped bins
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
-                               HG00733_C_chr12  10   0.339   0.204   0.557   0.218   0.203   0.302                     0.552    0.287    0.114
-                               HG00733_R_chr12  10   0.365   0.216   0.553   0.244   0.216   0.289                     0.548    0.270    0.104

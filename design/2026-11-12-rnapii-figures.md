@@ -94,7 +94,7 @@ the cudaMMC arm included, with `_60mb` slices beside them. The enhancer3d packag
   the CLI is not rerun. A recomputed point estimate must reproduce `summary.tsv` before the draws
   are trusted.
 - c and f take Hi-C from the battery JSON and Micro-C from the Micro-C JSON under
-  `design/figures/rnapii-2026-11-12/readouts/`, original models included.
+  `data/figures/rnapii-2026-11-12/readouts/`, outside git, original models included.
 - b is computed from the models: contacts within the battery's contact distance, summed over
   the ten conformations, binned at 25 kb, beside the deep Hi-C map's same window.
 - h renders one conformation per arm, the medoid of the ten by RMSD after alignment, with the

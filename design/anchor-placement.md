@@ -88,7 +88,7 @@ percent of pairs at every separation have nothing but that repulsion, and Hi-C r
 percent of them. Arc springs pulling everything to 0.2 against a repulsion with no sense of scale
 equilibrates at a uniform ball.
 
-Measured on five finished models from three data sources with `playground/calibrate_beta.py`,
+Measured on five finished models from three data sources with `data/figures/retired/playground/calibrate_beta.py`,
 the realised exponent over 20 kb to 1 Mb is 0.143 to 0.212, always well under 0.285. The
 simulated contact probability from the beads themselves decays as `s^-0.41` against `s^-0.86` in
 the Hi-C, which is the same fact on the observable Hi-C measures directly.
@@ -107,7 +107,7 @@ violated by construction. Excluded volume wants centroids at least `0.5 * dtn` a
 wants all of them inside a sphere narrower than one bond, both cannot hold, and whichever jams
 first sets the layout instead of genomic separation.
 
-Coarse stage alone on chr1, 52 blocks, `playground/ib_confine_ablate.py`:
+Coarse stage alone on chr1, 52 blocks, `data/figures/retired/playground/ib_confine_ablate.py`:
 
 | `packing_factor_ib` | block layout exponent | Rg |
 |---|---|---|
@@ -120,7 +120,7 @@ Coarse stage alone on chr1, 52 blocks, `playground/ib_confine_ablate.py`:
 | off | 0.280 | 320 |
 
 Finished structures on chr1:1-60 Mb, 11 blocks in 5 segments, 3158 anchors, 3M sampled pairs,
-`playground/boundary_wide.py`:
+`data/figures/retired/playground/boundary_wide.py`:
 
 | `packing_factor_ib` | cross block exponent | within block exponent | Rg, all beads |
 |---|---|---|---|
@@ -280,8 +280,8 @@ Implemented in `gnome3d/pipeline/stitch.py`, wired into `reconstruct.py::_assemb
 
 Measured through the pipeline on the workstation, chr1:1-60 Mb at packing factor 0.75, flag
 off and flag on from the same seed so the two structures differ only by the pass, then
-`playground/boundary_wide.py` on each. The offline application of the pass to the laptop's
-finished structure, `playground/stitch_offline.py`, gave the same answer to within 0.05 in every
+`data/figures/retired/playground/boundary_wide.py` on each. The offline application of the pass to the laptop's
+finished structure, `data/figures/retired/playground/stitch_offline.py`, gave the same answer to within 0.05 in every
 bin.
 
 | separation | jump, flag off | jump, flag on |
@@ -414,7 +414,7 @@ maximum, anchors fixed, gated on `[relax] use_cross_block_relax`, run after the 
 toy of two overlapping coils it takes 564 cross block contacts to zero with bonds kept within
 1.44. Unit checks in `tests/unit/test_relax.py`.
 
-Applied offline to the D, C and stitch structure, `playground/relax_offline.py`:
+Applied offline to the D, C and stitch structure, `data/figures/retired/playground/relax_offline.py`:
 
 | | before | after |
 |---|---|---|
@@ -702,7 +702,7 @@ What that leaves. The kink is real and its cause is known. A fix has to hold onl
 that collapse, under about 100 kb, and leave the long range free to be set by the arcs and the
 polymer scale. That is a short range background, not an all pairs one. It is built, opt in, as
 `[springs] background_weight` and `background_range_bp`, swept in
-`playground/short_range_sweep.py`, and the three cell battery decides.
+`data/figures/retired/playground/short_range_sweep.py`, and the three cell battery decides.
 
 Swept on the same eight GM12878 blocks with the solver, measured input 0.272, production
 otherwise (chain bonds on at 1.5, cutoff 3.0):
@@ -1244,11 +1244,11 @@ stitch, option E.
 
 | gate | tool | at 0.15 | at 0.75 |
 |---|---|---|---|
-| cross block exponent, finished | `playground/boundary_wide.py` | 0.017 | 0.183 |
-| within block exponent, 20 kb to 1 Mb | `playground/calibrate_beta.py` | 0.205 | 0.208 |
-| simulated contact probability slope | `playground/calibrate_beta.py` | 0.40 | 0.41 |
-| boundary jump at 562 kb to 1 Mb | `playground/boundary_wide.py` | 33 | 59, with stitch 0.98 |
-| block layout exponent, coarse | `playground/ib_confine_ablate.py` | 0.021 | 0.214 |
+| cross block exponent, finished | `data/figures/retired/playground/boundary_wide.py` | 0.017 | 0.183 |
+| within block exponent, 20 kb to 1 Mb | `data/figures/retired/playground/calibrate_beta.py` | 0.205 | 0.208 |
+| simulated contact probability slope | `data/figures/retired/playground/calibrate_beta.py` | 0.40 | 0.41 |
+| boundary jump at 562 kb to 1 Mb | `data/figures/retired/playground/boundary_wide.py` | 33 | 59, with stitch 0.98 |
+| block layout exponent, coarse | `data/figures/retired/playground/ib_confine_ablate.py` | 0.021 | 0.214 |
 | enhancer promoter expression | `enhancer3d/playground/beyond_linear.py` | 86 percent of v4 | not yet run |
 | byte exact parity, flag off | see the byte exactness gate of AGENTS.md | must stay identical | |
 

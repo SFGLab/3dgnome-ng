@@ -1,0 +1,16 @@
+pairs under 0.7 model units per thousand beads: every pair | pairs not next to each other in the file | bond median | beads
+GM12878_chr1_10000000_15000000 | prod:   10.9    1.3 1.07 2597 | node_c5k_centre:   31.9    3.0 1.04 3025 | ctr_squeeze1:    6.1    1.6 1.11 3025 | ctr_bonds1:   22.1    5.5 1.03 3025 | ctr_step05:   50.5   13.6 1.02 3025 | ctr_norelax:   78.0   57.9 1.03 3025 | ctr_nowall:   23.9    9.0 1.04 3025 | ctr_ev1:   33.9    1.7 1.01 3025
+GM12878_chr1_20000000_25000000 | prod:   21.6    5.8 1.11 4268 | node_c5k_centre:   47.4    5.4 1.05 4893 | ctr_squeeze1:   14.9    5.2 1.14 4893 | ctr_bonds1:   35.8    8.7 1.03 4893 | ctr_step05:   73.9   19.7 1.01 4893 | ctr_norelax:   63.9   34.3 1.04 4893 | ctr_nowall:   41.7   15.9 1.04 4893 | ctr_ev1:   64.4    2.7 1.02 4893
+H1ESC_chr1_10000000_15000000 | prod:    3.9    0.9 1.05 2823 | node_c5k_centre:   29.4    6.1 1.02 3900 | ctr_squeeze1:    8.6    4.0 1.08 3900 | ctr_bonds1:   20.2    7.2 1.01 3900 | ctr_step05:   46.4   17.1 1.00 3900 | ctr_norelax:   36.0   19.4 1.02 3900 | ctr_nowall:   27.2   12.6 1.03 3900 | ctr_ev1:   29.4    2.6 1.01 3900
+H1ESC_chr1_20000000_25000000 | prod:   12.2    4.5 1.07 4233 | node_c5k_centre:   37.6    5.2 1.04 4836 | ctr_squeeze1:    8.7    3.9 1.12 4836 | ctr_bonds1:   27.9    8.6 1.03 4836 | ctr_step05:   61.7   19.0 1.01 4836 | ctr_norelax:   46.8   24.6 1.03 4836 | ctr_nowall:   28.7   12.4 1.04 4836 | ctr_ev1:   51.3    1.6 1.02 4836
+HFFC6_chr1_10000000_15000000 | prod:    5.4    0.5 1.07 3301 | node_c5k_centre:   22.8    2.7 1.02 4565 | ctr_squeeze1:    2.8    1.1 1.08 4565 | ctr_bonds1:   14.0    5.3 1.01 4565 | ctr_step05:   34.6   13.4 1.00 4565 | ctr_norelax:   35.0   21.2 1.01 4565 | ctr_nowall:   15.5    6.1 1.02 4565 | ctr_ev1:   34.3    0.7 1.01 4565
+HFFC6_chr1_20000000_25000000 | prod:    7.0    2.6 1.04 4684 | node_c5k_centre:   26.9    3.5 1.04 4832 | ctr_squeeze1:    6.0    3.0 1.11 4832 | ctr_bonds1:   17.4    5.3 1.02 4832 | ctr_step05:   39.8   10.5 1.01 4832 | ctr_norelax:   27.9   12.0 1.03 4832 | ctr_nowall:   22.7    9.5 1.03 4832 | ctr_ev1:   61.0    1.7 1.03 4832
+mean over the rows
+  prod                           10.2    2.6
+  node_c5k_centre                32.7    4.3
+  ctr_squeeze1                    7.9    3.1
+  ctr_bonds1                     22.9    6.8
+  ctr_step05                     51.1   15.6
+  ctr_norelax                    47.9   28.2
+  ctr_nowall                     26.6   10.9
+  ctr_ev1                        45.7    1.8

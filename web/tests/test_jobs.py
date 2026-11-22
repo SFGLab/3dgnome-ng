@@ -90,6 +90,16 @@ def test_the_contact_background_is_in_the_key(other: Any, shared: SimpleNamespac
     assert request_key(none, cat) != request_key(other, cat), "the contact background is in the key"
 
 
+def test_the_chain_is_in_the_key_and_loop_anchors_keep_the_key_they_had(other: Any, shared: SimpleNamespace) -> None:
+    from gnome3d_web.jobs.request import normalised
+
+    cat = shared.cat
+    uniform = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, chain="uniform")
+    anchors = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, chain="anchors")
+    assert request_key(uniform, cat) != request_key(other, cat), "the chain is in the key"
+    assert request_key(anchors, cat) == request_key(other, cat) and "chain" not in normalised(other, cat), "a request on loop anchors has the key it had"
+
+
 def test_the_old_hicdiffusion_flag_and_the_new_background_give_one_key(shared: SimpleNamespace) -> None:
     cat = shared.cat
     old = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, hicdiffusion=True)

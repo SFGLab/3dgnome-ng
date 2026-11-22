@@ -7,8 +7,11 @@
 #
 # An arm is slurm/ensemble/<cell>$BASE.ini with its overrides, BASE _xc_R unless set. Production
 # runs beside the arms on the same machine. CONTACT_MAP in an override is replaced by the deepest
-# mcool of the cell at 1 kb. A region chr1 runs the whole chromosome and is scored on
-# chr1:1-60000000. The log is OUT/TAG.log.
+# mcool of the cell at 1 kb, of CONTACT_HIC when set and of HIC otherwise. With the two apart a run
+# reads one map and is scored against another. CELL in an override is replaced by the name of
+# the cell, for a file of the cell. A region chr1 runs the whole chromosome and is
+# scored on chr1:1-60000000. The log is OUT/TAG.log. INI_ONLY=yes writes the config of every arm and
+# builds nothing.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
@@ -24,13 +27,14 @@ LOG="$OUT/$TAG.log"
 git log --format="$TAG on %h %s" -1 >> "$LOG"
 
 mcool() { ls -S "$HIC/$1"/*.mcool | head -1; }
+cmap() { ls -S "${CONTACT_HIC:-$HIC}/$1"/*.mcool | head -1; }
 
 ARMS="prod"
 for spec in "$@"; do ARMS="$ARMS ${spec%%:*}"; done
 
 for C in $CELLS; do
   c=$(echo "$C" | tr 'A-Z' 'a-z')
-  .venv/bin/python - "slurm/ensemble/${c}${BASE}.ini" "$OUT" "$C" "$(mcool "$C")::/resolutions/1000" "$@" <<'PY'
+  .venv/bin/python - "slurm/ensemble/${c}${BASE}.ini" "$OUT" "$C" "$(cmap "$C")::/resolutions/1000" "$@" <<'PY'
 import configparser, sys
 src, out, cell, uri, *specs = sys.argv[1:]
 arms = {"prod": {}}
@@ -40,7 +44,7 @@ for spec in specs:
     for item in filter(None, body.split(",")):
         key, val = item.split("=", 1)
         sec, k = key.split(".", 1)
-        over[(sec, k)] = uri if val == "CONTACT_MAP" else val
+        over[(sec, k)] = uri if val == "CONTACT_MAP" else val.replace("CELL", cell)
     arms[name] = over
 for arm, over in arms.items():
     c = configparser.ConfigParser()
@@ -53,6 +57,7 @@ for arm, over in arms.items():
         c.write(fh)
 PY
 done
+[ "${INI_ONLY:-no}" = yes ] && exit 0
 
 for C in $CELLS; do
   M=$(mcool "$C")

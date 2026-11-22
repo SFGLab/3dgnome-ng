@@ -1,5 +1,0 @@
-chr1:1-60000000, pooled ensemble against Hi-C at 25000 bp
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC
-                        GM12878_chr1_60mb_prod   3   0.313   0.141   0.343   0.710   0.140   0.276
-                  GM12878_chr1_60mb_gyr01relax   3   0.346   0.164   0.361   0.674   0.163   0.292
-                       GM12878_chr1_60mb_mxgyr   3   0.351   0.169   0.379   0.671   0.168   0.308

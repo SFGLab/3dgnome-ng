@@ -16,9 +16,9 @@ conformations. One structure at the mean has no spread.
 
 The full depth anchor table with the two sided background at z 3, 2026-11-13, held under 0.1
 percent of anchor pairs on chr1 and moved SCC by 0.007 to 0.022 on whole chr1 with nothing else
-changed, `playground/square_blocks/acxc/`. Pair counts at the anchor level do not reach the gaps.
+changed, `data/figures/square_blocks/acxc/`. Pair counts at the anchor level do not reach the gaps.
 Pooled over windows of about 10 kb inside a gap, a full depth map holds enough counts to call a
-pair depleted as well as enriched, `playground/gap_window_balance.py`.
+pair depleted as well as enriched, `data/figures/retired/playground/gap_window_balance.py`.
 
 ## Options
 
@@ -100,8 +100,8 @@ worth reading against the battery.
 
 ## Trial of option 1, 2026-11-14
 
-`slurm/ensemble/gap_maxent_trial.sh`, workstation, results in `out/gapme` and copied to
-`playground/square_blocks/gapme/`. Configs `slurm/ensemble/<cell>_xc_R.ini`. Production and the
+`data/figures/retired/slurm/ensemble/gap_maxent_trial.sh`, workstation, results in `out/gapme` and copied to
+`data/figures/square_blocks/gapme/`. Configs `slurm/ensemble/<cell>_xc_R.ini`. Production and the
 z3 arm come from the cross cell run in `out/acxc`, and a rerun of GM12878 chr1:20-25 Mb at
 production checks the coil start is unchanged.
 
@@ -153,9 +153,9 @@ place a denser map enters.
 
 ## Smooth stage trace, 2026-11-14
 
-`playground/smooth_widening_trace.py` keeps each block's start, its start after the restart noise
-and its final chain, `slurm/ensemble/smooth_widening_trace.sh`, GM12878 chr1:20-25 Mb, one
-structure per arm, logs in `playground/square_blocks/widen/`. Pairs inside one gap, realised over
+`data/figures/retired/playground/smooth_widening_trace.py` keeps each block's start, its start after the restart noise
+and its final chain, `data/figures/retired/slurm/ensemble/smooth_widening_trace.sh`, GM12878 chr1:20-25 Mb, one
+structure per arm, logs in `data/figures/square_blocks/widen/`. Pairs inside one gap, realised over
 law.
 
 | Arm | State | 1-5 kb | 5-25 kb | 25-50 kb | 50-100 kb | 100-200 kb | mean bend | close pairs per thousand |
@@ -188,8 +188,8 @@ the end state.
 
 ## Bend term and hole beads, 2026-11-14, regions
 
-`slurm/ensemble/gap_angle_holes_trial.sh`, results in `out/gapah` and
-`playground/square_blocks/gapah/`. Gate rerun byte identical. Battery on raw counts, Pearson and
+`data/figures/retired/slurm/ensemble/gap_angle_holes_trial.sh`, results in `out/gapah` and
+`data/figures/square_blocks/gapah/`. Gate rerun byte identical. Battery on raw counts, Pearson and
 SCC.
 
 | Cell, region | prod | noangle | maxent | maxent_noangle | maxent_bare | holes |
@@ -244,13 +244,13 @@ them. The second version, chromosome expectation and smoothed holes, is in `out/
 
 ## Hole beads against the blocks, 2026-11-14
 
-Two diagnostics on the second version, `playground/hole_contact_split.py` and
-`playground/hole_contact_overlap.py`. Hole with block and two hole contacts sat under 0.7 bond in
+Two diagnostics on the second version, `data/figures/retired/playground/hole_contact_split.py` and
+`data/figures/retired/playground/hole_contact_overlap.py`. Hole with block and two hole contacts sat under 0.7 bond in
 15 percent of cases at every separation, the share for beads uniform within the contact radius,
 against 2 to 5 percent inside one hole. The holes passed through the blocks. The third version
 smooths every hole in one pass over the chromosome with the block beads fixed, so the excluded
-volume and the wall act between them. `slurm/ensemble/gap_holes_v3_trial.sh`, results in
-`playground/square_blocks/gapv3/`. Raw Pearson, SCC and cross block overlaps per thousand beads.
+volume and the wall act between them. `data/figures/retired/slurm/ensemble/gap_holes_v3_trial.sh`, results in
+`data/figures/square_blocks/gapv3/`. Raw Pearson, SCC and cross block overlaps per thousand beads.
 
 | Region | prod | holes2 | holes3 |
 |---|---|---|---|
@@ -330,14 +330,14 @@ iterations. Two structures, against production:
 | draw rms, contact share | 3.8, 0.045 | 5.5, 0.013 | 6.9, 0.0067 | 9.7, 0.0019 |
 
 The draw's block contacts fall 24 fold from the first band to the last, Hi-C's 21 fold and
-production's 170 fold. Anchor pairs touch at every separation. Trial `slurm/ensemble/spread_trial.sh`,
+production's 170 fold. Anchor pairs touch at every separation. Trial `data/figures/retired/slurm/ensemble/spread_trial.sh`,
 arms against production on three regions and three cells and on whole chr1 for two cells: the
 draw kept, the draw and 30 solver iterations, the draw and the full solve, the repulsion's reach
 at 1.0 and 0.75, loop dropout, and the kept draw with hole beads.
 
 ### Spread trial, regions, 2026-11-15
 
-`slurm/ensemble/spread_trial.sh`, results in `playground/square_blocks/spread/`. Gate rerun
+`data/figures/retired/slurm/ensemble/spread_trial.sh`, results in `data/figures/square_blocks/spread/`. Gate rerun
 byte identical. Mean over chr1:10-15, 20-25 and 35-40 Mb on GM12878, H1ESC and HFFC6, five
 structures each: raw Pearson, balanced Pearson, balanced SCC, MultiMM.
 
@@ -361,14 +361,14 @@ long range arrangement the draw set, where production's comes from the Hilbert c
 repulsion reach raises raw Pearson and costs balanced Pearson and MultiMM, compacting the blocks
 to an Rg 15 to 20 percent under production. Dropout loses on every column.
 
-The arm that keeps the spread and removes the overlaps, `slurm/ensemble/spread_ev_trial.sh`,
+The arm that keeps the spread and removes the overlaps, `data/figures/retired/slurm/ensemble/spread_ev_trial.sh`,
 draws and then solves with every target spring at zero, so only the excluded volume and the
 arcless repulsion act. On GM12878 20-25 Mb, two structures, block contacts at 400 kb to 1 Mb
 hold 0.0021 of pairs against production's 0.0002 and 25 to 50 kb 0.035 against 0.036.
 
 ### Drawn anchors with only the overlaps relaxed, 2026-11-15
 
-`slurm/ensemble/spread_ev_trial.sh`, results in `playground/square_blocks/spreadev/`. The draw, then
+`data/figures/retired/slurm/ensemble/spread_ev_trial.sh`, results in `data/figures/square_blocks/spreadev/`. The draw, then
 up to 200 solver iterations with every target spring at zero, the arcless repulsion's reach at 0.5
 or 1.0 of the mean arc target. Mean over the nine region runs, raw Pearson, balanced Pearson,
 balanced SCC, MultiMM:
@@ -393,7 +393,7 @@ was stopped. The drawn start with the full solve stays the one arm with a gain, 
 
 `slurm/ensemble/arms_trial.sh` on the RTX 3090 workstation, GM12878 chr1:10-15, 20-25 and 35-40 Mb, five structures,
 one arcs term removed per arm, production rerun beside them. Results in
-`playground/square_blocks/ablate/`. `playground/contact_spread.py` now prints the anchor floor,
+`data/figures/square_blocks/ablate/`. `playground/contact_spread.py` now prints the anchor floor,
 the 1 percent and median quantiles of anchor pair distance over the law.
 
 | Arm | floor beyond 100 kb, 1% and median | block contacts 400 kb to 1 Mb | bal Pearson | Rg | cross block overlaps |
@@ -417,7 +417,7 @@ repulsion, with the arcs excluded volume at its default radius and at a full mea
 ### Excluded volume radius and a gyration term, 2026-11-15
 
 Without the repulsion the arcs excluded volume radius sets the long range size, and it sets a
-floor with it. GM12878, three regions, `playground/square_blocks/ablate2/` and `ablate3/`: at 1.0
+floor with it. GM12878, three regions, `data/figures/square_blocks/ablate2/` and `data/figures/square_blocks/ablate3/`: at 1.0
 of the mean arc target the floor beyond 100 kb is 0.29 to 0.35 of the law and far block contacts
 four times production's, at Rg down 15 percent and balanced Pearson down 0.03 to 0.06; at 1.5 the
 floor is 0.34 to 0.44 and the contacts 1.3 times production's; at 2.0 the floor is back at 0.38 to
@@ -426,7 +426,7 @@ floor is 0.34 to 0.44 and the contacts 1.3 times production's; at 2.0 the floor 
 `[springs] gyration_weight` holds the radius of gyration of every genomic window of anchors at the
 law's, windows at every scale from 100 kb doubling up and tiled twice, in the arcs solver's energy.
 It sets size without holding a pair. Unit checks in `tests/unit/test_gyration.py`. GM12878, three
-regions, mean, results in `playground/square_blocks/gyr/`:
+regions, mean, results in `data/figures/square_blocks/gyr/`:
 
 | Arm | raw P | raw SCC | bal P | bal SCC | MultiMM | Rg |
 |---|---|---|---|---|---|---|
@@ -439,7 +439,7 @@ Far block contacts stay two to two and a half times production's with the floor 
 Balanced Pearson stays 0.02 under production on every region, with the 20 to 100 kb exponent at
 0.25 to 0.28 against 0.27 to 0.30 and smooth stage overlaps up, 16 to 46 per thousand on 20-25 Mb.
 
-Three cells, three regions, mean, results in `playground/square_blocks/gyr3c/` and `rrange/`:
+Three cells, three regions, mean, results in `data/figures/square_blocks/gyr3c/` and `data/figures/square_blocks/rrange/`:
 
 | Arm | raw P | raw SCC | bal P | bal SCC | MultiMM | e20-100k |
 |---|---|---|---|---|---|---|
@@ -466,7 +466,7 @@ structures score as five do: chr1:20-25 Mb, `gyr01` against production, balanced
 against 0.730 on GM12878 and 0.719 against 0.785 on HFFC6 at twenty, the same gaps at five. Hi-C is
 a population average, and a production structure resembles it because every conformation is
 nearly the same one. `playground/ensemble_score.py` pools each arm's contacts first. Twenty
-structures, results in `playground/square_blocks/n20/`:
+structures, results in `data/figures/square_blocks/n20/`:
 
 | | raw P | raw Spearman | raw SCC | bal P | bal Spearman | bal SCC |
 |---|---|---|---|---|---|---|
@@ -480,7 +480,7 @@ balanced Pearson by 0.04 to 0.09. Balanced counts are well under one, so Pearson
 one is nearly linear and follows the largest values, the first diagonals, which production's
 steeper decay next to the diagonal matches better.
 
-GM12878 whole chr1, three structures, scored on 1 to 60 Mb, `playground/square_blocks/gyrchr/`:
+GM12878 whole chr1, three structures, scored on 1 to 60 Mb, `data/figures/square_blocks/gyrchr/`:
 per structure raw Pearson 0.281 against 0.261, MultiMM 0.628 against 0.588, balanced Pearson
 0.626 against 0.672, balanced SCC 0.233 against 0.228; pooled raw Spearman 0.165 against 0.141,
 balanced SCC 0.290 against 0.276. Far block contacts at 400 kb to 1 Mb four and a half times
@@ -526,7 +526,7 @@ arcs_repulsion_cutoff_factor` 0.05, the arcs excluded volume at the mean arc tar
 
 ### The drawn start on top, 2026-11-15
 
-`start = maxent` added to the arm above, results in `playground/square_blocks/mxgyr/` and
+`start = maxent` added to the arm above, results in `data/figures/square_blocks/mxgyr/` and
 `gyrchr/`. Pooled, mean over three regions and three cells, five structures:
 
 | Arm | raw P | raw Sp | raw SCC | bal P | bal Sp | bal SCC |
@@ -543,7 +543,7 @@ the chromosome 25 minutes on 36 cores and an RTX 3090.
 
 ### Hole beads on top, 2026-11-15
 
-Holes v3 with the contact map on the drawn start and gyration arm, `playground/square_blocks/mxholes/`.
+Holes v3 with the contact map on the drawn start and gyration arm, `data/figures/square_blocks/mxholes/`.
 Pooled balanced SCC over the bins Hi-C maps, `playground/ensemble_score.py` now printing it
 beside the full map, raw in brackets:
 
@@ -567,7 +567,7 @@ its blocks rather than against them.
 `[holes] hard_wall = no` takes the wall out of the hole pass and `[holes] flank_beads` conditions
 the draw on block beads beside the anchors, `conditioned_draw` in `maxent.py`, the bridge when only
 the ends are fixed. Unit checks in `tests/unit/test_maxent_start.py` and `tests/unit/test_holes.py`.
-chr1:10-15 Mb, pooled balanced SCC over mapped bins, raw in brackets, `playground/square_blocks/hiface/`:
+chr1:10-15 Mb, pooled balanced SCC over mapped bins, raw in brackets, `data/figures/square_blocks/hiface/`:
 
 | | mxgyr | holes | no wall | flank 5 | both |
 |---|---|---|---|---|---|
@@ -575,11 +575,11 @@ chr1:10-15 Mb, pooled balanced SCC over mapped bins, raw in brackets, `playgroun
 | H1ESC | 0.134 (0.260) | 0.158 (0.233) | 0.160 (0.229) | 0.160 (0.232) | 0.158 (0.221) |
 | HFFC6 | 0.302 (0.400) | 0.313 (0.398) | 0.312 (0.406) | 0.329 (0.421) | 0.329 (0.423) |
 
-The wall changes nothing and the flank conditioning adds up to 0.016. `playground/hole_mask_scc.py`
+The wall changes nothing and the flank conditioning adds up to 0.016. `data/figures/retired/playground/hole_mask_scc.py`
 leaves each hole's bins out in turn: with every hole bin out the arms score alike, GM12878 0.279 and
 0.316 with holes against 0.266 and 0.318 without, so the cost lies in the hole bins themselves, and
 on GM12878 in both holes, the PRAMEF hole at 0.70 mapped and 0.52 of the median raw coverage and
-the fully mapped one at 0.77. `playground/hole_scale_scc.py` multiplies every count touching a hole
+the fully mapped one at 0.77. `data/figures/retired/playground/hole_scale_scc.py` multiplies every count touching a hole
 bin: on GM12878 the pooled SCC falls steadily from a factor of 0, 0.468 and 0.406 raw and
 balanced, through 0.25, 0.5 and 1 to 0.156 and 0.204 at 2; on H1ESC balanced SCC rises with it,
 0.142 to 0.163, and HFFC6 is flat. Over pairs touching a hole bin the model's counts follow Hi-C's
@@ -617,7 +617,7 @@ Every long range arm was measured on the cross line CTCF and RNAPII inputs. On t
 `<cell>_hic_arcs.ini` and the C arm, the new production against the old on GM12878 and HFFC6 at
 10-15 and 20-25 Mb, five structures: pooled raw SCC up on eight of eight, by 0.006 to 0.041,
 balanced SCC on seven, MultiMM on eight, and smooth stage overlaps 22 to 294 per thousand against
-5 to 103, cross block 1 to 90 against 5 to 23. `playground/overlap_classes.py` puts them between
+5 to 103, cross block 1 to 90 against 5 to 23. `data/figures/retired/playground/overlap_classes.py` puts them between
 the coils of two gaps at 50 kb to 1 Mb, whose anchors sit at 0.59 to 0.65 of the law against 0.66
 to 0.74: on GM12878 20-25 Mb 379 such pairs per thousand beads against 119, inside one gap 134
 against 68. The long range fix brings far anchors close and the coils laid down around them meet.
@@ -625,7 +625,7 @@ against 68. The long range fix brings far anchors close and the coils laid down 
 `[relax] within_blocks` lets the relaxation move non neighbour pairs of one block closer than 0.7
 of a bond as well as beads touching another block, and with it the pass runs on a lone block.
 Unit checks in `tests/unit/test_relax.py`. At the pass's radius of 1.5 bonds it costs Pearson and
-MultiMM; at `ev_radius` 1.0, results in `playground/square_blocks/within/`:
+MultiMM; at `ev_radius` 1.0, results in `data/figures/square_blocks/within/`:
 
 | | overlaps within and across blocks, production then 1.0 | pooled balanced SCC |
 |---|---|---|

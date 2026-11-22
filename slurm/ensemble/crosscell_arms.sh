@@ -8,11 +8,15 @@
 #   CHROMS="chr2 chr3" sbatch -A <account> --array=0-8 slurm/ensemble/crosscell_arms.sh
 #   DRY=1 SLURM_ARRAY_TASK_ID=4 bash slurm/ensemble/crosscell_arms.sh
 #   SPLIT=1 CHROMS="chr2 ... chr22" sbatch -A <account> --array=0-188%24 slurm/ensemble/crosscell_arms.sh
+#   ARMS="C UC UR" OUT=out/xu SPLIT=1 CHROMS="chr1 ... chr22" sbatch -A <account> --array=0-197%24 \
+#     --mem=96G --cpus-per-task=16 slurm/ensemble/crosscell_arms.sh
 #
-# Task i runs line i / 3 of GM12878 H1ESC HFFC6 and arm i % 3 of C R M. With SPLIT=1 it runs line
-# and arm i % 9 on chromosome i / 9 of CHROMS. A member whose .cif exists is skipped. After chr1 the
-# arm is sliced to chr1:1-60000000. The inputs come from playground/rnapii/crosscell_prep.py and the
-# configs from slurm/ensemble/crosscell_configs.py.
+# ARMS is the list of arms, C R M by default. With n arms, task i runs line i / n of GM12878 H1ESC
+# HFFC6 and arm i % n. With SPLIT=1 it runs line and arm i % 3n on chromosome i / 3n of CHROMS. A
+# member whose .cif exists is skipped. After chr1 the arm is sliced to chr1:1-60000000. The inputs
+# come from playground/rnapii/crosscell_prep.py and the configs from
+# slurm/ensemble/crosscell_configs.py. UC and UR are C and R on the uniform chain. They read half a
+# of the deep map of the line, data/_hic_half/a/<LINE>.mcool of playground/thin_cooler.py.
 
 #SBATCH --job-name=xc_rnapii
 #SBATCH --nodes=1
@@ -38,17 +42,20 @@ DRY="${DRY:-0}"
 SPLIT="${SPLIT:-0}"
 
 LINES=(GM12878 H1ESC HFFC6)
-ARMS=(C R M)
+read -r -a ARMS <<< "${ARMS:-C R M}"
+NARMS=${#ARMS[@]}
+NCOMBO=$((3 * NARMS))
 TASK="${SLURM_ARRAY_TASK_ID:-0}"
 COMBO="$TASK"
 if [ "$SPLIT" = "1" ]; then
   read -r -a CHROM_LIST <<< "$CHROMS"
-  COMBO=$((TASK % 9))
-  [ $((TASK / 9)) -lt ${#CHROM_LIST[@]} ] || { echo "task $TASK beyond ${#CHROM_LIST[@]} chromosomes"; exit 1; }
-  CHROMS="${CHROM_LIST[$((TASK / 9))]}"
+  COMBO=$((TASK % NCOMBO))
+  [ $((TASK / NCOMBO)) -lt ${#CHROM_LIST[@]} ] || { echo "task $TASK beyond ${#CHROM_LIST[@]} chromosomes"; exit 1; }
+  CHROMS="${CHROM_LIST[$((TASK / NCOMBO))]}"
 fi
-LINE="${LINES[$((COMBO / 3))]}"
-ARM="${ARMS[$((COMBO % 3))]}"
+[ "$COMBO" -lt "$NCOMBO" ] || { echo "task $TASK beyond $NCOMBO lines and arms"; exit 1; }
+LINE="${LINES[$((COMBO / NARMS))]}"
+ARM="${ARMS[$((COMBO % NARMS))]}"
 LOWER="$(echo "$LINE" | tr '[:upper:]' '[:lower:]')"
 CONFIG="$ROOT/slurm/ensemble/${LOWER}_xc_${ARM}.ini"
 DEST="$OUT/${LINE}_${ARM}"
@@ -86,7 +93,12 @@ d = Path(sys.argv[2])
 names = [s.data_anchors, s.data_singletons, *s.data_pet_clusters.split(",")]
 missing = [n for n in names if not (d / n).is_file()]
 assert not missing, f"missing under {d}: {missing}"
-print(f"[guard] config ok: clusters={s.data_pet_clusters} factors={s.data_factors or 'CTCF'}")
+contact_map = str(s.data_contact_map).partition("::")[0]
+assert not contact_map or Path(contact_map).is_file(), f"missing contact map {contact_map}"
+print(
+    f"[guard] config ok: clusters={s.data_pet_clusters} factors={s.data_factors or 'CTCF'}"
+    f" uniform_chain={s.uniform_chain} contact_map={s.data_contact_map or 'none'}"
+)
 PYCHECK
 
 for C in $CHROMS; do

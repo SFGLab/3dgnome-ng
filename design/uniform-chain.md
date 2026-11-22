@@ -1,0 +1,2090 @@
+# Uniform chain: rules of the model
+
+Status 2026-11-19: design, not built. The first build of `[main] uniform_chain` is in the code and is described in
+its own section at the end. The rules below replace it in place. Its trial is the baseline.
+
+A trial below gives a folder with its figure and its table of arms, `design/figures/uniform-2026-11-19/<trial>/`, and
+a folder of score files, `scores-<trial>/`. The tables of overlaps, stretches and ends of `scores-<trial>/` are in
+`design/figures/uniform-2026-11-19/`. The score files per row, the battery and the pooled tables, are in
+`data/figures/uniform-2026-11-19/scores-<trial>/`, outside git.
+
+## The object
+
+A block is a chain of beads of equal width, one per `target_bp_per_subanchor`, from the start of its first anchor to
+the end of its last. Every base of the block is in one bead. The span of an anchor is the run of beads whose
+midpoints are in its range. Anchors that overlap share beads. In the GM12878 anchor file 88 percent of consecutive
+anchors overlap, 42 percent are nested, the median width is 1.4 kb and 1.2 percent are over 10 kb.
+
+Every rule below is stated on beads. No rule is stated on anchors as points.
+
+## Decisions of 2026-11-19
+
+Every row is the maintainer's decision.
+
+| Question | Decision |
+|---|---|
+| The object a loop acts on | One bead of each of its two spans, the contact beads, drawn per conformation |
+| The scope of the draw | Each loop end draws its own bead |
+| PET counts of loops on one bead pair | The strengths add and the sum goes through the law once |
+| The draw of a contact bead inside a span | Uniform over the beads of the span, measured against the bead at the midpoint |
+| The smooth stage and the contact beads | Small and bounded adjustments are allowed. Three arms: fixed, bounded drift, centre of mass kept |
+| The reach of the chain in the arcs stage | A one sided spring at the loop spring weight beyond k bonds |
+| The orientation term | Three arms: as it is, off, and with the beads beside a site held within their bonds |
+| Contact data of a pair of beads | The Hi-C cell that holds the two beads, at a resolution finer than 25 kb |
+| The resolution of the cell | One setting, measured at 1, 5 and 10 kb |
+| The cells that act | A cell that passes the Poisson test of `contact_background_z`, over or under its expectation |
+| The pairs that a cell acts on | Every pair of nodes without a loop, near and far. A pair with a loop keeps its loop target |
+| The counts and the expectation | Raw counts against the mean count at the same separation on the same chromosome and resolution |
+| The order of the build | Three stages with an arms trial after each |
+| The centre of mass that the smooth stage keeps | That of a node, the bead before it and the bead after it |
+| The exceptions of that rule and the reach of the bond limit, both the assistant's | Kept as built |
+| The resolution of the contact cells | 5 kb alone, with both sides. The ladder is deleted, in its first form and as rewritten: the first expands the region and the second scores under the cells at 5 kb. Locked on 2026-11-21 |
+| The draw of the contact bead | Both draws stay as arms |
+| The rule of the smooth stage for a node | Decided after the trial of the rules |
+| Room for the free chain | Gyration windows under 100 kb first, blobs for the free chain when that does not work |
+| The three bead move and the bond limit in the JAX kernel | After the rules are chosen |
+| The larger trial | Three cells, six regions of 5 Mb across chr1, 20 structures per arm, for the arms that remain |
+| The first build | Replaced in place. Comparisons use its trial of 2026-11-19 |
+
+## Decisions of 2026-11-20
+
+Every row is the maintainer's decision, after the trials of the night.
+
+| Question | Decision |
+|---|---|
+| The rule of the smooth stage for a node | The centre of mass rule |
+| The bond of the smooth stage against a squeeze | `squeeze_constant` of 1.0 on the uniform chain |
+| The node rule in the settings | The centre of mass rule is the one node rule of the chain. Its setting and the fixed node are deleted, after step 3 of `uniform_night4.sh` |
+| The squeeze in the settings | No setting implies another. There are two canonical configs, `CANONICAL` of the default chain and `CANONICAL_UNIFORM` of the uniform chain, in `gnome3d/production.py`. A value that works better on the uniform chain is stated in the second: `uniform_chain` and `squeeze_constant` 1.0 so far |
+| The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
+| The orientation term | On as it is. `bond_limit` is deleted |
+| The radius of the arcs excluded volume of a node | The key `[excluded_volume] radius_arcs` at 0, the derived radius. Under `loop_dropout` it is derived from every loop of the chromosome, before the dropout. Decided on 2026-11-21 |
+| The cap of the radius of a pair | Deleted on 2026-11-21, both limits |
+| A radius of a node from its chain | `[excluded_volume] arcs_chain_radius = sum`, on with the dropout in the uniform canonical config. The product form is deleted |
+| The subanchor heatmap | Off, as in production |
+| The expectation of a contact cell | The mean count at the separation times the bias of the two bins, from the balancing weights of the map. It is the one derivation of the expectation and has no key, by the maintainer's word of 2026-11-21 |
+| A map without the resolution of the cells | Read at the finest resolution it holds over the one asked, with a line in the log |
+| The resolution of the contact cells | 5 kb alone, with both sides. The ladder is deleted, in its first form and as rewritten: the first expands the region and the second scores under the cells at 5 kb. Locked on 2026-11-21 |
+| `loop_dropout` | On, with the radius of a node from its chain |
+| `contact_background_z` | 3 |
+| The three bead move in the JAX kernel | Built on 2026-11-22, section "The three bead move in the JAX kernel" |
+
+The draw at the midpoint and `bond_limit` were removed on 2026-11-20, and `uniform_chain` implies the centre of
+mass rule since the same day. The byte exactness gate on GM12878 chr1 18.29 to 20.31 Mb is identical for the
+default chain and for the uniform chain with the centre of mass rule, `squeeze_constant` 1.0 and `loop_dropout`,
+two structures, across the three commits.
+
+A first run of the gate for the uniform chain differed, and commit 01503e1 states a cause that is wrong: the order
+of the float operations under `fastmath`. The cause was the gate. A worktree has its own `data/` folder with the
+files that git tracks, which lack the Hi-C singletons. The run in the worktree fitted the exponent on the ChIA-PET
+singletons, 0.175, and the run in the checkout on the Hi-C singletons, 0.344. With one data folder for every tree
+the dumps are identical. The gate of a config built by `settings_for_cell` passes the data folder as an absolute
+path.
+
+## Loops
+
+A PET is one ligation between one place of anchor A and one place of anchor B. A conformation is one cell. In a
+conformation each end of each kept loop is at one bead of the span of its anchor, the contact bead of that end.
+
+- Each loop end draws its bead by itself. Two loops of one anchor can have two contact beads.
+- The draw is uniform over the beads of the span. It comes from a generator seeded by the conformation, the seed that
+  `loop_dropout` uses.
+- A span of one bead has one choice. This is the case of most anchors.
+- The comparison arm takes the bead at the midpoint of the anchor in every conformation.
+
+Over an ensemble the contacts of a loop cover the bead pairs of its two spans evenly. The cluster file gives the two
+intervals and a count and nothing on the places of the PET ends inside them.
+
+### Strength
+
+The strength of a loop is its PET count over the typical count at its span, `PolymerLaw.arc_strength`. It is linear
+in the count.
+
+- The strengths of the loops whose two contact beads are the same bead pair add.
+- The pair is held at `contact_distance` of the law for the summed strength and the separation of the two beads.
+- Loops of two factors on one bead pair add with the multiplier of each factor.
+- A loop whose two contact beads are one bead is left out of the conformation.
+
+Anchors that are copies of one site in several clusters then act as one stronger loop when their contact beads
+agree.
+
+## Arcs stage
+
+The nodes of the arcs stage are the distinct contact beads of the conformation. A node is a bead of the chain and
+its position is the position of that bead.
+
+- Loop springs act between nodes at the target of the summed strength.
+- The background spring of a pair without a loop is at the law for the separation of the two beads. Two nodes are
+  different beads and the floor of one bead holds for them.
+- Reach. Two nodes with k bonds of chain between them are at most k bonds apart. The term has no cost up to k
+  bonds and is a spring at the weight of a loop spring beyond. It acts on consecutive nodes of a block. The triangle
+  inequality carries it to every other pair.
+- Excluded volume acts at the radius of the arcs stage, `auto_factor_arcs` times the mean loop target, 2.6 to
+  3.1 beads, as on the default chain. A node stands for the chain around it and that chain needs the room. The
+  radius of a bead of the first rule, 0.7 of a bond, let the nodes of two megabases pass through each other.
+- The radius of a pair has an optional cap, `[excluded_volume] arcs_cap = target`. The excluded volume then does
+  not ask a pair to be further apart than the distance its spring holds it at:
+
+  | pair of nodes | limit |
+  |---|---|
+  | with a loop | the loop target |
+  | without a loop, closer than `background_range_bp` | the background of the law at its separation |
+  | held by its contact cell | the distance of the cell |
+  | any other pair | none, the radius of the stage |
+
+  The radius of a pair is the smaller of the radius of the stage and its limit. The nodes next to each other in
+  the order of the chromosome stay out of the excluded volume, as before. A second limit, the chain between the
+  two beads, changed no score on the sweep and was deleted on 2026-11-21.
+- The gyration term is unchanged. It reads the genomic midpoints of the beads.
+
+### Contact data
+
+A pair of nodes reads the cell of the contact map that holds its two beads. The map is `[data] contact_map`, a
+cooler, at a resolution finer than 25 kb. The value of a cell is its count over the expectation at its separation,
+and the law puts a pair at the background times that ratio to the minus third.
+
+The default chain reads the singletons at 25 kb. A singleton is given by the start of its bin and a contact is
+counted for the bead that holds that start.
+
+The resolution is `[springs] contact_resolution`. A cell acts on a pair of nodes without a loop when its expectation is
+above z squared and its count is more than z Poisson deviations from it, with z of `contact_background_z`. The pair
+is then held at the background times `((count + 0.5) / (expected + 0.5))` to the minus third, clipped to one bead and
+to `distance_heatmap_stretching` backgrounds, with the background spring. The expectation of a cell is the mean count
+at its offset over the stretch of the chromosome that holds the nodes, pooled in eight bins of offset a decade,
+without the cells of a bin that has no count. Two nodes in one cell are left as they are.
+
+The cells need a deep map. On the map of 7.8 million contacts in the laptop's data no cell of chr1 108.5 to 111 Mb
+has an expectation of 9 at 1, 5 or 10 kb and no pair is held. The maps of the trials hold 2.5 to 4.0 billion
+contacts.
+
+The count of nodes changes between conformations with the draw. The joint solve is over the chromosome as now.
+
+## Smooth stage
+
+The chain starts with each node at its arcs position and the beads between two nodes on the bridge of
+`smooth_start`. The beads before the first node and after the last continue the chain.
+
+The arcs stage owns the positions of the nodes. Three arms state the freedom of the smooth stage over them.
+
+| Arm | Rule |
+|---|---|
+| Fixed | A node does not move in the smooth stage |
+| Bounded drift | A node moves inside a sphere of a stated radius around its arcs position and a move that leaves the sphere is refused. `smooth_anchor_cap` is this rule |
+| Centre of mass kept | The centre of mass of a node, the bead before it and the bead after it stays as it is at the start of the stage. This is the rule of the uniform chain since 2026-11-20. Its setting was `anchor_centre` |
+
+No arm has a penalty with a weight between the two stages. Every bead that is not a node moves freely, with the other
+beads of a wide span among them.
+
+The maintainer chose the centre of mass of the node and its two neighbours on 2026-11-19, in place of that of the
+span: a loop acts on one bead, three spans of four are one bead, and the centre of mass of a span at the start of
+the stage is set by the start chain. Under the rule the three beads have two moves. The node moves by the draw and
+its two neighbours by minus half of it each. A neighbour moves by the draw and the other neighbour by minus it.
+Neither neighbour moves alone. A node at an end of the chain, a node beside another node and a node closer than
+three beads to the node of the rule before it stay fixed. Those three cases are the assistant's choice: the centres
+of mass of two nodes that share a bead cannot both stay under moves of three beads. On chr1 108.5 to 111 Mb half of
+the consecutive nodes are one bond apart.
+
+The cross block relaxation follows the arm of the smooth stage. It reads the nodes from the pipeline and not from
+the kind of the output bead.
+
+## Orientation
+
+A site of the orientation term is a contact bead of a CTCF loop. Its direction is from the bead before it to the
+bead after it.
+
+Measured on 2026-11-19: at weight 50 against bonds at 0.1 it stretches the bonds beside a site on the default
+chain and on the first build. With the term off the pooled SCC of the trial moved by 0.011 or less in the mean over
+six rows on either chain. The arms are the term as it is, the term off, and the term with a move of the two beads
+beside a site refused when it stretches their bonds past a stated length.
+
+The third arm was `[motif_orientation] bond_limit`, a hard rule of the numba kernel. On GM12878 chr1 108.5 to
+111 Mb, one structure, with the term on, the bonds over 2 and over 3 beads before the relaxation were 212 and 89
+without a limit, 78 and 0 at a limit of 1.5 and 74 and 4 at 1.25. In the trial of the rules the limit gained no
+score and raised the close pairs by a fifth. The setting and its rule were removed on 2026-11-20. The term stays
+on as it is.
+
+## Output
+
+The kind of an output bead is anchor when the bead is under a span, in every conformation. The nodes of a
+conformation are not written to the output.
+
+## Cases
+
+| Case | Rule |
+|---|---|
+| Two anchors of one site, each with a loop to one partner | The contact beads agree when the spans are one bead. The strengths add |
+| An anchor nested in a wide anchor | Each loop end draws inside its own span. The beads of the wide span that carry no loop end are free chain |
+| A wide anchor with loops to several partners | Each loop end draws its own bead. The partners meet the anchor at several beads |
+| Two contact beads next to each other on the chain | Two nodes one bond apart, by the reach term |
+| A loop with both contact beads on one bead | Left out of the conformation |
+| An anchor at the end of a block | Its span ends the chain. No bead is added beyond it |
+| An anchor without a loop in the conformation | No node. Its beads are free chain |
+| The beads before the first node of a block and after the last | A tail. Under `start = coil` it starts as a compact walk from its node at the bond targets. Under `start = line` it continues the line of the nodes |
+| A block without a node in the conformation | Its middle bead is at the centroid of the block and the chain is two tails from it |
+
+## Measurements that decide
+
+Arms run by `slurm/ensemble/arms_trial.sh` on GM12878, H1ESC and HFFC6, five structures per arm, against production
+and against the first build.
+
+- Pooled SCC and Spearman against raw and balanced Hi-C, the distance exponent over the exponent of Hi-C.
+- Overlapping pairs. The battery counts pairs by the kind of bead and the kinds differ between the chains. The count
+  is checked against a count over all non neighbour pairs under 0.7 beads before two chains are compared.
+- Bonds in chain order: the share over 2 beads and over 3 beads.
+- Loops: realised distance over target, per conformation.
+- For the draw: the contacts of the pairs of two wide anchors in the pooled map against Hi-C at 1 kb, uniform draw
+  against midpoint.
+- For the smooth arms: the three rules on the same arcs solution.
+
+## Stages of the build
+
+1. The contact beads, the summed strengths, the reach spring, the excluded volume at the radius of a bead and the
+   contact data per pair of beads in the arcs stage. The nodes are fixed in the smooth stage. The first build is
+   removed.
+2. The bounded drift arm and the centre of mass arm of the smooth stage.
+3. The arms of the orientation term.
+
+State on 2026-11-19: stage 1 is built. The joint solve runs on the nodes with the reach spring, the excluded
+volume at the radius of a bead and the contact cells of `gnome3d/pipeline/ib/cells.py`. The nodes are the fixed
+beads of the smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first
+numbers. Stage 2 is built: bounded drift is `anchor_cap`, which the uniform chain runs as it is, and the centre of
+mass rule is a move of three beads of the numba kernel, `step_delta_nb` and `batch_mc_nb` in
+`gnome3d/mc/numba/terms.py`. The JAX kernel has it since 2026-11-22. Stage 3 was the third arm of the orientation
+term, `[motif_orientation] bond_limit`, measured and removed.
+
+### Trial of stage 1 without the contact cells
+
+`design/figures/uniform-2026-11-19/nodes/` has the figure and the table, `scores-nodes/` the score files. Commit
+28374db, the cells, regions and structures of the trial of the first build. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | exponent over Hi-C |
+|---|---|---|---|---|---|
+| default chain | 0.327 | 0.307 | 0.448 | 0.716 | 1.062 |
+| default chain, orientation off | 0.320 | 0.296 | 0.440 | 0.717 | 1.073 |
+| default chain, contact terms off | 0.327 | 0.302 | 0.446 | 0.717 | 1.047 |
+| contact beads, uniform draw | 0.319 | 0.329 | 0.444 | 0.671 | 1.042 |
+| contact beads, uniform draw, orientation off | 0.314 | 0.323 | 0.437 | 0.670 | 1.050 |
+| contact beads, midpoint | 0.332 | 0.332 | 0.453 | 0.684 | 1.053 |
+| contact beads, midpoint, orientation off | 0.332 | 0.331 | 0.446 | 0.683 | 1.065 |
+
+- The midpoint is ahead of the uniform draw on raw SCC, 0.332 against 0.319, and level on balanced SCC.
+- Both draws gain balanced SCC over the default chain, 0.02 to 0.03, and lose balanced Pearson, 0.03 to 0.05.
+- HFFC6 chr1 10 to 15 Mb falls from 0.477 to 0.32 to 0.34 of raw SCC on every contact bead arm, as on the first
+  build. See the bins without a count below.
+- The default chain without its two contact terms scores as the default chain. The missing contact cells do not
+  explain a difference between the arms.
+- The battery's overlap count is 9.8 per thousand beads on the default chain, 24.5 with the uniform draw and 15.2
+  with the midpoint. The count is still not checked between the chains.
+
+### Bins of Hi-C without a count
+
+The pooled score counts a bin of Hi-C without a count as zero and a model bead there counts against the model. The
+three rows of chr1 10 to 15 Mb have 12, 17 and 20 such bins of 200 and the rows of 20 to 25 Mb have none. The
+default chain caps a gap at 100 beads and has fewer beads in those rows: 2,597, 2,823 and 3,301 against 3,025, 3,900
+and 4,565 of the uniform chain, 16 to 38 percent more. The two rows where the contact beads lose raw SCC are the
+two with 38 percent more beads.
+
+Over the bins that Hi-C maps, mean of the six rows:
+
+| arm | SCC raw | SCC balanced | balanced stratum Spearman |
+|---|---|---|---|
+| default chain | 0.295 | 0.266 | 0.113 |
+| default chain, contact terms off | 0.294 | 0.258 | 0.129 |
+| contact beads, uniform draw | 0.290 | 0.297 | 0.149 |
+| contact beads, midpoint | 0.307 | 0.305 | 0.141 |
+
+HFFC6 chr1 10 to 15 Mb over mapped bins: raw SCC 0.392 on the default chain against 0.311 and 0.289, balanced SCC
+0.309 against 0.313 and 0.300. The loss of that row is in the raw score. The share of it that the beads of the long
+gaps carry is not measured bead by bead.
+
+### Trial of the contact cells
+
+`design/figures/uniform-2026-11-19/cells/` has the figure and the table, `scores-cells/` the score files. Commit
+00c67bd, the uniform draw unless stated, z of 3, the maps of 2.5 to 4.0 billion contacts. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | SCC raw, mapped bins | SCC balanced, mapped bins | Spearman raw | Pearson balanced | exponent over Hi-C |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.327 | 0.307 | 0.295 | 0.266 | 0.448 | 0.716 | 1.062 |
+| contact beads, no cells | 0.319 | 0.329 | 0.290 | 0.297 | 0.444 | 0.671 | 1.042 |
+| cells at 1 kb | 0.321 | 0.335 | 0.291 | 0.302 | 0.447 | 0.676 | 1.053 |
+| cells at 5 kb | 0.374 | 0.364 | 0.351 | 0.341 | 0.437 | 0.678 | 1.038 |
+| cells at 10 kb | 0.391 | 0.376 | 0.369 | 0.354 | 0.387 | 0.682 | 1.065 |
+| midpoint, no cells | 0.332 | 0.332 | 0.307 | 0.305 | 0.453 | 0.684 | 1.053 |
+| midpoint, cells at 5 kb | 0.374 | 0.361 | 0.352 | 0.336 | 0.411 | 0.667 | 1.013 |
+
+Pairs of nodes that the cells hold in one structure of chr1 10 to 15 Mb, in and out, of all pairs:
+
+| resolution | GM12878, of 29,646 | H1ESC, of 77,815 | HFFC6, of 66,066 |
+|---|---|---|---|
+| 1 kb | 168 and 52 | 54 and 47 | 76 and 33 |
+| 5 kb | 3,761 and 224 | 2,879 and 297 | 2,774 and 398 |
+| 10 kb | 7,141 and 830 | 7,131 and 1,827 | 6,943 and 2,216 |
+
+- At 1 kb few cells pass the test and the scores are those of the arm without cells.
+- At 5 kb raw SCC rises 0.055 and balanced SCC 0.035 over the arm without cells, and 0.047 and 0.057 over the default
+  chain. Spearman falls 0.007.
+- At 10 kb SCC rises a further 0.012 to 0.017 and Spearman falls 0.057 under the arm without cells.
+- The midpoint with cells at 5 kb scores as the uniform draw on SCC and 0.026 lower on Spearman.
+- Balanced Pearson stays 0.03 to 0.05 under the default chain on every contact bead arm.
+
+### Trial of the bounded drift
+
+`design/figures/uniform-2026-11-19/drift/` and `scores-drift/`. Commit 00c67bd, the uniform draw, cells at 5 kb, z of
+3. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | overlaps per thousand beads |
+|---|---|---|---|---|---|
+| nodes fixed | 0.374 | 0.364 | 0.437 | 0.678 | 21.9 |
+| drift within 0.3 beads | 0.373 | 0.365 | 0.436 | 0.678 | 21.5 |
+| drift within 0.5 beads | 0.371 | 0.365 | 0.435 | 0.678 | 20.9 |
+| drift within 1 bead | 0.372 | 0.362 | 0.434 | 0.678 | 18.3 |
+
+The drift moves no pooled score by more than 0.003. The battery's overlap count falls from 21.9 to 18.3 at one
+bead, a count that is not yet checked between the chains.
+
+### Trial of the rules
+
+`design/figures/uniform-2026-11-19/rules/` and `scores-rules/`. Commit e4577f1, the uniform draw, cells at 5 kb, z of
+3. Mean over the six rows, with the close pairs of `playground/uniform_overlap_check.py` per thousand beads:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| default chain | 0.327 | 0.307 | 0.448 | 0.716 | 10.2 | 2.6 |
+| nodes fixed | 0.374 | 0.364 | 0.437 | 0.678 | 34.0 | 6.6 |
+| orientation term off | 0.368 | 0.358 | 0.429 | 0.677 | 32.9 | 8.9 |
+| centre of mass kept | 0.386 | 0.374 | 0.439 | 0.678 | 32.7 | 4.3 |
+| bond limit 1.25 | 0.371 | 0.360 | 0.431 | 0.677 | 42.4 | 8.0 |
+| bond limit 1.5 | 0.370 | 0.360 | 0.432 | 0.679 | 40.0 | 7.4 |
+| centre of mass kept, bond limit 1.5 | 0.381 | 0.367 | 0.431 | 0.679 | 42.0 | 5.5 |
+
+- The centre of mass rule gains 0.012 of raw SCC and 0.010 of balanced SCC over the fixed node and has the fewest
+  close pairs that are not next to each other.
+- The bond limit gains nothing and raises the close pairs by a fifth.
+- Without the orientation term the scores fall by 0.006 to 0.008.
+
+### Overlaps, checked without the bead kind
+
+`playground/uniform_overlap_check.py` counts the pairs of beads closer than 0.7 model units per thousand beads, over
+every pair and over the pairs that are not next to each other in the file sorted by start. Mean of the six rows,
+five structures per arm, after the relaxation:
+
+| arm | every pair | pairs not next to each other |
+|---|---|---|
+| default chain | 10.2 | 2.6 |
+| contact beads, uniform draw | 37.6 | 10.3 |
+| contact beads, midpoint | 30.5 | 5.9 |
+| contact beads, cells at 5 kb | 34.0 | 6.6 |
+| cells at 5 kb, drift within 1 bead | 24.9 | 3.1 |
+
+- The uniform chain has three to four times the close pairs of the default chain, with and without the contact
+  cells. The count of the battery was right about the direction.
+- Most of them are two consecutive beads closer than 0.7: 7.6 per thousand on the default chain against 24 to 27.
+- On GM12878 chr1 108.5 to 111 Mb, one structure before the relaxation, 83 of 2,482 bonds are under 0.7 beads: 1 of
+  the 76 bonds between two nodes, 8 of the 155 between a node and a free bead and 74 of the 2,251 between two free
+  beads. The bonds between two nodes have a median of 1.05.
+- The short bonds are in the free chain between nodes. In the smooth stage a bond at 0.6 beads costs 0.016 and the
+  wall does not act between consecutive beads. The relaxation takes the realised bond as its target. The reading
+  of that evening, that the arcs stage gives the beads between two nodes no room, did not hold: see the trial of
+  the gyration windows below.
+- The drift within one bead lowers both counts by a third to a half.
+
+## Room for the free chain
+
+Status 2026-11-19: options, nothing built. The maintainer asked for this section before a choice.
+
+A bound on the distance of two nodes by the beads between them is wrong. The two anchors of a loop touch whatever
+the length of the chain between them, and that chain is beside them. The arcs stage is missing the volume of the
+free beads, not a distance between two nodes.
+
+Sizes. A trial region of 5 Mb has 244 to 395 nodes in a conformation and 3,000 to 4,900 beads. Chromosome 1 has
+24,000 to 31,000 anchors in the three cell lines and about 230,000 beads. At the node density of the trial regions,
+49 to 79 a megabase, it has 11,000 to 18,000 nodes. The arcs solve holds the target matrix of every pair of nodes,
+1.0 to 2.6 GB in float64, and the contact cells read two more matrices of that size.
+
+| Option | Rule | New in the solve | Cost on chromosome 1 |
+|---|---|---|---|
+| A. Blobs | A run of free beads between two nodes enters the solve as blobs of b beads. A blob excludes at the radius of gyration of the law for b beads. Consecutive nodes and blobs are within the chain between their centres | One unit per b free beads | b of 10 adds 23,000 units and the matrix grows to 9 to 13 GB. b of 50 adds 4,600 units, 2 to 4 GB |
+| B. Short gyration windows | The gyration term holds every window of four nodes or more at the radius of gyration of the law. It starts at windows of `background_range_bp`, 100 kb. It would start at a smaller window | Windows, no units | A sparse matrix of windows by nodes. Small |
+| C. Drift | A node moves within a sphere in the smooth stage, `anchor_cap` | Nothing | None. Measured: a third to a half fewer close pairs at one bead, the pooled scores to 0.003 |
+| D. Bond floor | A hard least distance of two consecutive beads in the smooth stage | Nothing | None. Not chosen by the maintainer on 2026-11-19 |
+
+Notes on each.
+
+- A states the missing volume directly and makes the arcs stage solve a coarse chain. It needs three choices: the
+  size b, the start of the free beads from the blob positions in the smooth stage, and the contact data of a blob.
+  It is the largest change.
+- B uses a term the model has. The radius of gyration of the law for a span counts every bead of the span, and
+  nodes are a sample of them at the bases of loops. For a window of few nodes the sample is biased. The term holds
+  a window at the radius of the law from both sides.
+- C acts after the cause and does not need the arcs stage.
+- A and B can both be measured against C on the trial rows by the close pairs of
+  `playground/uniform_overlap_check.py` and the pooled scores.
+
+The maintainer on 2026-11-19: B first, A when B does not work.
+
+B is `[springs] gyration_min_bp`, the smallest window of the gyration term, 0 for `background_range_bp`. On GM12878
+chr1 108.5 to 111 Mb, one structure without contact cells and without the orientation term, the bonds under 0.7
+beads before the relaxation are 72 of 2,482 at 100 kb, 103 at 10 kb, 59 at 25 kb and 49 at 50 kb. One structure
+decides nothing. The trial runs 10, 25 and 50 kb on the six rows.
+
+### Trial of the gyration windows, and the cause of the close pairs
+
+`design/figures/uniform-2026-11-19/gyr/` and `scores-gyr/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night.sh`, commit
+5f98a91, cells at 5 kb. Mean over the six rows, close pairs per thousand beads:
+
+| arm | SCC raw | SCC balanced | Spearman raw | close pairs | not next to each other |
+|---|---|---|---|---|---|
+| nodes fixed, windows from 100 kb | 0.374 | 0.364 | 0.437 | 34.0 | 6.6 |
+| windows from 50 kb | 0.362 | 0.358 | 0.440 | 33.2 | 6.6 |
+| windows from 25 kb | 0.373 | 0.363 | 0.430 | 33.4 | 6.8 |
+| windows from 10 kb | 0.369 | 0.361 | 0.411 | 38.4 | 7.4 |
+| midpoint, windows from 25 kb | 0.363 | 0.349 | 0.421 | 31.1 | 5.1 |
+| centre of mass kept, windows from 100 kb | 0.386 | 0.374 | 0.439 | 32.7 | 4.3 |
+| centre of mass kept, windows from 50 kb | 0.370 | 0.364 | 0.442 | 32.6 | 4.6 |
+| centre of mass kept, windows from 25 kb | 0.378 | 0.370 | 0.436 | 32.3 | 4.3 |
+
+B does not work. No window size lowers the close pairs and every one lowers SCC.
+
+The close pairs are not a lack of room. Measured the same night:
+
+- On the trace region the bonds under 0.7 beads are spread over the gaps of every length at 22 to 39 per thousand
+  bonds, 55 of the 72 in gaps of more than 20 bonds whose two nodes are 0.04 to 0.09 of the chain apart. They are
+  not at the crowded nodes.
+- A bond is soft. At `squeeze_constant` 0.1 a bond at 0.7 beads costs 0.009. Over the 30 structures of the trial the
+  bonds of the uniform chain have a first percentile of 0.59 and a fifth of 0.77, and 28 per thousand are under 0.7.
+- The default chain has the same tail with the orientation term off, 19 per thousand under 0.7 and a first
+  percentile of 0.63. With the term on it has 8, since the term stretches its bonds, median 1.06 and 95th percentile
+  2.41. The default chain hides its short bonds behind stretched ones.
+- With `squeeze_constant` at 1.0 the trace structure has 2 bonds under 0.7 in place of 72, median bond 1.10.
+- The smooth confinement does not act: the sphere has a radius of 20 beads and 95 percent of the beads are within
+  10.7.
+
+The close pairs that are not next to each other are the overlaps of the chain: 2.6 per thousand on the default
+chain, 6.6 with fixed nodes and 4.3 under the centre of mass rule.
+
+Option A, the blobs, is not built. The cause it answers is not the one measured. The stiffness of a bond is step 4
+of the queue of the night.
+
+### Trial of the resolution and the test of the cells
+
+`design/figures/uniform-2026-11-19/res/` and `scores-res/`, step 2 of the night, commit 5f98a91, the uniform draw, the
+centre of mass rule. Mean over the six rows. The pairs held are those of one structure of GM12878 chr1 10 to 15 Mb,
+in and out, of 29,646.
+
+| cells | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs not next to each other | pairs held |
+|---|---|---|---|---|---|---|
+| none | 0.321 | 0.326 | 0.450 | 0.673 | 7.5 | 0 |
+| 5 kb, z of 4 | 0.359 | 0.353 | 0.445 | 0.675 | 6.2 | 2,842 and 107 |
+| 2 kb, z of 3 | 0.353 | 0.353 | 0.430 | 0.671 | 7.4 | 962 and 107 |
+| 5 kb, z of 3 | 0.386 | 0.374 | 0.439 | 0.678 | 4.3 | 3,761 and 224 |
+| 5 kb, z of 2 | 0.406 | 0.394 | 0.390 | 0.667 | 3.7 | 5,528 and 852 |
+| 10 kb, z of 3 | 0.401 | 0.384 | 0.388 | 0.682 | 3.4 | 7,141 and 830 |
+| 25 kb, z of 3 | 0.415 | 0.395 | 0.401 | 0.738 | 2.1 | 13,656 and 2,343 |
+
+- SCC rises with the count of pairs that the cells hold, from 0.32 with none to 0.41 with half of all pairs.
+- Spearman falls from 0.45 to 0.39 to 0.40 once more than a fifth of the pairs are held.
+- At 25 kb balanced Pearson passes that of the default chain, 0.738 against 0.716, and the close pairs that are not
+  next to each other fall under those of the default chain, 2.1 against 2.6.
+
+The trial scores the pooled map at 25 kb against the map that the cells are read from. At 25 kb the cells are the
+scored cells. A gain there is in part the input read back. The cells need a test on counts that the run did not
+read: the map thinned into two halves, one for the cells and one for the score.
+
+### Trial of the draw and the loops
+
+`design/figures/uniform-2026-11-19/draw/` and `scores-draw/`, step 3 of the night, commit 5f98a91, cells at 5 kb, z of
+3, the centre of mass rule. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| uniform draw | 0.386 | 0.374 | 0.439 | 0.678 | 32.7 | 4.3 |
+| midpoint | 0.377 | 0.367 | 0.417 | 0.668 | 33.7 | 3.9 |
+| `loop_dropout` | 0.397 | 0.385 | 0.445 | 0.689 | 29.0 | 2.9 |
+| `loop_dropout` with `loop_contact` | 0.418 | 0.391 | 0.574 | 0.626 | 73.8 | 21.6 |
+| `arc_weight_exponent` 0.5 | 0.387 | 0.377 | 0.443 | 0.670 | 35.6 | 5.0 |
+| orientation term off | 0.379 | 0.365 | 0.433 | 0.679 | 34.6 | 6.3 |
+| orientation weight 10 | 0.382 | 0.372 | 0.435 | 0.680 | 34.9 | 4.7 |
+
+- The loop dropout gains every column: 0.011 of SCC, 0.006 of Spearman, 0.011 of balanced Pearson and a third fewer
+  close pairs that are not next to each other. A conformation then keeps a loop with a chance by its strength.
+- With the kept loops at one bead Spearman rises to 0.574, from 0.439, and raw SCC to 0.418. Balanced Pearson falls
+  to 0.626 and the close pairs rise five times. The gain and the overlaps come together.
+  These dropout arms carry the stretched tails of the section on the tails below. Their scores are not a result.
+- The midpoint is under the uniform draw on every score with the centre of mass rule.
+- The loop weight by strength changes nothing. The orientation term at 10 or off loses 0.004 to 0.009 of SCC.
+
+### Trial of the smooth stage and the relaxation
+
+`design/figures/uniform-2026-11-19/smooth/` and `scores-smooth/`, step 4 of the night, commit 5f98a91, cells at 5 kb, z
+of 3, the centre of mass rule. Mean over the six rows, with the bonds under 0.7 beads per thousand bonds:
+
+| arm | SCC raw | SCC balanced | Spearman raw | close pairs | not next to each other | bonds under 0.7 | median bond |
+|---|---|---|---|---|---|---|---|
+| as it is | 0.386 | 0.374 | 0.439 | 32.7 | 4.3 | 28.6 | 1.03 |
+| `squeeze_constant` 1.0 | 0.388 | 0.378 | 0.450 | 7.9 | 3.1 | 4.8 | 1.10 |
+| `squeeze_constant` and `stretch_constant` 1.0 | 0.376 | 0.367 | 0.432 | 22.9 | 6.8 | 16.3 | 1.02 |
+| `noise_smooth` 0.5 | 0.373 | 0.362 | 0.429 | 51.1 | 15.6 | 35.9 | 1.01 |
+| no relaxation | 0.389 | 0.375 | 0.434 | 47.9 | 28.2 | 19.9 | 1.02 |
+| no hard wall | 0.374 | 0.366 | 0.438 | 26.6 | 10.9 | 15.9 | 1.03 |
+| excluded volume at one bead | 0.337 | 0.263 | 0.421 | 45.7 | 1.8 | 45.5 | 1.02 |
+
+- A bond that resists a squeeze ten times more has 7.9 close pairs per thousand beads, under the 10.2 of the
+  default chain, and gains 0.011 of Spearman and 0.002 to 0.004 of SCC. The median bond rises from 1.03 to 1.10.
+- With the stretch as stiff as well the gain is lost.
+- The relaxation removes most of the close pairs that are not next to each other, 28.2 without it against 4.3.
+- The half step, no wall and the excluded volume at one bead all lose.
+
+`squeeze_constant` at 1.0 joins the base of the second round.
+
+### Trial of the arcs stage
+
+`design/figures/uniform-2026-11-19/arcs/` and `scores-arcs/`, step 5 of the night, commit 5f98a91, cells at 5 kb, z of
+3, the centre of mass rule. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| as it is | 0.386 | 0.374 | 0.439 | 0.678 | 32.7 | 4.3 |
+| `background_weight` 0.3 | 0.367 | 0.356 | 0.459 | 0.668 | 35.2 | 4.6 |
+| `background_weight` 1.0 | 0.375 | 0.362 | 0.442 | 0.632 | 44.5 | 7.6 |
+| `gyration_weight` 0.3 | 0.370 | 0.363 | 0.423 | 0.696 | 27.2 | 3.4 |
+| `gyration_weight` 0 | 0.352 | 0.335 | 0.467 | 0.533 | 97.4 | 27.3 |
+| arcs excluded volume at one bead | 0.376 | 0.367 | 0.434 | 0.671 | 33.7 | 3.3 |
+| `background_range_bp` 50 kb | 0.384 | 0.371 | 0.437 | 0.685 | 33.2 | 4.9 |
+
+No setting of the arcs stage beats the values of production on SCC. A stronger background spring trades 0.02 of SCC
+for 0.02 of Spearman. Without the gyration term the chain collapses: balanced Pearson 0.533 and three times the
+close pairs.
+
+### Trial on counts the run did not read, with the singletons of the deep map
+
+`design/figures/uniform-2026-11-19/heldw/` and `scores-heldw/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night2.sh`, commit
+0b653a9. The earlier trials score a run against the map its contact cells read. Here
+`playground/thin_cooler.py` splits every count of the deep map of a cell into two halves by a binomial draw. The
+halves of a Poisson count are independent. A run reads half a and is scored against half b. The base of every
+uniform arm is the centre of mass rule with `squeeze_constant` 1.0. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| default chain | 0.305 | 0.294 | 0.374 | 0.745 | 3.3 | 1.5 |
+| no cells | 0.280 | 0.314 | 0.397 | 0.717 | 1.6 | 1.0 |
+| cells at 5 kb, z of 3 | 0.317 | 0.341 | 0.368 | 0.712 | 1.8 | 0.8 |
+| cells at 5 kb, z of 2 | 0.326 | 0.340 | 0.343 | 0.720 | 1.4 | 0.2 |
+| cells at 10 kb | 0.317 | 0.328 | 0.357 | 0.738 | 1.3 | 0.3 |
+| cells at 25 kb | 0.358 | 0.370 | 0.349 | 0.764 | 1.3 | 0.2 |
+| ladder from 5 to 25 kb | 0.334 | 0.349 | 0.377 | 0.761 | 1.3 | 0.2 |
+| cells at 5 kb, `loop_dropout` | 0.362 | 0.372 | 0.407 | 0.745 | 0.7 | 0.3 |
+| ladder, `loop_dropout` | 0.358 | 0.360 | 0.399 | 0.768 | 0.5 | 0.2 |
+
+The gain of the contact cells holds on counts the run did not read: 0.04 of raw SCC at 5 kb and 0.08 at 25 kb over
+the chain without cells, against 0.07 and 0.09 on the map the run read. `loop_dropout` adds 0.045 of raw SCC and
+0.04 of Spearman at 5 kb.
+
+The round has two faults of its setup. Both were found by a check of the instrument.
+
+- The halves were balanced over the bins of the regions alone. A bin at the end of a region loses its contacts
+  beyond the region and gets a weight 20 to 40 percent above its weight in the whole map. The first score of the
+  round, `scores-held/`, has balanced SCC between 0.13 and 0.19 and is not valid. `thin_cooler.py` now gives a half
+  the weights of the whole map. The table above is the same structures against the reweighted half,
+  scored by `slurm/ensemble/rescore_trial.sh`.
+- Every run read the Hi-C singletons of half a of the deep map. Production reads another file with 20,746 contacts
+  in chr1 10 to 15 Mb of GM12878, where half a has 1.67 million. The exponent of the law is 0.386 with the deep
+  singletons and 0.344 in production. The round is a model on other inputs. Its arms compare with each other and
+  not with the earlier trials. The close pairs of the default chain fall from 10.2 to 3.3 per thousand beads with
+  these inputs, which is a result of its own: deeper singletons and a larger exponent leave the chain more room.
+
+The round was stopped in its second step. `data/figures/retired/slurm/ensemble/uniform_night3.sh` repeats it on the data of production,
+with the contact cells from half a alone.
+
+### Trial on counts the run did not read, with the inputs of production
+
+`design/figures/uniform-2026-11-19/held3/` and `scores-held3/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night3.sh`, commit
+1b62c1d. A run reads the data of production. Its contact cells alone come from half a of the deep map, and its
+score is against half b with the weights of the whole map. The default chain and the chain without cells are the
+structures of the earlier trials, scored on half the counts. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| default chain | 0.325 | 0.305 | 0.448 | 0.715 | 10.2 | 2.6 |
+| no cells | 0.331 | 0.333 | 0.456 | 0.667 | 9.6 | 6.2 |
+| cells at 5 kb | 0.366 | 0.361 | 0.459 | 0.683 | 7.8 | 4.0 |
+| cells at 10 kb | 0.378 | 0.361 | 0.437 | 0.677 | 7.6 | 2.9 |
+| cells at 25 kb | 0.423 | 0.400 | 0.403 | 0.710 | 6.8 | 1.4 |
+| ladder from 5 to 25 kb | 0.380 | 0.368 | 0.432 | 0.706 | 6.8 | 2.4 |
+| cells at 5 kb, `loop_dropout` | 0.395 | 0.380 | 0.445 | 0.677 | 5.1 | 2.4 |
+| cells at 25 kb, `loop_dropout` | 0.423 | 0.398 | 0.415 | 0.705 | 3.5 | 1.3 |
+| ladder, `loop_dropout` | 0.402 | 0.384 | 0.460 | 0.718 | 2.9 | 0.9 |
+
+The gain of the cells holds on counts the run did not read. At 5 kb it is 0.035 of raw SCC and 0.03 of balanced SCC
+over the chain without cells. On the map the run read it was 0.07 and 0.05. The cells of this trial read half the
+counts, and a part of the difference is the depth. At 25 kb the gain is 0.09 and 0.07, as on the map the run read.
+
+The same structures scored at 10 kb and at 5 kb, `scores-held3_10k/` and `scores-held3_5k/`, raw and balanced SCC:
+
+| arm | at 25 kb | at 10 kb | at 5 kb | Spearman at 5 kb |
+|---|---|---|---|---|
+| default chain | 0.325, 0.305 | 0.246, 0.216 | 0.178, 0.139 | 0.292 |
+| no cells | 0.331, 0.333 | 0.256, 0.245 | 0.191, 0.166 | 0.325 |
+| cells at 5 kb | 0.366, 0.361 | 0.293, 0.267 | 0.221, 0.182 | 0.326 |
+| cells at 10 kb | 0.378, 0.361 | 0.299, 0.264 | 0.214, 0.176 | 0.304 |
+| cells at 25 kb | 0.423, 0.400 | 0.300, 0.264 | 0.215, 0.177 | 0.302 |
+| ladder from 5 to 25 kb | 0.380, 0.368 | 0.293, 0.264 | 0.220, 0.176 | 0.319 |
+| cells at 5 kb, `loop_dropout` | 0.395, 0.380 | 0.299, 0.267 | 0.218, 0.181 | 0.327 |
+| cells at 25 kb, `loop_dropout` | 0.423, 0.398 | 0.300, 0.265 | 0.211, 0.176 | 0.313 |
+| ladder, `loop_dropout` | 0.402, 0.384 | 0.304, 0.266 | 0.222, 0.178 | 0.335 |
+
+The lead of the cells at 25 kb exists in the score at 25 kb alone. At 10 kb every resolution of the cells scores
+within 0.007, and at 5 kb the cells at 5 kb lead by 0.006 with the higher Spearman. A cell of 25 kb fits the bin of
+the score at 25 kb. It does not place the beads inside the bin better. The uniform chain is ahead of the default
+chain at every resolution of the score, with and without cells. Five structures make a sparse pooled map at 5 kb.
+The larger trial has twenty.
+
+### Stretched tails, found under the loop dropout
+
+The trials with `loop_dropout` have a radius of gyration of 18 to 65 on chr1 10 to 15 Mb, where the other arms have 8
+to 12. `playground/uniform_stretch_check.py` counts the structures with a piece far from the rest. On HFFC6 chr1
+10 to 15 Mb three structures of five have a bond of 210 to 280 beads across the gap of 355 kb at 13.24 Mb, with
+480 to 1270 beads far from the rest. A run on a laptop without contact cells gives the same three structures.
+
+The cause is the start of the chain in `spans.start_chain`. The beads beyond the last node of a block continued the
+line of the nodes at one bond per bead, and a block without a node was one straight line. Without the dropout
+every anchor with a loop has a node and a tail is short. With the dropout a block loses nodes. A tail of 480 beads
+is then a line 480 bonds long, and a block of 1270 beads whose loops are all dropped is a line through its
+centroid. The smooth stage does not coil a line of that length within its budget. The pooled scores do not show
+it: a piece far from the rest makes no contact, and the bins of the gap have no count.
+
+`start.coil_start` now starts a tail as a walk from its node at the bond targets. Each bead takes the clear
+candidate of twenty draws nearest the node. A chain without a node is two tails from its middle bead. The draws
+of the tails follow the draws of every gap. The default chain has an anchor at both ends and draws nothing new.
+The byte exactness gate is identical for it.
+
+| HFFC6 chr1 10 to 15 Mb, five structures, no cells | radius of gyration in bonds | bonds over ten per structure | structures with a stretched piece |
+|---|---|---|---|
+| no dropout | 7.2 | 0.8 | 0 of 5 |
+| dropout, tails on a line | 54.3 | 11.2 | 4 of 5 |
+| dropout, tails on a coil | 6.9 | 1.0 | 0 of 5 |
+
+The check over the thirty structures of every arm of the earlier trials, six rows of five:
+
+| arm | radius of gyration in bonds | bonds over ten per structure | structures with a stretched piece |
+|---|---|---|---|
+| default chain | 9.2 | 0.4 | 0 of 30 |
+| no cells | 9.3 | 0.6 | 0 of 30 |
+| cells at 5 kb | 9.5 | 0.6 | 0 of 30 |
+| cells at 25 kb | 9.9 | 0.4 | 0 of 30 |
+| ladder from 5 to 25 kb | 9.7 | 0.5 | 0 of 30 |
+| cells at 5 kb, `loop_dropout` | 19.9 | 2.9 | 11 of 30 |
+| cells at 25 kb, `loop_dropout` | 20.1 | 2.7 | 10 of 30 |
+| ladder, `loop_dropout` | 20.3 | 2.8 | 11 of 30 |
+| `loop_dropout` of the trial of the draw | 20.8 | 3.1 | 11 of 30 |
+| `loop_dropout` with `loop_contact` of the trial of the draw | 19.6 | 2.9 | 13 of 30 |
+
+No arm without the dropout has a stretched piece, in these trials and in the trials of the rules, the smooth stage
+and the arcs stage. Their scores stand. A third of the structures of every arm with `loop_dropout` has one, and
+the scores of those arms are not a result. The arms run again in `data/figures/retired/slurm/ensemble/uniform_night4.sh`, which also
+keeps the stretch check of every step.
+
+### Trial of the loop dropout with the tails on a coil
+
+`design/figures/uniform-2026-11-19/tail/` and `scores-tail/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night4.sh`, commit
+f5ec43a. The inputs are those of the trial above: the data of production, the contact cells from half a, the score
+against half b. The default chain and the chain without cells are the structures of the earlier trials. Mean over
+the six rows, thirty structures per arm:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other | radius of gyration in bonds | structures with a stretched piece |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.325 | 0.305 | 0.448 | 0.715 | 10.2 | 2.6 | 9.2 | 0 of 30 |
+| default chain, `loop_dropout` | 0.322 | 0.294 | 0.428 | 0.701 | 10.3 | 2.9 | 9.1 | 0 of 30 |
+| no cells | 0.331 | 0.333 | 0.456 | 0.667 | 9.6 | 6.2 | 9.3 | 0 of 30 |
+| no cells, `loop_dropout` | 0.363 | 0.365 | 0.439 | 0.674 | 5.3 | 2.7 | 9.2 | 0 of 30 |
+| cells at 5 kb | 0.367 | 0.363 | 0.461 | 0.684 | 7.7 | 4.0 | 9.5 | 0 of 30 |
+| cells at 5 kb, `loop_dropout` | 0.388 | 0.384 | 0.442 | 0.669 | 5.5 | 2.6 | 9.1 | 0 of 30 |
+| ladder from 5 to 25 kb | 0.375 | 0.364 | 0.432 | 0.706 | 7.0 | 2.6 | 9.7 | 0 of 30 |
+| ladder, `loop_dropout` | 0.402 | 0.389 | 0.460 | 0.712 | 3.1 | 1.0 | 9.6 | 0 of 30 |
+| cells at 25 kb, `loop_dropout` | 0.424 | 0.405 | 0.419 | 0.701 | 3.4 | 1.3 | 9.6 | 0 of 30 |
+
+No structure has a stretched piece. The radius of gyration of every arm with the dropout is that of its arm
+without it.
+
+In the score at 25 kb the gain of the dropout on the uniform chain stands with the tails on a coil. It is 0.02 to
+0.03 of SCC with the cells and 0.03 without them. The scores of the stretched structures were within 0.007 of
+these: a piece far from the rest makes no contact and takes no part in the score. The dropout does not gain on the
+default chain. The cause of that difference is not traced.
+
+The same structures scored at 10 kb and at 5 kb, `scores-tail_10k/` and `scores-tail_5k/`, raw and balanced SCC:
+
+| arm | at 25 kb | at 10 kb | at 5 kb | Spearman at 5 kb |
+|---|---|---|---|---|
+| default chain | 0.325, 0.305 | 0.246, 0.216 | 0.178, 0.139 | 0.292 |
+| default chain, `loop_dropout` | 0.322, 0.294 | 0.237, 0.202 | 0.171, 0.130 | 0.280 |
+| no cells | 0.331, 0.333 | 0.256, 0.245 | 0.191, 0.166 | 0.325 |
+| no cells, `loop_dropout` | 0.363, 0.365 | 0.272, 0.253 | 0.198, 0.171 | 0.327 |
+| cells at 5 kb | 0.367, 0.363 | 0.294, 0.267 | 0.221, 0.183 | 0.326 |
+| cells at 5 kb, `loop_dropout` | 0.388, 0.384 | 0.295, 0.271 | 0.216, 0.182 | 0.326 |
+| ladder from 5 to 25 kb | 0.375, 0.364 | 0.291, 0.260 | 0.220, 0.176 | 0.319 |
+| ladder, `loop_dropout` | 0.402, 0.389 | 0.304, 0.269 | 0.221, 0.179 | 0.335 |
+| cells at 25 kb, `loop_dropout` | 0.424, 0.405 | 0.297, 0.266 | 0.208, 0.176 | 0.314 |
+
+With the cells, the gain of the dropout exists in the score at 25 kb alone. At 10 kb it is 0.001 to 0.013 and at
+5 kb the arms tie. Without the cells it is 0.016 at 10 kb and 0.007 at 5 kb. The close pairs are the measure the
+dropout moves at every resolution: from 7.7 to 5.5 per thousand beads with the cells at 5 kb, from 7.0 to 3.1 with
+the ladder and from 9.6 to 5.3 without cells. The default chain with the dropout is behind the default chain at
+every resolution of the score. Five structures make a sparse pooled map at 5 kb. Step 2 has twenty.
+
+### The larger trial on counts the run did not read
+
+`design/figures/uniform-2026-11-19/large4/` and `scores-large4/`, with `scores-large4_10k/` and `scores-large4_5k/`,
+step 2 of `data/figures/retired/slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Three cells, six regions of 5 Mb of chr1, twenty
+structures per arm. No structure of 360 per arm has a stretched piece. Mean over the eighteen rows, raw and
+balanced SCC and raw Spearman:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.316, 0.277 | 0.250, 0.196 | 0.190, 0.128 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 |
+| cells at 5 kb | 0.341, 0.349 | 0.299, 0.263 | 0.241, 0.186 | 0.487, 0.462, 0.429 | 0.638 | 10.7 | 5.9 |
+| cells at 5 kb, `loop_dropout` | 0.386, 0.387 | 0.323, 0.285 | 0.249, 0.198 | 0.461, 0.455, 0.433 | 0.634 | 6.8 | 3.5 |
+| ladder, `loop_dropout` | 0.395, 0.387 | 0.330, 0.282 | 0.253, 0.195 | 0.456, 0.451, 0.436 | 0.670 | 4.5 | 1.8 |
+
+- Balanced SCC at 25 kb is above the default chain on 17 rows of 18 for the cells at 5 kb, raw SCC on 11.
+- The dropout raises raw SCC at 25 kb on 18 rows of 18 and balanced SCC on 17. With twenty structures its gain
+  also shows at 10 kb, 0.02, and at 5 kb, 0.01.
+- Raw Spearman and balanced Pearson at 25 kb are higher for the default chain. Spearman is higher on 12 rows of 18
+  against the cells at 5 kb. At 10 kb the Spearman of the arms ties and at 5 kb the uniform chain is ahead.
+
+### Check of the pooled score
+
+`playground/pooled_score_check.py`, on three rows of the larger trial, the default chain against the cells at 5 kb.
+The pooled map counts the bead pairs within the contact radius and adds each to the bins of its two bead starts.
+
+The beads of a bin. A bin of 25 kb of the uniform chain holds 25 beads. A bin of the default chain holds 0 to 64,
+with a median of 23 to 25. The count of a cell grows with the product of the bead counts of its two bins. The bead
+count of the default chain correlates with the raw coverage of Hi-C at 0.49, 0.09 and 0.36 on the three rows.
+
+| row | arm | raw SCC | raw SCC per bead pair | raw SCC of the bead counts alone | Spearman | Spearman per bead pair | Spearman of the decay alone |
+|---|---|---|---|---|---|---|---|
+| GM12878 200 to 205 Mb | default chain | 0.437 | 0.208 | 0.455 | 0.595 | 0.592 | 0.849 |
+| | cells at 5 kb | 0.382 | 0.382 | 0.171 | 0.450 | 0.449 | 0.699 |
+| GM12878 20 to 25 Mb | default chain | 0.193 | 0.178 | 0.107 | 0.550 | 0.552 | 0.727 |
+| | cells at 5 kb | 0.330 | 0.345 | -0.028 | 0.396 | 0.394 | 0.535 |
+| HFFC6 200 to 205 Mb | default chain | 0.308 | 0.232 | 0.190 | 0.600 | 0.600 | 0.799 |
+| | cells at 5 kb | 0.424 | 0.412 | 0.082 | 0.622 | 0.622 | 0.826 |
+
+Per bead pair is the pooled map over the product of the bead counts. The bead counts alone is that product times
+the mean of each diagonal, a map without a 3D position. The decay alone is the mean of each diagonal of the pooled
+map.
+
+- Raw SCC favours the default chain through its bead counts. On GM12878 200 to 205 Mb a map of the bead counts
+  alone scores 0.455, above the 0.437 of the structures, and the score per bead pair is 0.208. The scores of the
+  uniform chain do not move. The lead of the uniform chain in raw SCC is larger than the tables show.
+- Spearman does not depend on the bead counts. It is set by the decay: the decay alone scores above the map of
+  the structures on every row, and the difference of the two arms in Spearman, 0.145, 0.154 and -0.022, is the
+  difference of their decays alone, 0.150, 0.192 and -0.027.
+- The decay of the uniform chain is not monotone on the GM12878 rows. At 4 Mb the mean count is 0.0175 of the
+  count at 25 kb, above the 0.0076 at 2 Mb. Hi-C has 0.0030 and the default chain 0.0005. The rise is also in
+  the arms without cells.
+- Per structure on GM12878 200 to 205 Mb, the bead pairs in contact over 3.5 Mb are 0 to 496 on the default
+  chain and 0 to 6250 on the uniform chain, over 600 in 7 structures of 20. Those structures have a radius of
+  gyration of 6.7 to 7.8 bonds against 8.0 to 8.7 of the default chain, and 1 Mb at each end of the region
+  shares its space with the other. The cause is not traced.
+
+The larger trial scored again with the SCC per bead pair, `scores-large4p/`, `scores-large4p_10k/` and
+`scores-large4p_5k/`. `playground/ensemble_score.py` prints it in its last two columns. Mean over the eighteen
+rows:
+
+| arm | raw SCC at 25 kb | per bead pair | balanced SCC at 25 kb | per bead pair | raw SCC at 10 kb | per bead pair | raw SCC at 5 kb | per bead pair |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.316 | 0.204 | 0.277 | 0.268 | 0.250 | 0.181 | 0.190 | 0.133 |
+| cells at 5 kb | 0.341 | 0.337 | 0.349 | 0.345 | 0.299 | 0.298 | 0.241 | 0.240 |
+| cells at 5 kb, `loop_dropout` | 0.386 | 0.381 | 0.387 | 0.382 | 0.323 | 0.322 | 0.249 | 0.249 |
+| ladder, `loop_dropout` | 0.395 | 0.390 | 0.387 | 0.383 | 0.330 | 0.329 | 0.253 | 0.253 |
+
+A third of the raw SCC of the default chain at 25 kb is the bead counts of its bins. The difference per row is
+-0.07 to 0.29. Balanced SCC moves by 0.009: the balancing takes the coverage out of Hi-C. Per bead pair the cells
+at 5 kb are above the default chain in raw SCC on 18 rows of 18 at every resolution and in balanced SCC on 15
+or 16. Every raw SCC of the default chain in an earlier comparison, the comparison of the tools among them,
+holds this share. Those are not scored again.
+
+### The resolution of the contact cells on the larger trial
+
+`design/figures/uniform-2026-11-19/res20p/` and `scores-res20p/`, with `scores-res20p_10k/` and
+`scores-res20p_5k/`. Step 1 of `data/figures/retired/slurm/ensemble/uniform_night5.sh` adds the ladder alone and the cells at 25 kb to
+the larger trial, commit f5ec43a. Eighteen rows of twenty structures, raw and balanced SCC per bead pair and raw
+Spearman. The ends overlap in a structure with more than 300 bead pairs between its end megabases:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.127 | 0.532, 0.463, 0.401 | 11.5 | 3.5 | 12 of 360 |
+| cells at 5 kb | 0.337, 0.345 | 0.298, 0.263 | 0.240, 0.185 | 0.487, 0.462, 0.429 | 10.7 | 5.9 | 90 of 360 |
+| ladder from 5 to 25 kb | 0.343, 0.338 | 0.303, 0.252 | 0.242, 0.176 | 0.442, 0.428, 0.412 | 8.7 | 3.4 | 71 of 360 |
+| cells at 25 kb | 0.385, 0.373 | 0.303, 0.258 | 0.230, 0.175 | 0.395, 0.382, 0.376 | 8.2 | 2.4 | 66 of 360 |
+| cells at 5 kb, `loop_dropout` | 0.381, 0.382 | 0.322, 0.284 | 0.249, 0.197 | 0.461, 0.455, 0.433 | 6.8 | 3.5 | 117 of 360 |
+| ladder, `loop_dropout` | 0.390, 0.383 | 0.329, 0.281 | 0.253, 0.195 | 0.456, 0.451, 0.436 | 4.5 | 1.8 | 77 of 360 |
+
+- The cells at 25 kb lead in the score at 25 kb alone, on 18 rows of 18 over the cells at 5 kb. At 10 kb the three
+  resolutions are within 0.005 of raw SCC, and at 5 kb the cells at 25 kb are behind on 14 rows of 18. Their
+  Spearman is the lowest at every resolution.
+- The ladder and the cells at 5 kb tie. The ladder is ahead in raw SCC on 9 to 11 rows of 18 and behind in
+  balanced SCC and in Spearman. It has a fifth fewer close pairs.
+- The dropout gains 0.01 to 0.04 of SCC at every resolution under either rule of the cells.
+- The ends overlap in a fifth to a third of the structures of every arm of the uniform chain and in 3 percent of
+  the default chain. Every arm of this table has the radius of a bead in the arcs excluded volume.
+
+### Trial of the loops, the bonds and the node rule on the base
+
+`design/figures/uniform-2026-11-19/combo4p/` and `scores-combo4p/`, with `scores-combo4p_10k/` and
+`scores-combo4p_5k/`, step 3 of `data/figures/retired/slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Every arm has the cells at
+5 kb and `loop_dropout`, six rows of five structures. Raw and balanced SCC per bead pair, raw Spearman at 25 kb,
+the close pairs, and the structures with more than 300 bead pairs between the end megabases,
+`playground/uniform_ends_check.py`:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.290, 0.304 | 0.223, 0.213 | 0.152, 0.138 | 0.448 | 10.2 | 2.6 | 1 of 30 |
+| cells at 5 kb, no dropout | 0.362, 0.359 | 0.291, 0.264 | 0.220, 0.182 | 0.461 | 7.7 | 4.0 | 4 of 30 |
+| the base with dropout | 0.382, 0.378 | 0.293, 0.268 | 0.215, 0.181 | 0.442 | 5.5 | 2.6 | 9 of 30 |
+| nodes fixed | 0.377, 0.372 | 0.289, 0.263 | 0.213, 0.178 | 0.440 | 6.0 | 3.1 | 10 of 30 |
+| `squeeze_constant` 0.3 | 0.385, 0.374 | 0.294, 0.265 | 0.213, 0.177 | 0.439 | 11.0 | 2.5 | 8 of 30 |
+| `squeeze_constant` 3.0 | 0.385, 0.379 | 0.296, 0.271 | 0.217, 0.183 | 0.444 | 4.2 | 2.6 | 8 of 30 |
+| `loop_dropout_scale` 0.5 | 0.379, 0.370 | 0.298, 0.269 | 0.219, 0.180 | 0.456 | 5.5 | 2.7 | 7 of 30 |
+| `loop_dropout_scale` 2.0 | 0.378, 0.366 | 0.287, 0.257 | 0.206, 0.171 | 0.455 | 3.9 | 1.5 | 9 of 30 |
+| dropout with `loop_contact` | 0.399, 0.379 | 0.300, 0.274 | 0.211, 0.180 | 0.582 | 35.1 | 26.9 | 2 of 30 |
+
+- The centre of mass rule is ahead of the fixed node by 0.002 to 0.006 of SCC at every resolution, with fewer
+  close pairs. The maintainer's choice of the base stands.
+- `squeeze_constant` 0.3 doubles the close pairs at the same scores. 3.0 has a quarter fewer close pairs than 1.0
+  and scores within 0.003.
+- The scale of the dropout moves no score by more than 0.01. At 2.0 the close pairs fall and the scores at 10 and
+  5 kb fall with them.
+- `loop_contact` raises Spearman by 0.14 at 25 kb and has six times the close pairs. It has the ends overlap
+  in 2 structures of 30.
+- The dropout doubles the structures with overlapping ends, from 4 to 9 of 30. A dropped loop leaves fewer nodes
+  for the excluded volume of the arcs stage. Its lower Spearman follows the overlap, as in the section below.
+
+### The ends of a region share their space: the excluded volume radius of the arcs stage
+
+A trace on a laptop with the config of the trial, `slurm/ensemble/gm12878_xc_R.ini`, without contact cells, one
+seed per structure and the same seeds in every arm. The distance is between the centroids of the first and the last
+megabase of the region, in bonds. The pairs are the bead pairs of the two megabases within the contact radius.
+
+| GM12878 chr1 200 to 205 Mb, 16 structures | radius of the arcs excluded volume | mean distance after arcs | smallest distance in the output | most pairs | structures over 300 pairs | Rg of the output |
+|---|---|---|---|---|---|---|
+| default chain | 2.67 | 12.0 | 6.5 | 731 | 3 of 16 | 8.37 |
+| uniform chain | 0.70 | 12.5 | 4.6 | 3021 | 6 of 16 | 7.73 |
+| uniform chain, `radius_arcs` 3.0 | 3.00 | 14.3 | 9.0 | 251 | 0 of 16 | 8.34 |
+
+On GM12878 chr1 10 to 15 Mb, eight structures, the smallest distance after arcs is 7.5 on the default chain, 5.5 on
+the uniform chain and 7.1 at a radius of 3.0, with at most 216, 910 and 376 pairs.
+
+- The arcs stage places the megabases. The distance after arcs and the distance in the output correlate at 0.92
+  to 0.97 in every arm. The smooth stage and the relaxation do not move a megabase.
+- A node of the uniform chain excludes at the radius of a bead of the smooth stage, 0.7 of a bond, by the
+  decision of 2026-11-19. An anchor of the default chain excludes at `auto_factor_arcs` times the mean target
+  distance, 2.6 to 3.1 bonds. With `arcs_repulsion` off the excluded volume and the gyration term are all that
+  hold two nodes without a loop and beyond 100 kb apart. At the radius of a bead the nodes of two megabases pass
+  through each other.
+- At a radius of 3.0 no structure of 16 has the overlap and the radius of gyration of the output is that of the
+  default chain. At the radius of a bead the output is 7 percent smaller than its nodes.
+- The trial of the arcs stage had `radius_arcs` 1 as an arm and scored it by SCC, which does not read the largest
+  separations.
+
+A node stands for the chain around it, and that chain needs room that a radius of one bead does not keep. A
+radius of 3.0 on every pair also asks two nodes with one bond of chain between them to be 3 bonds apart, against
+the reach term. The rule of the radius is open. `data/figures/retired/slurm/ensemble/uniform_night6.sh` measures the radius of 3.0 on
+the larger trial, with and without `loop_dropout`, and `playground/uniform_ends_check.py` counts the overlap of
+the ends for every arm.
+
+### Trial of the radius of the arcs excluded volume
+
+`design/figures/uniform-2026-11-19/ev20q/` and `scores-ev20q/`, with `scores-ev20q_10k/` and `scores-ev20q_5k/`,
+step 1 of `data/figures/retired/slurm/ensemble/uniform_night6.sh`, commit f5ec43a. The cells at 5 kb with `[excluded_volume]
+radius_arcs` 3.0, with and without `loop_dropout`, beside the same arms at the radius of a bead. Eighteen rows of
+twenty structures, raw and balanced SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.127 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 | 12 of 360 |
+| cells at 5 kb | 0.337, 0.345 | 0.298, 0.263 | 0.240, 0.185 | 0.487, 0.462, 0.429 | 0.638 | 10.7 | 5.9 | 90 of 360 |
+| cells at 5 kb, radius 3.0 | 0.313, 0.335 | 0.278, 0.255 | 0.226, 0.181 | 0.547, 0.485, 0.434 | 0.695 | 3.2 | 0.6 | 14 of 360 |
+| cells at 5 kb, `loop_dropout` | 0.381, 0.382 | 0.322, 0.284 | 0.249, 0.197 | 0.461, 0.455, 0.433 | 0.634 | 6.8 | 3.5 | 117 of 360 |
+| cells at 5 kb, `loop_dropout`, radius 3.0 | 0.353, 0.367 | 0.303, 0.274 | 0.236, 0.190 | 0.537, 0.494, 0.450 | 0.688 | 2.3 | 0.5 | 34 of 360 |
+
+No structure of 360 per arm has a stretched piece, and the radius of gyration is 9.4 bonds at a radius of 3.0
+against 9.1.
+
+The battery per structure over the eight arms of the larger trial is in `all20p/` and `scores-all20p/`. The
+exponent of the decay over that of Hi-C is 1.044 on the default chain, 1.004 with the cells at 5 kb, 1.018 with
+the radius of 3.0, 1.04 with the dropout at either radius and 1.11 to 1.12 with the ladder and with the cells at
+25 kb.
+
+- The radius of 3.0 takes the overlap of the ends from 90 structures of 360 to 14, the count of the default
+  chain. Spearman at 25 kb rises from 0.487 to 0.547, above the default chain, and it is above the default chain
+  at every resolution. Balanced Pearson rises from 0.638 to 0.695.
+- The close pairs fall from 10.7 to 3.2 per thousand beads and those not next to each other from 5.9 to 0.6, a
+  sixth of the default chain.
+- SCC falls by 0.02 of raw and 0.01 of balanced at 25 kb and by 0.02 and 0.01 at 10 kb. The arm at 3.0 is above
+  the arm at the radius of a bead in raw SCC on 4 rows of 18. It stays above the default chain on 17.
+- With the radius of 3.0 the dropout still gains 0.04 and 0.03 of SCC at 25 kb and has the ends overlap in 34
+  structures of 360 against 14.
+
+The radius of 3.0 on every pair is the test. It pushes apart two nodes with little chain between them, which is
+the likely cost in SCC. The rule of the radius is the maintainer's decision.
+
+### The loop dropout and the overlap of the ends
+
+With `loop_dropout` the ends of a region overlap in more structures, 34 of 360 against 14 at a radius of 3.0 and
+117 against 90 at the radius of a bead. Over the 360 structures of each arm on the larger trial the two end
+megabases are 1.0 bond closer with the dropout, 12.61 against 13.65 at a radius of 3.0 with a standard error of
+0.17, and the radius of gyration of a megabase is the same, 5.28 against 5.26.
+
+Four causes were tested and are not the cause.
+
+- Chain without a node. At a radius of 3.0 the beads of one end in contact with the other end are as far from
+  their nearest node as every bead of the end megabases, a median of 13 to 15 kb.
+- The megabases. Their radius of gyration does not change.
+- The start. The maximum entropy draw realises its targets at a median of 1.000 without the dropout and 1.001
+  with it, and the end megabases are 16.5 and 16.9 bonds apart at the start.
+- The gyration term. With `gyration_weight` 0 the radius of gyration of the region moves by 0.02 without the
+  dropout and by 0.09 with it.
+
+The cause is the excluded volume of the arcs stage. A trace that stops after the joint solve, 120 solves per arm
+on GM12878 chr1 20 to 25 Mb, without contact cells:
+
+| arm | nodes | radius of the excluded volume | end megabases apart after the solve | radius of gyration of the region |
+|---|---|---|---|---|
+| no dropout | 465 | 3.0 | 13.40 ± 0.24 | 8.44 ± 0.02 |
+| dropout | 320 | 3.0 | 12.93 ± 0.27 | 8.30 ± 0.02 |
+| dropout | 320 | 3.4 | 13.19 ± 0.25 | 8.36 ± 0.02 |
+| dropout | 320 | 3.8 | 13.66 ± 0.25 | 8.47 ± 0.02 |
+
+The solve packs the region from a radius of gyration of 9.0 at the start to 8.4. The excluded volume pushes out
+with every pair of nodes inside the radius, and the count of such pairs grows with the square of the number of
+nodes. The dropout leaves 320 nodes of 465 and the region packs 1.7 percent tighter. The megabases keep their size
+and are closer to each other. A radius larger by the ratio of the nodes to the power two thirds, 3.85, gives the
+size without the dropout back.
+
+The push of the excluded volume of the arcs stage depends on the number of nodes of the conformation. A node that
+stands for more chain after the dropout excludes no more than before.
+
+A larger weight of the term is the weaker lever. The same trace with the dropout at a radius of 3.0:
+
+| weight of the excluded volume | end megabases apart after the solve | radius of gyration of the region |
+|---|---|---|
+| 0.1, production | 12.93 ± 0.27 | 8.30 ± 0.02 |
+| 0.146, times the ratio of the nodes | 13.10 ± 0.27 | 8.33 ± 0.02 |
+| 0.211, times the square of the ratio | 13.33 ± 0.27 | 8.37 ± 0.02 |
+
+The square of the ratio of the nodes gives the count of the pairs without the dropout back and restores half of
+the size, 8.37 of 8.44. The radius at the ratio to the power two thirds restores all of it.
+
+#### Proposal: the radius of a node from its chain
+
+Built on 2026-11-21 as `[excluded_volume] arcs_chain_radius`, off, with this form as `product` and the mean of
+the two factors as `sum`. The trial is under "Trial of the radius under the chosen config".
+
+A node stands for the chain to the midpoints of its two neighbours, `c` beads. The volume a pair excludes grows
+with the cube of its radius. The sum over the pairs keeps its value under a change of the node count when the
+radius of a pair is `R * (c_i * c_j / c0^2) ^ (1/3)`, with `R` the radius of the arcs stage and `c0` the mean
+chain of a node of the conformation before the dropout. Without the dropout the mean of the factor is near 1.
+With it the 320 nodes of the trace get a mean radius of 3.85, the value that restored the size. A node beside
+a long stretch without a loop excludes more than a node in a dense run of loops. The cap by the chain of
+`arcs_cap` stays on top of it. The rule needs a radius per pair in the kernel of the solver and in its JAX
+twin, where the radius is one number now.
+
+### Trial of the threshold of the contact cells
+
+`design/figures/uniform-2026-11-19/z20p/` and `scores-z20p/`, with `scores-z20p_10k/` and `scores-z20p_5k/`,
+`data/figures/retired/slurm/ensemble/uniform_night8.sh`, commit f5ec43a. The cells at 5 kb with `contact_background_z` 2 beside the
+same arms at 3, at the radius of a bead and at `[excluded_volume] radius_arcs` 3.0. Eighteen rows of twenty
+structures, raw and balanced SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.126 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 | 12 of 360 |
+| z 3 | 0.337, 0.345 | 0.298, 0.263 | 0.240, 0.185 | 0.487, 0.462, 0.429 | 0.638 | 10.7 | 5.9 | 90 of 360 |
+| z 2 | 0.363, 0.363 | 0.315, 0.271 | 0.250, 0.189 | 0.429, 0.407, 0.381 | 0.606 | 10.1 | 5.0 | 83 of 360 |
+| z 3, radius 3.0 | 0.313, 0.335 | 0.278, 0.255 | 0.226, 0.181 | 0.547, 0.485, 0.434 | 0.695 | 3.2 | 0.6 | 14 of 360 |
+| z 2, radius 3.0 | 0.346, 0.362 | 0.302, 0.272 | 0.241, 0.188 | 0.512, 0.459, 0.416 | 0.689 | 3.4 | 0.5 | 16 of 360 |
+
+No structure of 360 per arm has a stretched piece.
+
+- At a radius of 3.0 the threshold of 2 gains 0.03 of raw and 0.03 of balanced SCC at 25 kb, 0.02 and 0.02 at
+  10 kb and 0.015 and 0.01 at 5 kb. It is above the threshold of 3 in raw SCC on 17 rows of 18 at 25 kb, 18 at
+  10 kb and 17 at 5 kb.
+- The gain costs Spearman, 0.512 against 0.547 at 25 kb, 0.459 against 0.485 at 10 kb and 0.416 against 0.434
+  at 5 kb. At 25 kb the arm is below the default chain, 0.532. Balanced Pearson is 0.689 against 0.695.
+- The close pairs and the overlap of the ends do not change with the threshold.
+- At the radius of a bead the threshold of 2 has the lowest Spearman of the trial, 0.429.
+
+The threshold of 2 with the radius of 3.0 has the SCC of the threshold of 3 at the radius of a bead, with the
+close pairs and the ends of the radius of 3.0. It is a comparison of the sweep of `uniform_sweep8.sh`.
+
+### Sweep at eight structures per arm
+
+`design/figures/uniform-2026-11-19/sweep8a/` and `scores-sweep8a/`, with `scores-sweep8a_10k/` and
+`scores-sweep8a_5k/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_sweep8.sh`, commit 5636a87. The eighteen rows of the larger
+trial with eight structures per arm, the cells at 5 kb on counts the run does not read. The first five arms are
+the first eight structures of the arms of the larger trial, built at commit f5ec43a. A pooled map of eight
+structures scores lower than one of twenty, and the arms compare within this table alone. Raw and balanced SCC
+per bead pair, with the rows of 18 above the cells at 5 kb with a radius of 3.0 in raw SCC at 25 kb:
+
+| arm | SCC at 25 kb | rows above | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.191, 0.247 | 0 | 0.161, 0.169 | 0.112, 0.105 | 0.502, 0.407, 0.335 | 0.723 | 11.2 | 3.5 | 6 of 144 |
+| radius of a bead | 0.318, 0.324 | 15 | 0.269, 0.235 | 0.205, 0.157 | 0.501, 0.436, 0.374 | 0.671 | 10.1 | 5.5 | 34 of 144 |
+| radius 3.0 | 0.289, 0.311 | | 0.247, 0.225 | 0.190, 0.151 | 0.517, 0.433, 0.366 | 0.715 | 3.2 | 0.6 | 9 of 144 |
+| radius 3.0, `loop_dropout` | 0.326, 0.336 | 16 | 0.263, 0.235 | 0.191, 0.151 | 0.518, 0.447, 0.381 | 0.714 | 2.2 | 0.5 | 13 of 144 |
+| radius 3.0, z 2 | 0.325, 0.341 | 16 | 0.270, 0.243 | 0.203, 0.157 | 0.502, 0.421, 0.359 | 0.717 | 3.4 | 0.5 | 4 of 144 |
+| radius 3.0, cap by the target | 0.298, 0.315 | 12 | 0.257, 0.228 | 0.198, 0.151 | 0.516, 0.433, 0.367 | 0.715 | 4.5 | 0.6 | 9 of 144 |
+| radius 3.0, cap by the chain | 0.292, 0.311 | 10 | 0.248, 0.227 | 0.190, 0.151 | 0.516, 0.433, 0.367 | 0.714 | 3.3 | 0.6 | 9 of 144 |
+| derived radius | 0.295, 0.312 | 13 | 0.249, 0.226 | 0.191, 0.149 | 0.518, 0.436, 0.368 | 0.713 | 3.7 | 0.8 | 9 of 144 |
+| derived radius, cap by the target | 0.303, 0.319 | 14 | 0.259, 0.229 | 0.200, 0.150 | 0.524, 0.438, 0.370 | 0.713 | 4.8 | 0.8 | 7 of 144 |
+| radius 3.0, cap by the target, `loop_dropout` | 0.333, 0.344 | 18 | 0.272, 0.239 | 0.199, 0.155 | 0.517, 0.448, 0.383 | 0.716 | 2.6 | 0.6 | 14 of 144 |
+| radius 2.0 | 0.316, 0.324 | 16 | 0.264, 0.232 | 0.201, 0.154 | 0.525, 0.447, 0.378 | 0.692 | 5.2 | 1.2 | 19 of 144 |
+| radius 3.0, ladder to 25 kb | 0.326, 0.330 | 16 | 0.270, 0.232 | 0.203, 0.151 | 0.515, 0.442, 0.380 | 0.749 | 4.3 | 0.5 | 2 of 144 |
+| radius 3.0, `background_weight` 0.3 | 0.298, 0.317 | 13 | 0.256, 0.228 | 0.198, 0.151 | 0.523, 0.439, 0.370 | 0.709 | 3.8 | 0.9 | 13 of 144 |
+
+No structure has a stretched piece. The radius of gyration is 9.9 bonds with the ladder and 9.1 to 9.4 on the
+other arms.
+
+- The ladder at a radius of 3.0 gains 0.04 of raw and 0.02 of balanced SCC at 25 kb, 0.02 and 0.01 at 10 kb, with
+  the same Spearman at 25 kb and 0.01 more at 10 and 5 kb. It has the highest balanced Pearson of the table, 0.749,
+  and the ends overlap in 2 structures of 144. It has the SCC of the radius of a bead without its close pairs and
+  its overlap of the ends.
+- The cap by the chain does not change a score. The cap by the target gains 0.01 of raw SCC at each resolution, on
+  12 rows of 18 at a radius of 3.0, 12 with the derived radius and 14 under the dropout, and adds 1.3 close pairs
+  per thousand beads next to each other.
+- The derived radius of the default chain scores as the radius of 3.0.
+- The radius of 2.0 has the SCC of the radius of a bead, half of its close pairs and the highest Spearman at
+  25 kb. The ends overlap in 19 structures of 144 against 9 at 3.0 and 34 at the radius of a bead.
+- The dropout and the threshold of 2 each gain 0.04 of raw SCC at 25 kb, as on twenty structures.
+- `background_weight` 0.3 gains 0.01 of raw SCC and has the ends overlap in 13 structures against 9.
+
+Step 2 of the sweep, `scores-sweep8b/`, is the subanchor heatmap of the smooth stage at a radius of 3.0, on the
+singletons of production at 25 kb, which are not held out. On 12 rows of 18 the term does not act and the
+structures are those of the base. On the 6 rows where it acts raw SCC is above on 2 and below on 4, and three
+of them have 18 to 26 close pairs per thousand beads next to each other against 1 to 3. Over the 18 rows it
+scores 0.281 and 0.309 against 0.289 and 0.311, a difference of -0.008 ± 0.006. It stays off.
+
+The differences of the table over the 18 rows, paired by row, from `playground/arm_stats.py`, with the p value
+of the Wilcoxon signed rank test. The rows of one cell share its data and the p value is a lower bound.
+
+| arm against the radius of 3.0 | raw SCC at 25 kb | balanced SCC at 25 kb | Spearman at 25 kb |
+|---|---|---|---|
+| ladder to 25 kb | +0.037 ± 0.009, p 0.003 | +0.019 ± 0.008, p 0.03 | -0.003 ± 0.015, p 0.7 |
+| `loop_dropout` | +0.036 ± 0.006, p 0.0005 | +0.025 ± 0.006, p 0.001 | +0.001 ± 0.008, p 1.0 |
+| z 2 | +0.035 ± 0.006, p 0.00005 | +0.029 ± 0.006, p 0.0007 | -0.016 ± 0.012, p 0.03 |
+| radius 2.0 | +0.027 ± 0.006, p 0.0003 | +0.013 ± 0.005, p 0.02 | +0.008 ± 0.006, p 0.2 |
+| cap by the target | +0.009 ± 0.004, p 0.06 | +0.004 ± 0.003, p 0.4 | -0.001 ± 0.005, p 1.0 |
+| cap by the chain | +0.003 ± 0.003, p 0.2 | +0.000 ± 0.004, p 0.6 | -0.001 ± 0.003, p 0.5 |
+| derived radius | +0.005 ± 0.003, p 0.09 | +0.001 ± 0.003, p 0.7 | +0.000 ± 0.005, p 1.0 |
+| `background_weight` 0.3 | +0.009 ± 0.005, p 0.06 | +0.006 ± 0.005, p 0.06 | +0.006 ± 0.006, p 0.04 |
+
+The cap by the target against the same arm without it: +0.007 ± 0.003 of raw SCC under the dropout, p 0.02, and
++0.008 ± 0.003 on the derived radius, p 0.02. On the larger trial of twenty structures the threshold of 2 against
+3 at a radius of 3.0 is +0.033 ± 0.005 of raw SCC, p 0.0003, and -0.035 ± 0.013 of Spearman, p 0.01.
+
+The second round, `data/figures/retired/slurm/ensemble/uniform_sweep8c.sh`, joins the ladder at a radius of 3.0 with the dropout, the
+threshold of 2 and the cap by the target, and tries the ladder up to 50 kb, the ladder at a radius of 2.0 and the
+dropout at a radius of 3.85.
+
+### Second round of the sweep
+
+`design/figures/uniform-2026-11-19/sweep8c/` and `scores-sweep8c/`, with `scores-sweep8c_10k/` and
+`scores-sweep8c_5k/`, `data/figures/retired/slurm/ensemble/uniform_sweep8c.sh`, commit 43163bd on the code of 5636a87. The rows and
+the inputs of the first round, eight structures per arm. Every new arm has the ladder to 25 kb. Raw and balanced
+SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.191, 0.247 | 0.161, 0.169 | 0.112, 0.105 | 0.502, 0.407, 0.335 | 0.723 | 11.2 | 3.5 | 6 of 144 |
+| radius 3.0, cells at 5 kb | 0.289, 0.311 | 0.247, 0.225 | 0.190, 0.151 | 0.517, 0.433, 0.366 | 0.715 | 3.2 | 0.6 | 9 of 144 |
+| radius 3.0, ladder | 0.326, 0.330 | 0.270, 0.232 | 0.203, 0.151 | 0.515, 0.442, 0.380 | 0.749 | 4.3 | 0.5 | 2 of 144 |
+| ladder, `loop_dropout` | 0.360, 0.360 | 0.283, 0.248 | 0.202, 0.158 | 0.518, 0.456, 0.393 | 0.740 | 2.2 | 0.4 | 8 of 144 |
+| ladder, z 2 | 0.357, 0.361 | 0.288, 0.252 | 0.214, 0.162 | 0.520, 0.444, 0.382 | 0.759 | 4.8 | 0.6 | 7 of 144 |
+| ladder, z 2, `loop_dropout` | 0.380, 0.379 | 0.296, 0.259 | 0.210, 0.165 | 0.549, 0.468, 0.399 | 0.753 | 2.3 | 0.4 | 5 of 144 |
+| ladder, `loop_dropout`, cap by the target | 0.363, 0.360 | 0.288, 0.247 | 0.208, 0.158 | 0.525, 0.458, 0.394 | 0.742 | 2.8 | 0.5 | 8 of 144 |
+| ladder, `loop_dropout`, radius 3.85 | 0.352, 0.358 | 0.277, 0.245 | 0.198, 0.156 | 0.526, 0.456, 0.389 | 0.748 | 1.9 | 0.3 | 6 of 144 |
+| ladder, radius 2.0 | 0.328, 0.322 | 0.275, 0.229 | 0.206, 0.151 | 0.477, 0.425, 0.373 | 0.721 | 6.4 | 1.1 | 15 of 144 |
+
+No structure has a stretched piece. The radius of gyration is 9.7 to 10.4 bonds on the arms with the ladder. The
+arm with the ladder up to 50 kb did not run. The map of half a holds no resolution of 50 kb.
+
+The differences at 25 kb over the 18 rows, paired by row, with the p value of the Wilcoxon signed rank test:
+
+| comparison | raw SCC | balanced SCC | Spearman |
+|---|---|---|---|
+| the dropout on the ladder | +0.034 ± 0.006, p 0.0007 | +0.030 ± 0.008, p 0.001 | +0.004 ± 0.004, p 0.4 |
+| z 2 on the ladder | +0.030 ± 0.006, p 0.0001 | +0.031 ± 0.006, p 0.0003 | +0.005 ± 0.009, p 0.5 |
+| z 2 and the dropout on the ladder | +0.054 ± 0.008, p 0.0003 | +0.048 ± 0.010, p 0.00004 | +0.034 ± 0.007, p 0.0004 |
+| z 2 on the ladder with the dropout | +0.020 ± 0.005, p 0.0009 | +0.018 ± 0.004, p 0.001 | +0.030 ± 0.007, p 0.0007 |
+| the cap by the target on the ladder with the dropout | +0.003 ± 0.004, p 0.4 | -0.001 ± 0.004, p 0.8 | +0.007 ± 0.004, p 0.07 |
+| the radius of 3.85 against 3.0 on the ladder with the dropout | -0.008 ± 0.004, p 0.08 | -0.003 ± 0.004, p 0.5 | +0.008 ± 0.005, p 0.2 |
+| the radius of 2.0 against 3.0 on the ladder | +0.002 ± 0.003, p 0.5 | -0.008 ± 0.004, p 0.1 | -0.037 ± 0.010, p 0.002 |
+| ladder, z 2 and the dropout against the default chain | +0.189 ± 0.018, p 0.000008 | +0.132 ± 0.019, p 0.0002 | +0.046 ± 0.012, p 0.002 |
+
+- The ladder, the threshold of 2 and the dropout add up. The three together have a raw SCC of 0.380 against
+  0.191 of the default chain, above it on 18 rows of 18, with a higher Spearman at every resolution, a higher
+  balanced Pearson, a fifth of its close pairs and the same overlap of the ends.
+- With the ladder the threshold of 2 does not cost Spearman. With the cells at 5 kb alone it cost 0.035 on the
+  larger trial.
+- The cap by the target does not change a score on the ladder with the dropout.
+- The radius of 3.85 under the dropout loses 0.008 of raw SCC and has the ends overlap in 6 structures of 144
+  against 8. The overlap of the ends under the dropout is small with the ladder, and a radius of a node from its
+  chain has nothing to repair there.
+- The radius of 2.0 on the ladder gains no SCC and loses 0.037 of Spearman.
+
+### Confirmation of the chosen config at twenty structures
+
+`design/figures/uniform-2026-11-19/confirm20/` and `scores-confirm20/`, with `scores-confirm20_10k/` and
+`scores-confirm20_5k/`, `slurm/ensemble/uniform_confirm20.sh`, commit c3dc42d. The config chosen by the maintainer
+on 2026-11-21 after the second round: the ladder to 25 kb over cells at 5 kb, `contact_background_z` 2,
+`loop_dropout` and the derived radius of the arcs stage. Eighteen rows of twenty structures, built nine at a time
+with JAX on the CPU, beside the default chain and the cells at 5 kb with a radius of 3.0 of the larger trial.
+Raw and balanced SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap | exponent over Hi-C |
+|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.126 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 | 12 of 360 | 1.044 |
+| cells at 5 kb, radius 3.0 | 0.313, 0.335 | 0.278, 0.255 | 0.226, 0.181 | 0.547, 0.485, 0.434 | 0.695 | 3.2 | 0.6 | 14 of 360 | 1.018 |
+| chosen config | 0.417, 0.413 | 0.344, 0.301 | 0.263, 0.207 | 0.569, 0.519, 0.475 | 0.732 | 2.5 | 0.4 | 27 of 360 | 1.131 |
+
+The chosen config against the default chain, paired over the 18 rows:
+
+| score | 25 kb | 10 kb | 5 kb |
+|---|---|---|---|
+| raw SCC | +0.212 ± 0.021, 18 rows of 18, p 0.000008 | +0.163 ± 0.017, 18 rows, p 0.000008 | +0.130 ± 0.016, 17 rows, p 0.0003 |
+| balanced SCC | +0.145 ± 0.021, 18 rows, p 0.0002 | +0.106 ± 0.015, 16 rows, p 0.00005 | +0.081 ± 0.012, 16 rows, p 0.00005 |
+| Spearman | +0.036 ± 0.019, 12 rows, p 0.09 | +0.056 ± 0.009, 17 rows, p 0.00005 | +0.073 ± 0.006, 18 rows, p 0.000008 |
+| balanced Pearson | +0.027 ± 0.007, 14 rows, p 0.003 | +0.035 ± 0.006, 16 rows, p 0.00005 | +0.047 ± 0.007, 17 rows, p 0.0003 |
+
+No structure of 360 has a stretched piece. The radius of gyration of the battery is 11.2 bonds against 10.0 of the
+default chain, and the decay is 13 percent steeper than that of Hi-C against 4 percent.
+
+The ends overlap in 27 structures of 360 against 12 of the default chain, on H1ESC and HFFC6 for the most part.
+On the sweep the same config at a radius of 3.0 had 5 of 144. The derived radius is the cause under test. It is
+`auto_factor_arcs` times the mean target of the loops of the conformation. The dropout keeps the stronger loops,
+whose targets are shorter, and the radius falls:
+
+| row | nodes, with the dropout and without | derived radius with the dropout | derived radius without |
+|---|---|---|---|
+| GM12878 chr1 20 to 25 Mb | 327, 468 | 2.33, 2.25 to 2.40 over three conformations | 2.68 |
+| GM12878 chr1 60 to 65 Mb | 57, 91 | 2.85 | 3.40 |
+| HFFC6 chr1 20 to 25 Mb | 412, 607 | 2.87 | 3.14 |
+| HFFC6 chr1 60 to 65 Mb | 160, 249 | 3.34 | 3.71 |
+
+The radius of the stage is a constant of the run and here it changes with the draw of the conformation. Under
+the dropout it is smaller where the dropout trace asks for a larger one. The arms of
+`scores-chain20/` measure the chosen config at a radius of 3.0 and with the radius from the chain.
+
+### Trace of the decay and of the overlap of the ends under the chosen config
+
+The mean distance of two beads by their separation, in bonds, over the 18 rows of twenty structures:
+
+| arm | 100 kb | 250 kb | 500 kb | 1 Mb | 2 Mb | 3 Mb | 4 Mb |
+|---|---|---|---|---|---|---|---|
+| default chain | 5.02 | 6.58 | 8.58 | 11.44 | 15.19 | 15.94 | 14.99 |
+| cells at 5 kb, radius 3.0 | 5.06 | 6.60 | 8.52 | 11.44 | 15.20 | 15.90 | 15.14 |
+| ladder alone, radius of a bead | 4.93 | 6.55 | 8.96 | 11.91 | 14.89 | 16.12 | 16.17 |
+| cells at 5 kb, `loop_dropout`, radius 3.0 | 5.00 | 6.58 | 8.58 | 11.56 | 15.05 | 15.20 | 14.25 |
+| cells at 5 kb, z 2, radius 3.0 | 5.11 | 6.93 | 8.73 | 11.32 | 14.99 | 15.98 | 15.39 |
+| chosen config | 4.97 | 6.70 | 9.12 | 12.36 | 15.96 | 17.41 | 18.03 |
+
+The chosen config has the distances of the default chain up to 250 kb and larger ones beyond, by 6 percent at
+500 kb, 8 percent at 1 Mb and 20 percent at 4 Mb. The ladder is the part that expands the range from 500 kb.
+
+The targets of the pairs of nodes, read before the solve on twenty conformations of three rows. A pair with a
+background spring is at the law, held in by its cell below the law or held out above it:
+
+| row | config | pairs held in beyond 100 kb | held out beyond 100 kb | mean target of a pair held in, over the law | of a pair held out | furthest separation with a cell |
+|---|---|---|---|---|---|---|
+| H1ESC chr1 20 to 25 Mb | chosen | 4,050 | 3,520 | 0.75 | 1.4 to 2.1 | 3 Mb |
+| H1ESC chr1 20 to 25 Mb | cells at 5 kb, z 3 | 0 | 0 | | | 100 kb |
+| HFFC6 chr1 200 to 205 Mb | chosen | 10,460 | 4,020 | 0.75 | 1.5 to 2.2 | 3 Mb |
+| HFFC6 chr1 200 to 205 Mb | cells at 5 kb, z 3 | 1,040 | 120 | 0.71 | 1.9 | 250 kb |
+| GM12878 chr1 20 to 25 Mb | chosen | 6,370 | 3,380 | 0.78 | 1.4 to 1.7 | 5 Mb |
+| GM12878 chr1 20 to 25 Mb | cells at 5 kb, z 3 | 2,290 | 240 | 0.74 | 1.6 to 2.1 | 500 kb |
+
+- The ladder gives a spring to thousands of pairs between 100 kb and 3 Mb, where the cells at 5 kb give none.
+- A pair held out is asked further off the law than a pair held in. The distance of a cell is the law times the
+  count over the expectation to the minus third, with a pseudo count of 0.5. A cell of 5 expected counts and
+  none observed passes the test at z 2 and asks for 2.2 times the law, under the clip of 2.5. At 1 to 2 Mb the
+  law is 11 bonds and the region has a radius of gyration of 10.
+- No cell and no loop joins the two end megabases on the two rows whose ends overlap. The distance of the end
+  megabases varies more between conformations, 12.9 ± 4.6 bonds with a smallest of 4.6 on H1ESC against
+  13.6 ± 2.5 and 9.4 with the cells at 5 kb, and 18.3 ± 8.2 against 17.2 ± 3.4 on HFFC6.
+
+The cells that pass the test follow the coverage of their bins. The count is raw and the expectation is the mean
+at the separation. A bin of low coverage is then depleted against every other bin. Over the bins of a row, the
+Spearman correlation of the coverage of a bin with the share of its cells that are held out, at z 2:
+
+| row | resolution | expectation by the separation alone | times the coverage of the two bins | times the root of the coverage | times the inverse balancing weights of the map |
+|---|---|---|---|---|---|
+| H1ESC chr1 20 to 25 Mb | 25 kb | -0.91 | 0.59 | -0.59 | 0.05 |
+| H1ESC chr1 20 to 25 Mb | 5 kb | -0.91 | 0.55 | -0.55 | 0.17 |
+| HFFC6 chr1 200 to 205 Mb | 25 kb | -0.80 | 0.65 | -0.25 | 0.26 |
+| HFFC6 chr1 200 to 205 Mb | 5 kb | -0.87 | 0.61 | -0.38 | 0.26 |
+| GM12878 chr1 20 to 25 Mb | 25 kb | -0.57 | 0.45 | -0.12 | 0.30 |
+| GM12878 chr1 20 to 25 Mb | 5 kb | -0.90 | 0.44 | -0.50 | 0.35 |
+
+With the weights in the expectation the cells over 1.8 times the law fall from 114 to 50 at 25 kb and from 2,276
+to 624 at 5 kb on the H1ESC row. The coverage acts at 5 kb as at 25 kb. The ladder carries it to the long range.
+
+The coverage of a bin is the same in the two halves of a map. A model that follows the coverage scores on the
+raw counts of the half it did not read. The balanced SCC is the score that the coverage does not reach.
+
+The trials below ran with two keys of commit 059d374, `[springs] contact_bias = weights` for the inverse
+balancing weights of the map in the expectation and `[springs] contact_pseudo_count` for the pseudo count. The
+weights are the one expectation of a cell since 2026-11-21 and have no key. The pseudo count is 0.5 and its key is
+deleted.
+
+The first run of the trace of the targets read the law before the run fits its exponent and counted pairs at the
+law as held out. The table is from the run with the law of the solve.
+
+### Trial of the radius under the chosen config
+
+`design/figures/uniform-2026-11-19/chain20/` and `scores-chain20/`, with `scores-chain20_10k/` and
+`scores-chain20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=chain20`, commit 3eb1a72. The chosen
+config with the derived radius, with a radius of 3.0 and with `[excluded_volume] arcs_chain_radius`. Eighteen
+rows of twenty structures, raw and balanced SCC per bead pair at 25 kb:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | Rg |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 10.0 |
+| derived radius | 0.417, 0.413 | 0.569 | 0.732 | 2.5 | 27 of 360 | 1.131 | 11.2 |
+| radius 3.0 | 0.413, 0.411 | 0.574 | 0.735 | 2.3 | 17 of 360 | 1.131 | 11.2 |
+| radius 3.0, radius from the chain as the mean of the two factors | 0.415, 0.413 | 0.581 | 0.746 | 2.3 | 7 of 360 | 1.135 | 11.3 |
+| radius 3.0, radius from the chain as their product | 0.415, 0.413 | 0.587 | 0.765 | 2.0 | 1 of 360 | 1.156 | 11.5 |
+| derived radius, product | 0.419, 0.414 | 0.584 | 0.759 | 2.2 | 5 of 360 | 1.146 | 11.4 |
+
+- The radius of 3.0 against the derived one takes the overlap of the ends from 27 structures to 17 and changes
+  no score. The decay is as steep. The radius is a part of the overlap and no part of the decay.
+- The radius from the chain takes the overlap to 7 structures as the mean and to 1 as the product. SCC does not
+  change, +0.002 ± 0.003. Balanced Pearson rises by 0.010 ± 0.002 and by 0.030 ± 0.003, on 16 and 18 rows of 18.
+  The product makes the decay steeper, 1.156 against 1.131.
+- A trace that stops after the solve, 120 solves on GM12878 chr1 20 to 25 Mb at a radius of 3.0 without cells:
+  under the dropout the mean form has a radius of gyration of 8.41 and the product 8.72, against 8.30 with one
+  radius and 8.44 without the dropout. Without the dropout they have 8.49 and 8.64. The mean form gives the size
+  back and the product goes over it.
+
+### Trial of the bias of the bins and of the tuning of the cells
+
+`design/figures/uniform-2026-11-19/bias20/`, `tune20/` and their `scores-` folders at 25, 10 and 5 kb,
+`slurm/ensemble/uniform_confirm20.sh` with `TAG=bias20` and `TAG=tune20`, commit 059d374. The chosen config at a
+radius of 3.0, with `contact_bias = weights` and with the keys that act on the push of a cell. Eighteen rows of
+twenty structures. Raw and balanced SCC per bead pair at 25 kb, and the mean distance of two beads 4 Mb apart in
+bonds, which is 15.0 on the default chain and 18.2 by the law:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | Rg | distance at 500 kb, 1 Mb, 4 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 10.0 | 8.6, 11.4, 15.0 |
+| ladder, expectation by the separation alone | 0.413, 0.411 | 0.574 | 0.735 | 2.3 | 17 of 360 | 1.131 | 11.2 | 9.2, 12.4, 18.4 |
+| the same, pseudo count 4 | 0.380, 0.378 | 0.566 | 0.727 | 2.2 | 20 of 360 | 1.102 | 10.6 | 8.7, 11.9, 17.3 |
+| ladder, weights | 0.359, 0.392 | 0.594 | 0.751 | 1.6 | 0 of 360 | 1.183 | 12.3 | 9.4, 13.1, 22.1 |
+| ladder, weights, pseudo count 1 | 0.356, 0.390 | 0.598 | 0.749 | 1.5 | 1 of 360 | 1.161 | 11.9 | 9.3, 12.8, 20.9 |
+| ladder, weights, pseudo count 2 | 0.350, 0.379 | 0.599 | 0.747 | 1.6 | 8 of 360 | 1.149 | 11.6 | 9.1, 12.6, 20.1 |
+| ladder, weights, pseudo count 4 | 0.338, 0.367 | 0.598 | 0.741 | 1.6 | 6 of 360 | 1.130 | 11.2 | 8.9, 12.3, 18.9 |
+| ladder, weights, z 3 | 0.338, 0.366 | 0.540 | 0.723 | 1.5 | 13 of 360 | 1.147 | 11.0 | 9.2, 12.6, 17.1 |
+| ladder to 10 kb, weights | 0.348, 0.387 | 0.464 | 0.708 | 1.7 | 22 of 360 | 1.165 | 10.6 | 9.7, 12.7, 15.7 |
+| ladder, weights, clip of the cell distance at 1.5 | 0.355, 0.386 | 0.602 | 0.745 | 1.6 | 6 of 360 | 1.143 | 11.5 | 9.1, 12.6, 19.7 |
+| cells at 5 kb, weights | 0.345, 0.377 | 0.488 | 0.674 | 2.0 | 30 of 360 | 1.040 | 10.1 | 9.0, 11.6, 15.0 |
+
+No structure has a stretched piece. The clip is `[heatmaps] distance_heatmap_stretching`, which also clips the
+heatmap of the coarse stage.
+
+- The weights take 0.054 ± 0.008 of raw SCC and 0.019 ± 0.005 of balanced SCC. That part of the score was the
+  coverage of the bins. With the weights the arm is 0.155 ± 0.019 of raw and 0.124 ± 0.020 of balanced SCC above
+  the default chain, on 18 and 16 rows of 18.
+- With the weights the ends overlap in no structure of 360, Spearman rises by 0.020 and balanced Pearson by
+  0.016.
+- The weights do not take the expansion away. The region is larger with them, 12.3 bonds of radius of gyration
+  against 11.2, and the distance at 4 Mb is 22.1 bonds. The push at the long range is not the coverage.
+- The pseudo count draws the long range in step by step and costs SCC from 2 on: 1 costs 0.003 ± 0.004 of
+  either SCC, 2 costs 0.009 and 0.013, 4 costs 0.021 and 0.026.
+- The threshold of 3 has the long range of the law, 17.1 bonds at 4 Mb, and loses 0.021 and 0.026 of SCC and
+  0.054 of Spearman.
+- The ladder to 10 kb has the long range of the default chain, 15.7 bonds, the largest distance at 500 kb, the
+  lowest Spearman, 0.464, and the ends overlap in 22 structures.
+- The cells at 5 kb alone have the decay of the default chain, 1.040, a Spearman under it, 0.488, and the ends
+  overlap in 30 structures.
+- Every arm with a ladder is 6 to 13 percent over the default chain at 500 kb and 8 to 14 percent at 1 Mb, and
+  has an exponent over Hi-C of 1.13 to 1.18. No key of this trial takes the expansion of that range away and
+  keeps the scores of the ladder.
+
+The equal evidence on the two sides of the test gives unequal distances. A cell of 5 expected counts with none
+observed is 2.2 deviations under and its ratio asks for 2.2 times the law. A cell with 10 observed is 2.2
+deviations over and its ratio asks for 0.80 of the law. A distance from a quantity that is symmetric in the
+evidence was built as `contact_estimate = bound`, measured in the next trial and deleted after it.
+
+### Trial of the estimate of a cell and of the radius from every loop
+
+`design/figures/uniform-2026-11-19/est20/` and `scores-est20/`, with `scores-est20_10k/` and
+`scores-est20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=est20`, commit a93ba5a. The ladder with the
+weights, z 2 and the dropout, with `contact_estimate = bound` and with the derived radius of the arcs stage from
+every loop of the chromosome. Eighteen rows of twenty structures, raw and balanced SCC per bead pair at 25 kb:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | Rg | distance at 500 kb, 1 Mb, 4 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 10.0 | 8.6, 11.4, 15.0 |
+| ratio, pseudo count 1, radius 3.0 | 0.356, 0.390 | 0.598 | 0.749 | 1.5 | 1 of 360 | 1.161 | 11.9 | 9.3, 12.8, 20.9 |
+| ratio, pseudo count 1, radius from every loop | 0.358, 0.389 | 0.597 | 0.749 | 1.6 | 1 of 360 | 1.162 | 11.9 | 9.2, 12.8, 20.9 |
+| bound, radius 3.0 | 0.313, 0.335 | 0.592 | 0.732 | 1.8 | 24 of 360 | 1.098 | 10.8 | 8.6, 11.8, 18.6 |
+| bound, radius from every loop | 0.312, 0.334 | 0.591 | 0.731 | 1.8 | 21 of 360 | 1.099 | 10.8 | 8.6, 11.8, 18.6 |
+| bound, z 1.5, radius 3.0 | 0.320, 0.341 | 0.618 | 0.744 | 1.8 | 4 of 360 | 1.114 | 11.1 | 8.7, 12.0, 19.5 |
+
+No structure has a stretched piece.
+
+- The radius from every loop scores as the radius of 3.0 under either estimate, +0.002 ± 0.003 of raw SCC with
+  the same overlap of the ends and the same decay. It is the rule of the uniform chain under the dropout, by the
+  maintainer's decision of 2026-11-21.
+- The bound gives the distances of the default chain back at 500 kb, 8.6 bonds, and the long range of the law,
+  18.6 bonds at 4 Mb. The exponent over Hi-C falls from 1.16 to 1.10.
+- The bound costs 0.043 ± 0.006 of raw and 0.054 ± 0.007 of balanced SCC against the ratio, on 17 and 18 rows
+  of 18, and the ends overlap in 24 structures of 360 against 1. It moves every cell towards the background,
+  the cells held in as the cells held out, and the cells held in carry the SCC.
+- The bound at z 1.5 has the highest Spearman of the trials, 0.618, the ends overlap in 4 structures, and it
+  costs 0.036 and 0.049 of SCC.
+- Each arm is above the default chain in SCC: the ratio by 0.153 ± 0.018 of raw and 0.121 ± 0.021 of balanced,
+  the bound at z 1.5 by 0.116 ± 0.016 and 0.073 ± 0.016.
+
+The decay and the SCC trade against each other over the cells. With the weights, the ladder, z 2 and the dropout:
+
+| estimate | balanced SCC | exponent over Hi-C | ends overlap | Spearman |
+|---|---|---|---|---|
+| ratio, pseudo count 1 | 0.390 | 1.16 | 1 of 360 | 0.598 |
+| ratio, pseudo count 4 | 0.367 | 1.13 | 6 of 360 | 0.598 |
+| bound, z 1.5 | 0.341 | 1.11 | 4 of 360 | 0.618 |
+| bound | 0.335 | 1.10 | 24 of 360 | 0.592 |
+| no ladder, ratio | 0.377 | 1.04 | 30 of 360 | 0.488 |
+| default chain | 0.268 | 1.04 | 12 of 360 | 0.532 |
+
+### Trial of the cells at 5 kb alone
+
+`design/figures/uniform-2026-11-19/five20/` and `scores-five20/`, with `scores-five20_10k/` and
+`scores-five20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=five20`, commit a93ba5a. The cells at 5 kb
+with the bias of the bins in their expectation and the derived radius, at a threshold of 3 and of 2, with and
+without `loop_dropout`, and with the radius of a node from its chain. Eighteen rows of twenty structures, raw
+and balanced SCC per bead pair at 25 kb:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | distance at 1 Mb, 4 Mb |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 11.4, 15.0 |
+| ladder with both sides, for reference | 0.356, 0.390 | 0.598 | 0.749 | 1.5 | 1 of 360 | 1.161 | 12.8, 20.9 |
+| z 3 | 0.285, 0.323 | 0.544 | 0.688 | 2.9 | 18 of 360 | 1.009 | 11.4, 14.9 |
+| z 2 | 0.297, 0.345 | 0.485 | 0.687 | 2.8 | 21 of 360 | 1.028 | 11.6, 15.4 |
+| z 3, `loop_dropout` | 0.331, 0.358 | 0.530 | 0.682 | 2.2 | 39 of 360 | 1.031 | 11.5, 14.2 |
+| z 2, `loop_dropout` | 0.348, 0.381 | 0.483 | 0.672 | 2.3 | 34 of 360 | 1.042 | 11.6, 15.0 |
+| z 3, `loop_dropout`, `arcs_chain_radius = sum` | 0.335, 0.360 | 0.564 | 0.721 | 1.4 | 18 of 360 | 1.064 | 11.9, 14.9 |
+
+- Every arm at 5 kb has the decay of the default chain, 1.01 to 1.06, and its distances at the long range.
+- The threshold of 2 gains 0.012 to 0.017 of raw SCC and loses 0.05 to 0.06 of Spearman.
+- The dropout gains 0.046 of raw and 0.035 of balanced SCC and has the ends overlap in 39 structures of 360
+  against 18.
+- The radius of a node from its chain takes that overlap back to 18, raises Spearman from 0.530 to 0.564 and
+  balanced Pearson from 0.682 to 0.721, and halves the close pairs. SCC does not change.
+- The arm with the threshold of 3, the dropout and the radius from the chain is 0.131 ± 0.016 of raw and
+  0.092 ± 0.017 of balanced SCC above the default chain, on 18 and 15 rows of 18, with a higher Spearman and
+  balanced Pearson. The ends overlap in 18 structures against 12.
+
+The decisions of 2026-11-21 on the threshold and on the dropout were taken on the six rows of GM12878 and hold
+on the eighteen.
+
+### Rewrite of the ladder: a cell holds a pair closer and the law holds the long range
+
+Decided by the maintainer on 2026-11-21, after the trials above. The ladder gave two things through one
+mechanism. It carried the contact evidence of bins too sparse to test at 5 kb. And its thousands of springs near
+the law between 100 kb and 3 Mb kept a region from folding back on itself: the distance of two beads grows up to
+4 Mb in every arm with the ladder, and on the default chain it is 15.9 bonds at 3 Mb and 15.0 at 4 Mb, where
+the law gives 18.2. The arcs solve has no other term that holds a pair beyond `background_range_bp` at the law.
+The maximum entropy start has the end megabases 16.5 to 16.9 bonds apart and the solve packs them to 13.4. The
+cost of the mechanism was the push of the cells under their expectation, which put the range from 500 kb to
+1 Mb 8 to 14 percent over the default chain.
+
+The rewrite gives each of the two jobs its own term.
+
+| case | rule |
+|---|---|
+| a cell over its expectation, at 5, 10 or 25 kb | holds its pair of nodes closer, at the background times the count over the expectation to the minus third, as before |
+| a cell under its expectation | is not read. A low count where few counts are expected does not measure how far apart two beads are |
+| a pair whose cell at 5 kb can be tested and is not over its expectation | keeps what it had. It is not read at a coarser resolution |
+| a pair without a loop closer than `background_range_bp` | holds the background of the law, as before |
+| the size of every genomic window from `background_range_bp` up | held at the radius of gyration of the law by the gyration term of the solve, `[springs] gyration_weight`, the term that production has for the long range since 2026-11-16 |
+
+The gyration term is close to no term on a region of 5 Mb at its weight of 0.1: without it the radius of
+gyration of the region moves by 0.02 bonds. The trial measures the weight at which it holds the long range,
+before any new term is written.
+
+The side of the cells is the key `[springs] contact_side` for the trial, `both` or `over`. The side that loses
+is deleted with the key.
+
+Also decided on 2026-11-21: the threshold of the cells is 3, since 2 costs 0.09 of Spearman on the cells at
+5 kb for 0.02 of SCC. `loop_dropout` is on with `[excluded_volume] arcs_chain_radius = sum`, which takes the
+overlap of the ends under the dropout from 23 structures of 120 to 10 on the rows of GM12878 with no change of
+SCC. The product form of that radius and the cap of the radius by the target are deleted.
+
+### Trial of the rewritten ladder
+
+`design/figures/uniform-2026-11-19/pull20/` and `scores-pull20/`, with `scores-pull20_10k/` and
+`scores-pull20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=pull20`, commit b7c16d7. The threshold of 3,
+`loop_dropout` and `arcs_chain_radius = sum` on every arm. Eighteen rows of twenty structures, raw and balanced
+SCC per bead pair at 25 kb, and the balanced SCC of the bands of `playground/band_scc.py`:
+
+| arm | SCC | Spearman | ends overlap | exponent over Hi-C | distance at 1 Mb, 4 Mb | SCC under 250 kb | 250 kb to 1 Mb | 1 to 2 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 12 of 360 | 1.044 | 11.4, 15.0 | 0.241 | 0.385 | 0.03 |
+| cells at 5 kb, both sides | 0.335, 0.360 | 0.564 | 18 of 360 | 1.064 | 11.9, 14.9 | 0.338 | 0.471 | 0.04 |
+| cells at 5 kb, over the expectation alone | 0.327, 0.349 | 0.561 | 14 of 360 | 1.071 | 12.0, 15.1 | 0.326 | 0.465 | 0.05 |
+| ladder to 25 kb, over alone | 0.325, 0.343 | 0.579 | 15 of 360 | 1.054 | 11.6, 16.3 | 0.326 | 0.417 | 0.05 |
+| ladder, over alone, `gyration_weight` 0.3 | 0.320, 0.339 | 0.567 | 13 of 360 | 1.078 | 11.9, 16.6 | 0.319 | 0.431 | 0.04 |
+| ladder, over alone, `gyration_weight` 1.0 | 0.309, 0.328 | 0.554 | 15 of 360 | 1.091 | 12.0, 17.5 | 0.309 | 0.426 | 0.02 |
+| cells at 5 kb, over alone, `gyration_weight` 1.0 | 0.307, 0.328 | 0.545 | 12 of 360 | 1.093 | 12.2, 15.6 | 0.307 | 0.437 | 0.05 |
+
+The arm with both sides, built on the code where the bias of the bins has no key, has the scores of the arm of
+`scores-five20/` to the last digit.
+
+- The rewritten ladder does what it was written for. The distance at 1 Mb is that of the default chain and the
+  distance grows up to 4 Mb. The exponent over Hi-C is 1.05.
+- It does not beat the cells at 5 kb with both sides. Raw SCC is 0.010 ± 0.006 under, balanced SCC 0.017 ± 0.007
+  under on 14 rows of 18, Spearman 0.015 ± 0.006 over on 12 rows. The loss is between 250 kb and 1 Mb, 0.417
+  against 0.471.
+- At 5 kb the cells under their expectation are worth their place: without them balanced SCC is 0.011 ± 0.005
+  lower.
+- A larger `gyration_weight` holds the long range further apart, 17.5 bonds at 4 Mb at a weight of 1.0, and
+  costs 0.02 to 0.03 of SCC with or without the ladder.
+- No arm has a correlation with Hi-C beyond 1 Mb.
+
+The cells at 5 kb with both sides stay the rule. The side of the cells over their expectation alone loses, and
+with it the ladder as rewritten.
+
+### The threshold and the side of the cells at 5 kb
+
+`design/figures/uniform-2026-11-19/side20/` and `scores-side20/`, `TAG=side20`, commit b7c16d7. The cells at 5 kb
+with `loop_dropout` and `arcs_chain_radius = sum`, at a threshold of 3 and of 2, with both sides and with the
+cells over their expectation alone. Eighteen rows of twenty structures:
+
+| arm | SCC | Spearman | Pearson balanced | ends overlap | exponent over Hi-C |
+|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 12 of 360 | 1.044 |
+| z 3, both sides, the locked config | 0.335, 0.360 | 0.564 | 0.721 | 18 of 360 | 1.064 |
+| z 3, over alone | 0.327, 0.349 | 0.561 | 0.721 | 14 of 360 | 1.071 |
+| z 2, both sides | 0.347, 0.380 | 0.531 | 0.719 | 12 of 360 | 1.069 |
+| z 2, over alone | 0.329, 0.347 | 0.571 | 0.726 | 11 of 360 | 1.076 |
+
+- At either threshold the cells under their expectation are worth their place: without them balanced SCC is
+  0.011 ± 0.005 lower at 3 and 0.033 lower at 2.
+- The threshold of 2 with both sides gains 0.012 ± 0.003 of raw and 0.020 ± 0.004 of balanced SCC, on 14 and 15
+  rows of 18, and loses 0.033 ± 0.009 of Spearman, which is then that of the default chain. The ends overlap in
+  12 structures against 18.
+
+The threshold stays 3, as locked. It is one key of `UNIFORM_CHAIN`, and 2 is the choice of SCC over Spearman.
+
+### The score by the separation of a pair
+
+`playground/band_scc.py`, on the structures of `out/confirm20`, eighteen rows of twenty structures. The balanced
+SCC per bead pair at 25 kb, split into four bands of diagonals, with the share of the weight of the whole score
+that each band holds:
+
+| arm | whole | under 250 kb | 250 kb to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|
+| share of the weight | | 0.81 to 0.84 | 0.16 to 0.19 | under 0.01 | under 0.01 |
+| default chain | 0.268 | 0.241 | 0.385 | 0.028 | 0.014 |
+| cells at 5 kb, z 2, dropout, radius 3.0 | 0.377 | 0.358 | 0.468 | 0.032 | 0.001 |
+| ladder to 10 kb with both sides, the same | 0.387 | 0.368 | 0.481 | 0.083 | 0.018 |
+| ladder to 25 kb with both sides, the same | 0.392 | 0.368 | 0.492 | 0.168 | 0.063 |
+| cells at 5 kb, z 3, dropout, radius from the chain | 0.360 | 0.338 | 0.471 | 0.044 | 0.011 |
+| ladder to 25 kb over its expectation alone, 8 rows | 0.374 | 0.367 | 0.419 | 0.023 | 0.002 |
+
+- The score reads the pairs under 1 Mb. Four fifths of its weight are under 250 kb and less than a hundredth is
+  beyond 1 Mb. A model with or without structure beyond 1 Mb has the same SCC.
+- The gain of the uniform chain over the default chain, 0.092, is under 250 kb, 0.089 of it.
+- The gain of the ladder with both sides over the cells at 5 kb, 0.016, is under 250 kb too, 0.014 of it.
+- Beyond 1 Mb the default chain and the cells at 5 kb have no correlation with Hi-C, 0.00 to 0.04. The ladder
+  with both sides has 0.17 between 1 and 2 Mb. The ladder that reads the cells over their expectation alone
+  has none. The structure beyond 1 Mb came with the cells under their expectation.
+
+### The scale beyond 1 Mb, and what the contact cells add
+
+`playground/band_scc.py` at 25 and at 100 kb. The maps of the two halves hold no resolution of 100 kb, and the
+tool sums the balanced counts at 25 kb over blocks of four bins, which agrees with a native map at 100 kb at 0.97
+to 0.99 per band. A first run read the bands "at 100 kb" on maps at 25 kb, since `observed_hic` takes the nearest
+resolution of a file. Its numbers were wrong and are not kept.
+
+The two halves of a Hi-C map against each other, balanced, over the 18 rows:
+
+| bins | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|
+| 25 kb | 0.64 | 0.86 | 0.66 | 0.44 |
+| 100 kb | 0.76 | 0.92 | 0.88 | 0.81 |
+
+The arms at 100 kb against the balanced half the cells did not read, eighteen rows of twenty structures, as the
+pooled contacts per bead pair and as the mean distance of the centroids of two bins with the sign turned:
+
+| arm | contacts: under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb | distance: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|
+| default chain | 0.36 | 0.50 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config, cells at 5 kb | 0.44 | 0.58 | 0.12 | 0.02 | 0.33 | 0.15 |
+| ladder over its expectation alone | 0.43 | 0.52 | 0.16 | 0.06 | 0.57 | 0.36 |
+| first ladder to 10 kb, both sides | 0.49 | 0.59 | 0.15 | 0.06 | 0.43 | 0.15 |
+| first ladder to 25 kb, both sides | 0.49 | 0.60 | 0.33 | 0.25 | 0.72 | 0.71 |
+
+- Beyond 1 Mb the data agrees with itself at 0.8 to 0.9 and the pooled contacts of every arm but one are near
+  zero. The first ladder to 25 kb with both sides has 0.33 and 0.25.
+- Under 1 Mb the arms have 0.4 to 0.6 against 0.76 and 0.92 of the data.
+
+The coarse stage of those arms reads the Hi-C singletons of production at 25 kb, which hold the counts of both
+halves. The trial `scores-coarse20/`, `out/coarse20`, `TAG=coarse20`, commit 442542e, runs on singletons of half a
+alone, `DATA=out/halves/data`, with the cells of half a, and is scored against the other half. Eighteen rows of
+twenty structures, raw and balanced SCC per bead pair at 25 kb:
+
+| arm | SCC | Spearman | Pearson balanced | at 100 kb: under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.155, 0.249 | 0.475 | 0.774 | 0.33 | 0.44 | 0.04 | -0.16 |
+| default chain, `use_contact_background` and `use_anchor_heatmap` off | 0.153, 0.246 | 0.465 | 0.771 | 0.33 | 0.45 | 0.05 | 0.01 |
+| locked config | 0.253, 0.336 | 0.503 | 0.784 | 0.37 | 0.49 | 0.06 | -0.09 |
+| locked config without the contact cells | 0.251, 0.331 | 0.507 | 0.783 | 0.38 | 0.52 | 0.12 | 0.15 |
+
+- The contact cells add 0.002 ± 0.004 of raw and 0.005 ± 0.003 of balanced SCC, on 10 and 11 rows of 18. The arm
+  without them read no cell, by its log.
+- The Hi-C terms of the pairs of the default chain add nothing, -0.003 ± 0.002.
+- The uniform chain is 0.098 ± 0.015 of raw and 0.087 ± 0.018 of balanced SCC over the default chain, on 17 and
+  16 rows of 18, with or without its cells. The gain is the chain: the equal beads, the nodes at the loop ends,
+  the dropout and the radius of a node from its chain.
+
+The same two arms on the inputs of production, `scores-nocells20/`, `TAG=nocells20`, eighteen rows of twenty
+structures: 0.335 and 0.360 with the cells against 0.324 and 0.343 without, +0.011 ± 0.005 of raw and
++0.017 ± 0.005 of balanced SCC, on 12 and 15 rows of 18, with the same Spearman, 0.564 and 0.563. The default
+chain has 0.204 and 0.268. On those inputs the cells are a fifth of the gain of the uniform chain in balanced
+SCC and on the singletons of one half a twentieth.
+
+The structure of both chains comes from the loops and from the distance law. Hi-C, read as one spring per pair
+of beads from the count of its cell, adds 0.005 to 0.017 of balanced SCC at 5 kb. The ladder with both sides is the one form
+that carried a signal of the half it did not read beyond 1 Mb, and it expanded the range from 500 kb to 1 Mb.
+
+### What the pattern of Hi-C at 100 kb is made of
+
+Measurements on the maps and on the inputs, with no run of the model. A predictor is built from one half of a
+map or from an input and scored against the balanced other half at 100 kb, by band, over the 18 rows.
+
+| predictor | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|
+| the map of the other half | 0.76 | 0.92 | 0.88 | 0.81 |
+| rank 1 of the log of observed over expected | 0.22 | 0.45 | 0.56 | 0.61 |
+| rank 3 | 0.28 | 0.62 | 0.73 | 0.70 |
+| rank 5 | 0.40 | 0.72 | 0.79 | 0.74 |
+| mean over blocks of 500 kb | 0.35 | 0.58 | 0.67 | 0.68 |
+| compartment track `<cell>_compartments.bedGraph`, outer product | 0.20 | 0.10 | 0.40 | 0.49 |
+| compartment track, same sign | 0.30 | 0.30 | 0.40 | 0.52 |
+| Hi-C singletons of production at 25 kb, both halves | 0.79 | 0.87 | 0.68 | 0.49 |
+| ChIA-PET singletons, 490 pairs a region | -0.04 | 0.18 | 0.24 | 0.13 |
+| ChIA-PET loops, PET counts | 0.27 | 0.45 | 0.00 | |
+| anchors per bin, outer product | 0.06 | 0.11 | 0.11 | 0.18 |
+
+- The pattern beyond 1 Mb has few dimensions. Three numbers per bin hold 0.73 and 0.70 of it.
+- One number per bin from the genome wide compartment track holds 0.40 and 0.49, half of what the data holds.
+- The ChIA-PET inputs alone hold 0.24 and 0.13 beyond 1 Mb. The loops end under 1 Mb and the singletons are 490
+  pairs a region.
+
+A first form of this table had a row for the mean over pairs of domains of `<cell>_tads.bed`. That file holds
+boundaries, one position a line, and the row was read with every bin as its own domain, which is the map itself.
+It is removed.
+
+Tracks per locus, each standardised over the region, as the product of the values of two bins or as minus their
+difference. The domains are the stretches between the boundaries of `<cell>_tads.bed`, 3 to 17 boundaries a
+region. ATAC is in the data of GM12878 alone.
+
+| predictor from tracks per locus | rows | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|
+| compartment track, product | 18 | 0.13 | 0.34 | 0.44 | 0.49 |
+| compartment track, likeness | 18 | 0.31 | 0.36 | 0.42 | 0.47 |
+| compartment track averaged over its domain, product | 18 | 0.09 | 0.27 | 0.40 | 0.45 |
+| two bins in one domain | 18 | 0.21 | 0.25 | 0.17 | |
+| domains between two bins | 18 | 0.20 | 0.16 | 0.15 | 0.05 |
+| anchors per bin, product | 18 | 0.11 | 0.14 | 0.11 | 0.11 |
+| ATAC, product | 6 | 0.02 | 0.22 | 0.27 | 0.37 |
+| ATAC, likeness | 6 | 0.20 | 0.25 | 0.27 | 0.34 |
+| compartment track with the domains and the anchors, coefficients from the other rows | 18 | 0.07 | 0.26 | 0.41 | 0.47 |
+| GM12878, compartment track with ATAC, coefficients from the other rows | 6 | 0.24 | 0.40 | 0.47 | 0.57 |
+| GM12878, compartment track alone | 6 | 0.24 | 0.47 | 0.56 | 0.64 |
+| one number per bin, the first eigenvector of the region in the other half | 18 | 0.22 | 0.45 | 0.56 | 0.61 |
+| three numbers per bin | 18 | 0.28 | 0.62 | 0.73 | 0.70 |
+
+- The domain boundaries, the anchors and ATAC add nothing to the compartment track beyond 1 Mb. The boundaries
+  hold 0.15 to 0.17 there on their own.
+- The compartment track is the track that holds the pattern. It agrees with the first eigenvector of the region
+  at 0.50 to 0.70 in absolute correlation, and that eigenvector holds 0.56 and 0.61 against 0.44 and 0.49 of the
+  track. By cell line between 1 and 2 Mb: GM12878 0.50 for the track and 0.71 for the eigenvector, H1ESC 0.35
+  and 0.53, HFFC6 0.47 and 0.44.
+- Three numbers per bin hold 0.73 and 0.70 of the 0.88 and 0.81 that the two halves share.
+
+The interaction blocks of the 18 rows: of 360 runs of the locked config, 180 have one block in the region, 80
+have two, 60 three and 40 four. The coarse stage places block centroids, and inside a block it places nothing.
+
+The maintainer on 2026-11-22: a coarse design must not make the model correlate with the Hi-C map by reading the
+map, and the identity of 3D-GNOME stays. The line that follows from it for a coarse term: Hi-C enters as a
+quantity per locus, a domain boundary or a compartment value, of which a region of 5 Mb has 50, and not as a
+target per pair of loci, of which it has 1,225. A model cannot store a map of pairs in a track per locus, and the
+score on the pairs stays a test.
+
+### The compartment term the model has, on the bands
+
+`design/figures/uniform-2026-11-19/comp20/` and `scores-comp20/`, `TAG=comp20`, commit 6cea514.
+`[compartments] use_compartments` with the track `<cell>_compartments.bedGraph` of each cell line, on the default
+chain and on the locked config. The term acts in the heatmap stages, in the placement of the blocks and in the
+smooth stage, as an attraction of two beads of one class. Eighteen rows of twenty structures. The smooth stage
+takes 120 s a structure with the term against 3.5 s.
+
+| arm | SCC | Spearman | ends overlap | exponent over Hi-C | contacts at 100 kb: 1 to 2 Mb | over 2 Mb | distance at 100 kb: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 12 of 360 | 1.044 | 0.07 | 0.00 | 0.32 | 0.17 |
+| default chain with the term | 0.148, 0.265 | 0.552 | 6 of 360 | 1.102 | 0.08 | 0.01 | 0.34 | 0.17 |
+| locked config | 0.335, 0.360 | 0.564 | 18 of 360 | 1.064 | 0.12 | 0.02 | 0.33 | 0.15 |
+| locked config with the term | 0.329, 0.362 | 0.573 | 12 of 360 | 1.079 | 0.14 | 0.03 | 0.34 | 0.14 |
+
+- The term does not move the bands beyond 1 Mb on either chain.
+- On the default chain it costs 0.056 ± 0.014 of raw SCC and raises Spearman by 0.020. On the locked config it
+  changes SCC by 0.006 or less and raises Spearman by 0.009 ± 0.003, on 15 rows of 18.
+
+An attraction between the beads of one class in the smooth stage does not place a megabase. The nodes are placed
+by the node solve, and the smooth stage moves the chain between them.
+
+### Components per locus: the gathering and the term under trial
+
+The maintainer on 2026-11-22: extend the gathering of the A/B compartments to a few numbers per locus and see
+whether structure can be derived from them. MultiMM, whose compartment term the model has, takes the eight ranks
+of CALDER per locus and a table of affinities between classes. The model reads the first two levels, four
+classes, and every run so far fed it one signed eigenvector.
+
+The gathering was measured on counts disjoint from the score. The components of a locus come from the whole map
+of its chromosome arm at 100 kb with the block of the region left out, which is the counts of the locus with
+the rest of the arm. They are scored on the block of the region of half b, by band, over the 18 rows:
+
+| per locus quantity | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|
+| one component | 0.21 | 0.22 | 0.39 | 0.38 |
+| three components | 0.06 | 0.13 | 0.50 | 0.63 |
+| five components | 0.07 | 0.13 | 0.55 | 0.70 |
+| ten components | 0.13 | 0.19 | 0.53 | 0.68 |
+| three components, 2 Mb around the region left out too | 0.08 | 0.12 | 0.51 | 0.62 |
+| classes of loci with a table of their mean affinity, 4 classes | 0.10 | 0.25 | 0.26 | 0.35 |
+| 8 classes | 0.05 | 0.25 | 0.32 | 0.43 |
+| 16 classes | 0.11 | 0.29 | 0.43 | 0.50 |
+
+- Three to five numbers per locus, gathered from counts that hold none of the region, give the pattern inside
+  the region beyond 1 Mb at 0.50 to 0.70, where the two halves of the map share 0.88 and 0.81. A locus has an
+  identity that its contacts with the rest of the chromosome state.
+- The components hold more than classes of loci with a table, at the same or a smaller count of numbers.
+- By cell line with three components, between 1 and 2 Mb and beyond: GM12878 0.70 and 0.80, HFFC6 0.51 and 0.64,
+  H1ESC 0.29 and 0.45.
+- Under 1 Mb the components hold 0.1 to 0.2. That range is the loops and the cells.
+
+The maps of the two halves on the workstation hold the counts of the trial regions alone, and no arm can be
+gathered from them.
+
+`playground/component_track.py` writes the track. Per arm it takes the log of the count over the mean of its
+diagonal, with half of that mean added on both sides, takes the mean of each diagonal off, and keeps the
+eigenvectors of largest absolute eigenvalue. The affinity of two bins is the signed sum of the products of their
+values and has a mean of zero at every separation. A track without that step had one component of the same sign
+on every bin and asked every pair apart.
+
+The term under trial, `[data] components`, off when empty:
+
+| pair of nodes | target |
+|---|---|
+| with a loop | the loop target, as before |
+| held by its contact cell at 5 kb | the distance of the cell, as before |
+| without a loop, closer than `background_range_bp` | the background of the law, as before |
+| any other pair with both nodes in one arm of the track | the background times `exp(-affinity / 3)`, clipped as a cell distance, as a background spring |
+| any other pair | no spring, as before |
+
+Hi-C enters as numbers per locus. The run reads no count of a pair beyond the cells at 5 kb.
+
+#### First trial: a spring on every pair of nodes
+
+`design/figures/uniform-2026-11-19/compo20/` and `scores-compo20/`, `TAG=compo20`, commit 15cdd18. The locked
+config with a track of one, three and five components, gathered from the whole map of each cell line with the
+blocks of the six regions left out, and a control with the law on every pair and no track,
+`background_range_bp` 6000000. In this commit every pair of nodes of the table above got its spring, 12,000 pairs
+on a region. Eighteen rows of twenty structures. The bands are at 100 kb against the balanced half the cells did
+not read, by the pooled contacts and by the mean distance of two bins. The bands of the distance are on the 10
+rows where every bin holds a bead in every structure.
+
+| arm | SCC | Spearman | ends overlap | exponent over Hi-C | distance at 4 Mb | contacts: 1 to 2 Mb | over 2 Mb | distance: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 12 of 360 | 1.044 | 15.0 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config | 0.335, 0.360 | 0.564 | 18 of 360 | 1.064 | 14.9 | 0.12 | 0.02 | 0.33 | 0.15 |
+| the law on every pair, no track | 0.316, 0.307 | 0.612 | 1 of 360 | 1.138 | 18.7 | 0.15 | -0.04 | 0.25 | 0.10 |
+| one component | 0.322, 0.312 | 0.632 | 0 of 360 | 1.099 | 18.1 | 0.18 | 0.01 | 0.40 | 0.37 |
+| three components | 0.317, 0.312 | 0.621 | 1 of 360 | 1.109 | 19.1 | 0.19 | 0.09 | 0.42 | 0.38 |
+| five components | 0.315, 0.310 | 0.617 | 1 of 360 | 1.119 | 19.3 | 0.22 | 0.04 | 0.43 | 0.50 |
+
+- The track carries structure into the model. Against the control with the law alone, five components raise the
+  correlation of the distances with Hi-C by 0.17 ± 0.06 between 1 and 2 Mb and by 0.40 ± 0.10 beyond, on 8 and
+  9 rows of 10, and that of the contacts by 0.07 ± 0.02 between 1 and 2 Mb, on 11 rows of 17. The control has no
+  more structure there than the locked config.
+- The cost is that of a spring on every pair, with or without the track. Balanced SCC falls by 0.05 ± 0.01 on
+  every arm with the springs, the control among them, the decay is 1.10 to 1.14 against 1.06, and the distance at
+  4 Mb is that of the law, 18 to 19 bonds. Spearman rises by 0.05 to 0.07 and the ends overlap in 0 or 1
+  structure of 360.
+- The number of components moves the bands of the distance beyond 2 Mb, 0.37, 0.38 and 0.50, and no other score.
+
+The affinity of two loci is one number. In this trial each pair of nodes of the two loci carried it, 40 pairs
+for one pair of loci on a region of 450 nodes. The second trial has one node stand for a locus.
+
+#### Second trial: one node stands for a locus
+
+`design/figures/uniform-2026-11-19/locus20/` and `scores-locus20/`, `TAG=locus20`, commit c78ce00. One node
+stands for each locus of the track that holds a node, the node nearest to the middle of its bin, and a pair of
+loci has one spring: about 300 springs on a region of 26 loci with a node, where the first trial had 12,000. The
+control is a track of zeros, which holds every pair of loci at the law. Eighteen rows of twenty structures.
+
+| arm | SCC | Spearman | Pearson balanced | ends overlap | exponent over Hi-C | distance at 1 Mb, 4 Mb | contacts at 100 kb: 1 to 2 Mb | over 2 Mb | distance at 100 kb: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 12 of 360 | 1.044 | 11.4, 15.0 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config | 0.335, 0.360 | 0.564 | 0.721 | 18 of 360 | 1.064 | 11.9, 14.9 | 0.12 | 0.02 | 0.33 | 0.15 |
+| the law between the loci, a track of zeros | 0.330, 0.357 | 0.635 | 0.741 | 1 of 360 | 1.042 | 11.5, 18.4 | 0.16 | 0.03 | 0.32 | 0.10 |
+| three components | 0.328, 0.352 | 0.636 | 0.739 | 1 of 360 | 1.031 | 11.4, 18.7 | 0.18 | 0.00 | 0.46 | 0.42 |
+| five components | 0.330, 0.355 | 0.637 | 0.739 | 0 of 360 | 1.033 | 11.5, 18.7 | 0.17 | 0.15 | 0.44 | 0.46 |
+
+The result has two parts.
+
+- The law between the loci, with no track. One spring at the law for each pair of loci raises Spearman by
+  0.071 ± 0.011 on 18 rows of 18, takes the overlap of the ends from 18 structures of 360 to 1 and the exponent
+  over Hi-C from 1.064 to 1.042, and changes SCC by -0.004 ± 0.004. The distance of two beads grows up to 4 Mb,
+  18.4 bonds against 18.2 of the law, and the region no longer folds back. This part reads no Hi-C beyond the
+  exponent of the law.
+- The track on top of it. The correlation of the distances of two bins with Hi-C rises from 0.10 to 0.42 and 0.46
+  beyond 2 Mb, +0.32 ± 0.09 and +0.36 ± 0.09 on 8 and 9 rows of 10, and from 0.32 to 0.44 and 0.46 between 1 and
+  2 Mb. By the pooled contacts five components have 0.15 beyond 2 Mb against 0.03, +0.13 ± 0.07 on 11 rows of 15,
+  and three have none. SCC, Spearman, the ends and the decay are those of the control.
+
+Against the first trial the cost in SCC is gone, 0.005 ± 0.004 of balanced SCC against 0.050, and the decay is
+nearer to Hi-C than that of the locked config.
+
+Half of the loci of a region hold no node, 26 of 50 on the first row, and take no part in the term.
+
+
+
+### The loci of the uniform chain
+
+Decided by the maintainer on 2026-11-22, on the two trials of the components.
+
+A locus is a stretch of 100 kb of a chromosome, on a grid from its start. 100 kb is the bin at which the two
+halves of a Hi-C map agree at 0.8 to 0.9 beyond 1 Mb and at which the component track is gathered.
+
+| part | rule | state |
+|---|---|---|
+| the law between the loci | one node stands for a locus, and every pair of those nodes without a loop, without a cell and beyond `background_range_bp` is held at the background of the law. It reads no Hi-C beyond the exponent of the law | a rule of the uniform chain, with no key |
+| the component track | with `[data] components` the distance of such a pair is the background times `exp(-affinity / 3)`. The affinity of two loci of different arms, or of a locus the track does not hold, is zero | an input, off when empty. The track has five components |
+| the gathering | `playground/component_track.py` on the whole map of the cell line, per chromosome arm, one file a cell line. The option that leaves regions out is for trials | |
+
+The node that stands for a locus. In the two trials it was the node nearest to the middle of the bin, and a locus
+without a node took no part. Half of the loci of a region have no node, 26 of 50 on one row: a node is the bead
+of a loop end.
+
+The design for a locus without a node, with every case:
+
+| case | rule |
+|---|---|
+| a locus inside the chain of a block | it has a locus bead, the bead of the chain nearest to the middle of its bin. The locus bead is a node |
+| a locus bead that is also the bead of a loop end | one node. It keeps its loops |
+| a locus of which the chain of a block covers a part | the bead of that part nearest to the middle of the bin |
+| a locus outside every block | no bead and no part in the term. The chain has no bead there |
+| the same locus in two conformations | the same bead. The locus beads do not depend on the draw of the loop ends or on the dropout |
+
+A locus bead is a node in every respect, and no stage has a rule of its own for it:
+
+| stage | a locus bead |
+|---|---|
+| node solve | is placed with the other nodes. It is held within the chain to its two neighbour nodes, holds the background with the nodes closer than `background_range_bp`, reads its contact cells, and has the excluded volume of a node with the radius from its chain |
+| densify | the chain between two consecutive nodes is filled as before |
+| smooth | it moves with its two neighbours, the centre of mass rule. It has no orientation |
+| the count of nodes with every loop, for the radius from the chain | the locus beads are in it |
+
+Two forms give a locus its node, and the trial measures both against the form of the trials before:
+
+| form | the node of a locus |
+|---|---|
+| `node` | the node nearest to the middle of the bin, none for a locus without a node. The form of the two trials |
+| `fill` | the same, and a locus bead for a locus without a node |
+| `middle` | a locus bead for every locus |
+
+`middle` is one rule for every locus and adds a node per locus, 50 on a region of 5 Mb. `fill` adds a node for
+the loci without one, about 25, and the node of a locus then depends on the draw. The key for the trial is
+`[springs] locus_bead`. The forms that lose are deleted with the key.
+
+#### Trial of the locus bead
+
+`design/figures/uniform-2026-11-19/bead20/` and `scores-bead20/`, `TAG=bead20`, commit 1a1b93d. The locked config
+with the law between the loci under the three forms, and the two forms with a locus bead with the track of five
+components. Eighteen rows of twenty structures. On the first row 26 loci of 50 hold a node, 32 have chain in a
+block, and the nodes are 164, 170 and 193.
+
+| arm | SCC | Spearman | Pearson balanced | ends overlap | exponent over Hi-C | close pairs | contacts at 100 kb: 1 to 2 Mb | over 2 Mb | distance at 100 kb: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 12 of 360 | 1.044 | 11.5 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config before the loci | 0.335, 0.360 | 0.564 | 0.721 | 18 of 360 | 1.064 | 1.4 | 0.12 | 0.02 | 0.33 | 0.15 |
+| `node` | 0.330, 0.357 | 0.635 | 0.741 | 1 of 360 | 1.041 | 1.4 | 0.16 | 0.03 | 0.32 | 0.10 |
+| `fill` | 0.282, 0.336 | 0.628 | 0.768 | 0 of 360 | 1.072 | 1.2 | 0.09 | 0.03 | 0.28 | -0.03 |
+| `middle` | 0.258, 0.316 | 0.616 | 0.772 | 0 of 360 | 1.061 | 1.0 | 0.12 | 0.05 | 0.29 | 0.09 |
+| `node` with the track, of the trial before | 0.330, 0.355 | 0.637 | 0.739 | 0 of 360 | 1.033 | | 0.17 | 0.15 | 0.44 | 0.46 |
+| `fill` with the track | 0.284, 0.341 | 0.634 | 0.766 | 0 of 360 | 1.070 | 1.2 | 0.13 | 0.14 | 0.45 | 0.53 |
+| `middle` with the track | 0.256, 0.317 | 0.623 | 0.770 | 0 of 360 | 1.061 | 1.0 | 0.19 | 0.18 | 0.46 | 0.52 |
+
+- The arm `node` has the scores of the control of the trial before to the last digit. The rule in the chain is
+  the arm that was measured.
+- A locus bead costs SCC. Against `node`, `fill` loses 0.048 ± 0.011 of raw SCC and `middle` 0.072 ± 0.013, on
+  16 rows of 18, and `middle` loses 0.041 ± 0.012 of balanced SCC and 0.018 ± 0.003 of Spearman. Balanced
+  Pearson rises by 0.03.
+- It adds nothing beyond 1 Mb. With the track the bands of `fill` and `middle` are within 0.07 of those of
+  `node`, and no difference is over its error.
+- The beads 10 to 25 kb apart are 7 to 8 percent closer with a locus bead on every locus, 2.89 bonds against
+  3.11 at 10 kb. A node is not a mark on a bead. It holds the background with every node within 100 kb, has the
+  excluded volume of a node and moves by the centre of mass rule, and thirty more of them on a region change the
+  chain at the short range.
+
+`fill` and `middle` are deleted with the key. The node that stands for a locus is the node nearest to its middle,
+and a locus without a node takes no part. A locus without a loop end would need a term on a bead that does not
+make it a node. That is open.
+
+
+### The three bead move in the JAX kernel
+
+The JAX kernel of the smooth stage, `gnome3d/mc/jax/smooth.py`, has the centre of mass rule since 2026-11-22, in
+every form of the kernel: one chain, a batch of blocks, the prefetch of proposals and the cell grid. The batch
+executor runs the smooth stage of the uniform chain.
+
+- A proposal is three parts on a copy of the positions: the bead before the node, the node and the bead after it,
+  with the factors of the draw that the numba kernel has. A bead outside a node moves alone as the first part.
+  The changes of the bonds, the excluded volume, the compartment term, the heat term and the confinement are
+  summed over the parts. The hard wall rejects on the summed count and the summed depth. The orientation sites
+  at the node and two beads from it are scored one after another.
+- With the cell grid the three beads of a move are left out of the cells and of the list of moved beads and are
+  candidates of their own. A bead that an earlier part carried away is not in the list yet.
+- The numba loop ends a run when one round ends above twice the score before it. The JAX loop did not have that
+  stop and has it now, `SMOOTH_STOP_RATIO`. On GM12878 chr1 10 to 20 Mb and 18.3 to 20.3 Mb the stop ended none
+  of 20 runs of the numba kernel under the two production configs. On the chain of 60 beads of the unit test,
+  whose schedule starts hot, it ended one run of 48 after its first round, at twice the score of its start.
+
+`tests/unit/test_centre_move.py` holds for both kernels: the centre of mass of the three beads stays, the running
+score is the energy of the final chain, a node without the rule stays, the orientation score follows the move.
+The medians of the final energy over twelve seeds agree between the kernels within 30 %. The forms with the grid
+are marked slow. The two kernels draw from different streams and their chains differ bead by bead.
+
+One round of the kernel on an RTX 3090, 16 blocks, the prefetch at 32, the cell grid on, no orientation term, in
+microseconds per step of the launch:
+
+| | 16 blocks of 4,096 beads | 16 blocks of 16,384 beads |
+|---|---|---|
+| a move of one bead | 3.8 | 20 |
+| the three bead move, each part scored on a copy of the chain | 16 | 69 |
+| the three bead move, no copy of the chain | 9.6 | 45 |
+
+The three bead move was first scored on a working copy of the positions and of the orientation vectors, one
+copy a proposal under the prefetch. It reads the positions as they are since 2026-11-22: the sums over the other
+beads are corrected for the pairs inside the three beads, the bonds and angles are scored on a window of fifteen
+beads and the orientation sites take their vectors as arguments. A step costs 2.2 to 2.5 times a step of one
+bead. The largest block of chr1 needs 20 million steps, about 15 minutes at 45 microseconds, and every block of
+the launch waits for it. A thread of the numba kernel takes a block of 14,714 beads through 13 million steps in
+60 s.
+
+The reach term and the gyration term of the arcs solve are on the device since 2026-11-22, by the maintainer's
+decision: `DeviceReachEnergy` and `DeviceGyrationEnergy` in `gnome3d/mc/jax/arcs_energy.py`, beside the factory
+term. The radius of gyration of a window is taken about the centroid of the window, which keeps the precision of
+float32 on a chromosome. On positions 300 to 400 beads from the origin the two terms agree with the CPU functions
+within 1e-4 of the energy and of the largest gradient entry. On GM12878 chr1 18.3 to 20.3 Mb the two node solves
+of the uniform chain end at 8.7475 and 7.0771 with the terms on the device against 8.7468 and 7.0771 with them on
+the host, in 394 and 532 iterations against 422 and 535. The beads of the two structures differ after the smooth
+stage, with a correlation of the bead distances of 0.77 and 0.86 between the two builds. The annealer of the arcs
+stage refuses the three terms on both backends.
+
+### The whole chromosome: chr1 of GM12878
+
+The trials above are regions of 5 Mb. On 2026-11-22 whole chr1 of GM12878 was built on the workstation, three
+structures an arm, the arcs energy on an RTX 3090 and the smooth stage on threads: `prod` the default chain,
+`u_pre` the uniform chain before the law between the loci, at 4520d76, `u_loci` the locked config at c85dd1c
+and `u_loci_k5` the same with the component track. The first 60 Mb are scored against the whole map of the cell
+line. No held out half exists at this scale: the contact cells and the track read the map of the score.
+
+| arm | SCC per bead pair at 25 kb, raw and balanced | raw Spearman at 25 kb | contacts at 100 kb, 1 to 2 Mb | beyond 2 Mb |
+|---|---|---|---|---|
+| `prod` | 0.242, 0.237 | 0.171 | 0.049 | 0.030 |
+| `u_pre` | 0.371, 0.339 | 0.169 | 0.040 | 0.014 |
+| `u_loci` | 0.364, 0.336 | 0.223 | 0.119 | 0.054 |
+| `u_loci_k5` | 0.376, 0.345 | 0.222 | 0.233 | 0.171 |
+| `u_dev`, the locked config again at 4bd9f11 | 0.366, 0.336 | 0.222 | 0.036 | 0.024 |
+
+The scores repeat the regions: the uniform chain is 0.10 to 0.12 of SCC over the default chain, the law between
+the loci adds 0.05 of Spearman and the track adds the bands beyond 1 Mb. The locked config built twice has 0.119
+and 0.036 in the band from 1 to 2 Mb: three structures do not carry a difference of that size in a band beyond
+1 Mb, and the law alone adds nothing there, as on the regions.
+
+`u_dev` is the locked config at the commit with the gyration and reach terms on the device. Its SCC, Spearman,
+distances by separation and close pairs are those of `u_loci`: 10.5 beads at 1 Mb and 70.4 at 200 Mb, 246 close
+pairs per thousand beads. A structure of whole chr1 took 8 min 17 s of wall time at a peak of 15.1 GB.
+
+The arm with the smooth stage on the batch executor, `u_batch`, was stopped by the maintainer's choice after 40
+minutes in the smooth stage of its first structure. The launch pads the 89 blocks to 16,384 beads each. The
+threaded smooth stage of the same chromosome takes 25 s. The JAX smooth kernel runs the uniform chain and is not
+the executor for a chromosome, as `SETTINGS.md` states for the default chain.
+
+The chain itself does not repeat the regions. Mean distance in beads by separation, the first structure for the
+counts:
+
+| | 1 Mb | 4 Mb | 10 Mb | 50 Mb | 200 Mb | pairs under 0.7 bonds per 1000 beads | of those over 100 beads apart on the chain | beads within 3 bonds of a bead, median |
+|---|---|---|---|---|---|---|---|---|
+| the law at 0.344 | 10.8 | 17.3 | 23.8 | 41.3 | 66.6 | | | |
+| `prod` | 11.5 | 18.7 | 25.3 | 40.5 | 59.7 | 103 | 21 | 143 |
+| `u_pre` | 12.6 | 20.9 | 26.6 | 41.2 | 58.2 | 50 | 21 | 154 |
+| `u_loci` | 10.5 | 17.0 | 23.3 | 44.4 | 70.3 | 236 | 126 | 206 |
+| `u_loci`, chr1 10 to 15 Mb alone | 12.1 | 17.6 | | | | 7 | 0 | 101 |
+
+- With the law between the loci the chromosome is at the law at every separation. Without it the chain is 7 to
+  21 % over the law from 1 to 10 Mb.
+- At the law the chain is a third denser around a bead than without the rule, and the pairs of beads under 0.7
+  bonds are 236 per thousand beads against 50. The added pairs are of beads far apart on the chain. They are in
+  149 of 199 windows of 1 Mb.
+- A region of 5 Mb built alone has two thirds of the density of the same chain inside the chromosome and 7 close
+  pairs per thousand beads, with the rule and without it. A region has nothing around it. The trials on
+  regions could not show the cost of the rule.
+- The rule holds 873,058 pairs of 1,323 loci on chr1 and 1,225 pairs of 50 loci in a region of 5 Mb, each pair
+  at one weight. A locus of the chromosome has 1,322 springs and a locus of a region 49. The balance of the rule
+  against the excluded volume of the arcs stage changes with the length of the chromosome.
+- Before the relaxation a block holds 0.91 pairs of beads under 0.7 bonds per bead with the rule and 0.55
+  without it, against 0.40 in a region. The relaxation removes 98 % of them in a region and three quarters on
+  the chromosome with the rule.
+- The battery splits close pairs by block with a rule of the default chain. On the uniform chain that split is
+  not valid. The counts above are of `/tmp/close_where.py` on the workstation and of the lines of the
+  relaxation in the logs.
+
+### The pairs of loci that the law holds: four forms on chr1
+
+The maintainer chose on 2026-11-22 to measure four forms of the rule under `[springs] loci_pairs`, a key of the
+trial: `near`, the pairs up to 5 Mb apart, the span of the regions of the trials. `octave`, the pairs whose
+offset in the order of the loci is 1, 2, 3, 4, 6, 8, 12, 16 and on. `near_octave`, either. `segment`, the pairs
+of one segment of the coarse stage. Whole chr1 of GM12878, three structures a form, at e7025fd, beside the arms
+above. The close pairs and the density are means over the three structures, `/tmp/close_all.py`.
+
+| form | pairs held | SCC per bead pair at 25 kb, raw and balanced | raw Spearman | close pairs per 1000 beads | of those over 100 beads apart | beads within 3 bonds | 1 Mb | 4 Mb | 200 Mb |
+|---|---|---|---|---|---|---|---|---|---|
+| no rule, `u_pre` | 0 | 0.371, 0.339 | 0.169 | 67 | 31 | 161 | 12.6 | 20.9 | 58.2 |
+| `all`, `u_dev` | 873,058 | 0.366, 0.336 | 0.222 | 266 | 148 | 210 | 10.5 | 17.1 | 70.4 |
+| `near` | 40,279 | 0.369, 0.341 | 0.161 | 109 | 59 | 172 | 12.0 | 20.1 | 59.4 |
+| `octave` | 21,476 | 0.378, 0.350 | 0.169 | 47 | 20 | 151 | 12.0 | 19.6 | 64.6 |
+| `near_octave` | 51,090 | 0.381, 0.355 | 0.167 | 66 | 30 | 156 | 11.8 | 20.2 | 65.8 |
+| `segment` | 116,218 | 0.376, 0.349 | 0.184 | 115 | 59 | 175 | 11.3 | 19.3 | 56.4 |
+| the default chain, `prod` | | 0.242, 0.237 | 0.171 | 100 | 19 | 140 | 11.5 | 18.7 | 59.7 |
+
+The last three columns are the mean distance in beads at that separation. The law gives 10.8, 17.3 and 66.6.
+
+- `octave` and `near_octave` have the close pairs of the chain without the rule or fewer, and the highest SCC of
+  the forms. Their chromosome is at the law at 200 Mb and 10 % over it from 1 to 10 Mb, as a region built alone.
+- `near` and `segment` hold the middle range alone. They have 1.6 to 1.7 times the close pairs of the chain
+  without the rule.
+- `all` alone has the Spearman of 0.22 over the map of 60 Mb. Every other form has that of the chain without
+  the rule. Three structures give a sparse pooled map beyond 1 Mb, and the denser chain of `all` fills it.
+- The band of contacts from 1 to 2 Mb at 100 kb is 0.08 for `near` and `octave`, 0.13 for `near_octave` and
+  0.03 for `segment`, against 0.04 without the rule. Three structures do not carry that band.
+
+`near` and `near_octave` hold every pair of a region of 5 Mb and are the locked config there. `octave` and
+`segment` on the 18 regions at twenty structures, the trial `loci20`, against every pair, `o_on`:
+
+| at 25 kb | `octave` | rows above | p | `segment` | rows above | p |
+|---|---|---|---|---|---|---|
+| SCC per bead pair, balanced | -0.000 ± 0.002 | 10 of 18 | 0.74 | -0.000 ± 0.000 | 0 of 18 | 0.18 |
+| Spearman | -0.033 ± 0.005 | 0 of 18 | 0.0002 | -0.005 ± 0.004 | 0 of 18 | 0.18 |
+| structures with overlapping ends, of 360 | 3 | | | 5 | | |
+
+Every pair has 1 structure of 360 with overlapping ends. `octave` gives up half of the Spearman that the rule
+gains on a region. `segment` is every pair on most rows, a region of 5 Mb being one or two segments.
+
+The effort of the annealing does not fall with the length of the chain. On whole chr1 the smooth stage runs 930
+to 1,400 steps per movable bead on blocks of 600 to 14,700 beads and the relaxation 1,145 steps per movable bead
+on the 162,522 movable beads of the chromosome, in 3,722 rounds and 608 s. A region of 10 Mb has 1,160 to
+1,430. The close pairs of a whole chromosome are those of its density.
+
+The maintainer chose `near_octave` on 2026-11-22. It is the rule since: `loci_pairs` in
+`gnome3d/pipeline/ib/components.py` holds every pair of loci up to `NEAR_BP`, 5 Mb, and beyond it the pairs whose
+offset in the order of the loci is on the ladder of `octave_offsets`. `[springs] loci_pairs` and the other forms
+are deleted. A region of 5 Mb is the locked config, byte for byte on the gate. On chr1 a locus has about 110
+springs against 1,322.
+
+## The config locked on 2026-11-21
+
+`gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
+
+| part | rule | key |
+|---|---|---|
+| the chain | one bead per kilobase, nodes at the loop ends, the centre of mass rule | `[main] uniform_chain` |
+| the bonds | squeeze as stiff as stretch | `[springs] squeeze_constant` 1.0 |
+| the contact cells | one resolution, 5 kb or the finest the map holds over it. A cell over its expectation holds its pair closer and a cell under it further. The expectation is the mean at the separation times the bias of the two bins from the balancing weights of the map | `[data] contact_map`, `[springs] contact_resolution` |
+| the threshold of a cell | 3 Poisson deviations | `[springs] contact_background_z` 3 |
+| the loops of a conformation | each kept by its strength | `[springs] loop_dropout` |
+| the excluded volume of the arcs stage | the derived radius, from every loop of the chromosome, times the mean of the factors of the two nodes from the chain each stands for | `[excluded_volume] arcs_chain_radius` sum |
+| the long range, since 2026-11-22 | one node stands for each locus of 100 kb, and a pair of those nodes without a loop, without a cell and beyond `background_range_bp` holds the background of the law: every pair up to 5 Mb apart and two offsets to a doubling beyond | no key |
+
+On 18 rows of twenty structures, on counts the run did not read, against the default chain, with the law
+between the loci: 0.330 and 0.357 of raw and balanced SCC per bead pair at 25 kb against 0.204 and 0.268.
+Spearman 0.635 against 0.532. Balanced Pearson 0.741 against 0.705. 1.4 close pairs per thousand beads against
+11.5. The exponent of the decay over that of Hi-C is 1.04 against 1.04. The ends of a region overlap in 1
+structure of 360 against 12. No structure has a stretched piece. Before the law between the loci the config had
+0.335 and 0.360 of SCC, a Spearman of 0.564, an exponent of 1.06 and the ends overlapping in 18 structures.
+
+`[data] components`, the track of five components per locus, is an input on top of the config and is off when
+empty. With it the correlation of the distances of two bins with Hi-C beyond 2 Mb is 0.46 against 0.10 and that
+of the pooled contacts 0.15 against 0.03, at the same SCC and Spearman.
+
+Measured and deleted: the ladder of resolutions with both sides and with the cells over their expectation alone,
+the pseudo count and the bound estimate of a cell, the cap of the radius of a pair by the chain and by the target,
+the product form of the radius from the chain, the midpoint draw, the fixed node, the bond limit of the
+orientation term. Each has its trial above.
+
+Open: a locus without a loop end takes no part in the law between the loci or in the track, section "The loci of
+the uniform chain". The pooled contacts beyond 1 Mb reach 0.15 to 0.19 where the two halves of a map share 0.8 to
+0.9. The site has no control for the chain. Whole chromosomes of other cell lines and other chromosomes are not
+built.
+
+## Settings
+
+A setting is added when a run reads it.
+
+- `[main] uniform_chain` selects the chain.
+- The draw is uniform over the span. `[main] contact_bead` selected the draw at the midpoint, which lost the trial
+  of the draw, and was removed on 2026-11-20.
+- Bounded drift is `[simulation_arcs_smooth] anchor_cap`, which exists.
+- The centre of mass rule is the rule of the uniform chain. `[simulation_arcs_smooth] anchor_centre` selected it
+  against the fixed node, which lost the trial of the rules and step 3 of `uniform_night4.sh`, and was removed on
+  2026-11-20. Both kernels of the smooth stage have the move and the uniform chain runs on every executor.
+
+## The first build
+
+Commits 9d8b59f and a898a0e. It kept the arcs stage on points and added a hold to the smooth stage.
+
+- Each anchor is one arcs node at its midpoint. Anchors with their midpoints in one bead are one node, and a pair of
+  nodes takes the shortest loop target of its anchor pairs. PET counts do not add.
+- The smooth stage moves every bead and adds `anchor_span_weight * |centroid - home|^2` per span. On the traced
+  region the centroids end a median of 0.7 beads from their homes. No stage owns the position of an anchor.
+- The arcs stage has no reach term and nodes one bead apart have homes a median of 1.5 beads apart.
+- The numba and the JAX smooth kernels both have the span term.
+
+`design/features.md` has its measurements and the trace of the long bonds.
+
+### Trial of the first build
+
+`design/figures/uniform-2026-11-19/` has the figure `arms.png`, the table `arms.md` and the score files. Six arms on
+GM12878, H1ESC and HFFC6, chr1 10 to 15 Mb and 20 to 25 Mb, five structures per arm, pooled maps at 25 kb. Mean over
+the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | exponent over Hi-C |
+|---|---|---|---|---|---|
+| default chain | 0.327 | 0.307 | 0.448 | 0.716 | 1.062 |
+| default chain, orientation off | 0.320 | 0.296 | 0.440 | 0.717 | 1.073 |
+| first build | 0.332 | 0.334 | 0.452 | 0.708 | 1.038 |
+| first build, orientation off | 0.334 | 0.335 | 0.451 | 0.708 | 1.042 |
+| first build, span weight 0.1 | 0.319 | 0.323 | 0.452 | 0.708 | 1.038 |
+| first build, span weight 0.1, orientation off | 0.317 | 0.320 | 0.449 | 0.709 | 1.048 |
+
+- The first build gains raw SCC on five rows of six, 0.02 to 0.09, and loses 0.20 on HFFC6 chr1 10 to 15 Mb, 0.477 to
+  0.278. That row is not traced.
+- Balanced SCC is up 0.027 in the mean, Spearman level, balanced Pearson down 0.008.
+- The battery counts 9.8 overlapping pairs per thousand beads on the default chain and 16.2 on the first build. It
+  reads neighbours from the file order and splits pairs by the kind of bead. Both differ between the chains and the
+  two counts are not yet comparable.
+- Five structures per arm are few for a pooled map. The trial is a baseline and decides nothing.

@@ -1,4 +1,0 @@
-chr1:1-60000000 @ 100 kb: experimental saddle 1.489
-  arm                           saddle  eig |r|   kappa   n
-  HG00732_C_60mb                 1.013    0.189   0.215  10
-  HG00732_R_60mb                 0.991    0.143   0.020  10

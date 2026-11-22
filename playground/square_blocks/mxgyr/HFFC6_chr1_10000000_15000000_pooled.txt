@@ -1,5 +1,0 @@
-chr1:10000000-15000000, pooled ensemble against Hi-C at 25000 bp
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC
-             HFFC6_chr1_10000000_15000000_prod   5   0.459   0.356   0.454   0.738   0.338   0.388
-       HFFC6_chr1_10000000_15000000_gyr01relax   5   0.529   0.438   0.443   0.698   0.432   0.382
-            HFFC6_chr1_10000000_15000000_mxgyr   5   0.528   0.428   0.486   0.697   0.417   0.415

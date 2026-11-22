@@ -174,6 +174,10 @@ NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
 NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 NO_F64: F64Array = np.zeros(1, dtype=np.float64)
 NO_F64_N3: F64Array = np.zeros((1, 3), dtype=np.float64)
+NO_I32_N1: I32Array = np.full((1, 1), -1, dtype=np.int32)
+# The beads to either side of an anchor that give its direction: the shortest stretch in which a
+# bead moved by one bond turns the vector by under 5 degrees, design/orientation-term.md.
+ORIENTATION_STRETCH = 3
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -376,22 +380,51 @@ def init_affinity_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _calc_orientation_nb(
-    pos: F64Array, cind: int, n: int, is_L: bool
+def calc_orientation_stretch_nb(
+    pos: F64Array, cind: int, n: int, is_L: bool, stretch: int
 ) -> tuple[float, float, float]:
-    """Returns the unit orientation vector of the anchor at `cind`."""
-    if cind == 0:
-        ox = pos[cind + 1, 0] - pos[cind, 0]
-        oy = pos[cind + 1, 1] - pos[cind, 1]
-        oz = pos[cind + 1, 2] - pos[cind, 2]
-    elif cind == n - 1:
-        ox = pos[cind, 0] - pos[cind - 1, 0]
-        oy = pos[cind, 1] - pos[cind - 1, 1]
-        oz = pos[cind, 2] - pos[cind - 1, 2]
-    else:
-        ox = pos[cind + 1, 0] - pos[cind - 1, 0]
-        oy = pos[cind + 1, 1] - pos[cind - 1, 1]
-        oz = pos[cind + 1, 2] - pos[cind - 1, 2]
+    """Returns the unit orientation vector of the anchor at `cind` over a stretch of chain: from
+    the centroid of the `stretch` beads before it to the centroid of the `stretch` beads after
+    it. A side with fewer beads has the centroid of those there are and a side with none has
+    the anchor bead.
+    """
+    lo = cind - stretch
+    if lo < 0:
+        lo = 0
+    hi = cind + stretch
+    if hi > n - 1:
+        hi = n - 1
+    bx = pos[cind, 0]
+    by = pos[cind, 1]
+    bz = pos[cind, 2]
+    if cind > lo:
+        bx = 0.0
+        by = 0.0
+        bz = 0.0
+        for i in range(lo, cind):
+            bx += pos[i, 0]
+            by += pos[i, 1]
+            bz += pos[i, 2]
+        bx /= cind - lo
+        by /= cind - lo
+        bz /= cind - lo
+    ax = pos[cind, 0]
+    ay = pos[cind, 1]
+    az = pos[cind, 2]
+    if hi > cind:
+        ax = 0.0
+        ay = 0.0
+        az = 0.0
+        for i in range(cind + 1, hi + 1):
+            ax += pos[i, 0]
+            ay += pos[i, 1]
+            az += pos[i, 2]
+        ax /= hi - cind
+        ay /= hi - cind
+        az /= hi - cind
+    ox = ax - bx
+    oy = ay - by
+    oz = az - bz
     if is_L:
         ox = -ox
         oy = -oy
@@ -402,6 +435,61 @@ def _calc_orientation_nb(
         oy /= nm
         oz /= nm
     return ox, oy, oz
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def rescore_sites_nb(
+    pos: F64Array,
+    n: int,
+    sites: I32Array,
+    site_old: F64Array,
+    anchor_orn: F64Array,
+    anchor_ar: I32Array,
+    orn_is_L: BoolArray,
+    nbr_offsets: I32Array,
+    nbr_indices: I32Array,
+    nbr_weights: F64Array,
+    motif_weight: float,
+    motifs_symmetric: bool,
+    stretch: int,
+) -> float:
+    """Gives the sites of `sites` their vectors at the current positions, one after another,
+    and returns the change of the orientation score. `site_old` receives the vectors before, for
+    `restore_sites_nb`. `sites` ends at its first -1.
+    """
+    change = 0.0
+    for m in range(sites.shape[0]):
+        k = sites[m]
+        if k < 0:
+            break
+        site_old[m, 0] = anchor_orn[k, 0]
+        site_old[m, 1] = anchor_orn[k, 1]
+        site_old[m, 2] = anchor_orn[k, 2]
+        before = _local_score_orientation_nb(
+            anchor_orn, k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric
+        )
+        ar = int(anchor_ar[k])
+        ox, oy, oz = calc_orientation_stretch_nb(pos, ar, n, bool(orn_is_L[ar]), stretch)
+        anchor_orn[k, 0] = ox
+        anchor_orn[k, 1] = oy
+        anchor_orn[k, 2] = oz
+        after = _local_score_orientation_nb(
+            anchor_orn, k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric
+        )
+        change += 2.0 * (after - before)
+    return change
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def restore_sites_nb(sites: I32Array, site_old: F64Array, anchor_orn: F64Array) -> None:
+    """Puts back the vectors that `rescore_sites_nb` replaced."""
+    for m in range(sites.shape[0]):
+        k = sites[m]
+        if k < 0:
+            break
+        anchor_orn[k, 0] = site_old[m, 0]
+        anchor_orn[k, 1] = site_old[m, 1]
+        anchor_orn[k, 2] = site_old[m, 2]
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -640,6 +728,10 @@ def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float
 # Heat, orientation, excluded volume and compartment add 2 * (curr - prev). Confinement adds (curr -
 # prev).
 #
+# Under `use_centre` a node keeps the centre of mass of itself, the bead before it and the bead
+# after it. `centre_of` gives that node for each of the three beads, -1 for any other bead.
+# `move_sites` gives the orientation sites that the move of a bead reads, a row ended by -1.
+#
 # A move is kept when `score_new < score` under `strict_better` and when `score_new <= score`
 # otherwise. Smooth is strict.
 
@@ -787,6 +879,158 @@ def init_excl_cells_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
+def step_delta_nb(
+    pos: F64Array,
+    p: int,
+    dx: float,
+    dy: float,
+    dz: float,
+    dtn: F64Array,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+    use_heat: bool,
+    heat_dist: F64Array,
+    heat_weight: float,
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    use_conf: bool,
+    conf_cx: float,
+    conf_cy: float,
+    conf_cz: float,
+    conf_R: float,
+    conf_weight: float,
+    use_comp: bool,
+    comp_cls: I8Array,
+    comp_r0: float,
+    comp_weight: float,
+    comp_ea: float,
+    comp_eb: float,
+    use_cells: bool,
+    cell_lo: F64Array,
+    cell_dim: I64Array,
+    cell_size: float,
+    cell_head: I32Array,
+    cell_next: I32Array,
+    cell_where: I32Array,
+    cell_buf: I32Array,
+    use_wall: bool,
+) -> tuple[float, float, float, float, float, int, float]:
+    """Moves bead p of a chain by (dx, dy, dz) in place and returns the changes that the move
+    makes: of the structure, heat, excluded volume, confinement and compartment scores, of the
+    count of pairs under the wall radius and of their summed depth.
+
+    The changes of several beads moved one after another sum to the change of the whole move.
+    The cell grid follows the bead.
+    """
+    n = pos.shape[0]
+    s0 = local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+    h0 = 0.0
+    if use_heat:
+        h0 = local_heat_nb(pos, heat_dist, p, heat_weight)
+    e0 = 0.0
+    if use_excl:
+        if use_cells:
+            e0 = local_excl_cells_nb(
+                pos,
+                p,
+                excl_r0,
+                excl_weight,
+                excl_skip,
+                cell_lo,
+                cell_dim,
+                cell_size,
+                cell_head,
+                cell_next,
+                cell_buf,
+            )
+            if e0 < 0.0:
+                e0 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+        else:
+            e0 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+    cnt0 = 0
+    dep0 = 0.0
+    if use_wall:
+        if use_cells:
+            cnt0, dep0 = _wall_local_cells_nb(
+                pos, p, excl_r0, excl_skip, cell_lo, cell_dim, cell_size, cell_head, cell_next
+            )
+        else:
+            cnt0, dep0 = _wall_local_nb(pos, p, excl_r0, excl_skip)
+    c0 = 0.0
+    if use_conf:
+        c0 = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight)
+    a0 = 0.0
+    if use_comp:
+        a0 = local_affinity_nb(pos, p, use_comp, comp_cls, comp_r0, comp_weight, comp_ea, comp_eb)
+
+    pos[p, 0] += dx
+    pos[p, 1] += dy
+    pos[p, 2] += dz
+    if use_cells:
+        relink_nb(
+            cell_head,
+            cell_next,
+            cell_where,
+            p,
+            cell_of_nb(pos[p, 0], pos[p, 1], pos[p, 2], cell_lo, cell_dim, cell_size),
+        )
+
+    s1 = local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+    h1 = 0.0
+    if use_heat:
+        h1 = local_heat_nb(pos, heat_dist, p, heat_weight)
+    e1 = 0.0
+    if use_excl:
+        if use_cells:
+            e1 = local_excl_cells_nb(
+                pos,
+                p,
+                excl_r0,
+                excl_weight,
+                excl_skip,
+                cell_lo,
+                cell_dim,
+                cell_size,
+                cell_head,
+                cell_next,
+                cell_buf,
+            )
+            if e1 < 0.0:
+                e1 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+        else:
+            e1 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+    cnt1 = 0
+    dep1 = 0.0
+    if use_wall:
+        if use_cells:
+            cnt1, dep1 = _wall_local_cells_nb(
+                pos, p, excl_r0, excl_skip, cell_lo, cell_dim, cell_size, cell_head, cell_next
+            )
+        else:
+            cnt1, dep1 = _wall_local_nb(pos, p, excl_r0, excl_skip)
+    c1 = 0.0
+    if use_conf:
+        c1 = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight)
+    a1 = 0.0
+    if use_comp:
+        a1 = local_affinity_nb(pos, p, use_comp, comp_cls, comp_r0, comp_weight, comp_ea, comp_eb)
+    return (
+        s1 - s0,
+        2.0 * (h1 - h0),
+        2.0 * (e1 - e0),
+        c1 - c0,
+        2.0 * (a1 - a0),
+        cnt1 - cnt0,
+        dep1 - dep0,
+    )
+
+
+@njit(cache=True, fastmath=True, nogil=True)
 def batch_mc_nb(
     pos: F64Array,
     movable: I64Array,
@@ -813,7 +1057,6 @@ def batch_mc_nb(
     nbr_indices: I32Array,
     nbr_weights: F64Array,
     anchor_orn: F64Array,
-    bead_to_anchor_k: I32Array,
     motif_weight: float,
     motifs_symmetric: bool,
     # ---- Excluded volume term ----
@@ -866,8 +1109,13 @@ def batch_mc_nb(
     cap_r: F64Array = NO_F64,
     use_arc_w: bool = False,
     arc_w: F32Array = NO_W,
+    use_centre: bool = False,
+    centre_of: I32Array = NO_I32,
+    move_sites: I32Array = NO_I32_N1,
 ) -> tuple[float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
+    moves = np.zeros(3)
+    moved_old = np.zeros((move_sites.shape[1], 3))
     n_mov = movable.shape[0]
     n_ok = 0
     wall_cnt0 = 0
@@ -879,6 +1127,131 @@ def batch_mc_nb(
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
+
+        if use_centre and centre_of[p] >= 0:
+            # The bead belongs to a node that keeps the centre of mass of itself, the bead before
+            # it and the bead after it. The node moves by the draw and its two neighbours by
+            # minus half of it. A neighbour moves by the draw and the other neighbour by minus
+            # it. The single moves of the three beads sum to the change of the whole move. The
+            # sites at the node and two beads from it read a moved bead.
+            c = int(centre_of[p])
+            d_struct = 0.0
+            d_heat = 0.0
+            d_excl = 0.0
+            d_conf = 0.0
+            d_comp = 0.0
+            d_cnt = 0
+            d_dep = 0.0
+            for part in range(3):
+                q = c - 1 + part
+                if p == c:
+                    f = 1.0 if part == 1 else -0.5
+                elif q == p:
+                    f = 1.0
+                elif q == c:
+                    f = 0.0
+                else:
+                    f = -1.0
+                moves[part] = f
+                if f == 0.0:
+                    continue
+                ds, dh, de, dc, da, dn, dd = step_delta_nb(
+                    pos,
+                    q,
+                    f * dx,
+                    f * dy,
+                    f * dz,
+                    dtn,
+                    stretch_k,
+                    squeeze_k,
+                    ang_k,
+                    dist_w,
+                    ang_w,
+                    use_heat,
+                    heat_dist,
+                    heat_weight,
+                    use_excl,
+                    excl_r0,
+                    excl_weight,
+                    excl_skip,
+                    use_conf,
+                    conf_cx,
+                    conf_cy,
+                    conf_cz,
+                    conf_R,
+                    conf_weight,
+                    use_comp,
+                    comp_cls,
+                    comp_r0,
+                    comp_weight,
+                    comp_ea,
+                    comp_eb,
+                    use_cells,
+                    cell_lo,
+                    cell_dim,
+                    cell_size,
+                    cell_head,
+                    cell_next,
+                    cell_where,
+                    cell_buf,
+                    use_wall,
+                )
+                d_struct += ds
+                d_heat += dh
+                d_excl += de
+                d_conf += dc
+                d_comp += da
+                d_cnt += dn
+                d_dep += dd
+            d_orn = 0.0
+            if use_orn:
+                d_orn = rescore_sites_nb(
+                    pos, n, move_sites[p], moved_old, anchor_orn, anchor_ar, orn_is_L,
+                    nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric,
+                    ORIENTATION_STRETCH,
+                )  # fmt: skip
+
+            score_new = score + d_struct + d_heat + d_excl + d_conf + d_comp + d_orn
+            if use_wall and (d_cnt > 0 or (d_cnt == 0 and d_dep > 0.0)):
+                ok = False
+            else:
+                ok = score_new < score if strict_better else score_new <= score
+                if not ok and T > 0.0 and score > 0.0:
+                    ok = np.random.random() < jump_scale * math.exp(
+                        -jump_coef * (score_new / score) / T
+                    )
+            if ok:
+                n_ok += 1
+                score = score_new
+                score_struct += d_struct
+                score_heat += d_heat
+                score_excl += d_excl
+                score_conf += d_conf
+                score_comp += d_comp
+                score_orn += d_orn
+            else:
+                for part in range(3):
+                    f = moves[part]
+                    if f == 0.0:
+                        continue
+                    q = c - 1 + part
+                    pos[q, 0] -= f * dx
+                    pos[q, 1] -= f * dy
+                    pos[q, 2] -= f * dz
+                    if use_cells:
+                        relink_nb(
+                            cell_head,
+                            cell_next,
+                            cell_where,
+                            q,
+                            cell_of_nb(
+                                pos[q, 0], pos[q, 1], pos[q, 2], cell_lo, cell_dim, cell_size
+                            ),
+                        )
+                if use_orn:
+                    restore_sites_nb(move_sites[p], moved_old, anchor_orn)
+            T *= dt
+            continue
 
         if struct_type == STRUCT_ARCS:
             loc_struct_prev = _local_arcs_nb(
@@ -941,27 +1314,6 @@ def batch_mc_nb(
                 comp_ea,
                 comp_eb,
             )
-
-        orn_k: int = -1
-        prev_ox = 0.0
-        prev_oy = 0.0
-        prev_oz = 0.0
-        loc_orn_prev = 0.0
-        if use_orn:
-            orn_k = int(bead_to_anchor_k[p])
-            if orn_k >= 0:
-                prev_ox = anchor_orn[orn_k, 0]
-                prev_oy = anchor_orn[orn_k, 1]
-                prev_oz = anchor_orn[orn_k, 2]
-                loc_orn_prev = _local_score_orientation_nb(
-                    anchor_orn,
-                    orn_k,
-                    nbr_offsets,
-                    nbr_indices,
-                    nbr_weights,
-                    motif_weight,
-                    motifs_symmetric,
-                )
 
         pos[p, 0] += dx
         pos[p, 1] += dy
@@ -1048,22 +1400,11 @@ def batch_mc_nb(
             score_comp_new = score_comp + 2.0 * (loc_comp_curr - loc_comp_prev)
 
         score_orn_new = score_orn
-        if use_orn and orn_k >= 0:
-            ar: int = int(anchor_ar[orn_k])
-            ox, oy, oz = _calc_orientation_nb(pos, ar, n, bool(orn_is_L[ar]))
-            anchor_orn[orn_k, 0] = ox
-            anchor_orn[orn_k, 1] = oy
-            anchor_orn[orn_k, 2] = oz
-            loc_orn_curr = _local_score_orientation_nb(
-                anchor_orn,
-                orn_k,
-                nbr_offsets,
-                nbr_indices,
-                nbr_weights,
-                motif_weight,
-                motifs_symmetric,
-            )
-            score_orn_new = score_orn + 2.0 * (loc_orn_curr - loc_orn_prev)
+        if use_orn:
+            score_orn_new = score_orn + rescore_sites_nb(
+                pos, n, move_sites[p], moved_old, anchor_orn, anchor_ar, orn_is_L, nbr_offsets,
+                nbr_indices, nbr_weights, motif_weight, motifs_symmetric, ORIENTATION_STRETCH,
+            )  # fmt: skip
 
         score_new = (
             score_struct_new
@@ -1107,10 +1448,8 @@ def batch_mc_nb(
             pos[p, 0] -= dx
             pos[p, 1] -= dy
             pos[p, 2] -= dz
-            if use_orn and orn_k >= 0:
-                anchor_orn[orn_k, 0] = prev_ox
-                anchor_orn[orn_k, 1] = prev_oy
-                anchor_orn[orn_k, 2] = prev_oz
+            if use_orn:
+                restore_sites_nb(move_sites[p], moved_old, anchor_orn)
         T *= dt
     return (
         T,

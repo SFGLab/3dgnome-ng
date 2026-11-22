@@ -1,6 +1,6 @@
 /** The parts of the site the server turns off, the features of its `config.json`. */
 
-export type Part = 'results' | 'method' | 'trios'
+export type Part = 'results' | 'method' | 'trios' | 'uniform_chain'
 
 /**
  * Returns true for a part of the site that is turned off. The server puts

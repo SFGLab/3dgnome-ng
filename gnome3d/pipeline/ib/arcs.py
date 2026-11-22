@@ -76,8 +76,15 @@ def _run_one(problem: Problem, backend: str) -> Result:
                 arc_w=arc_w,
                 activity=activity,
                 mids=g[:, 2] if g.ndim == 2 else g,
+                reach=problem.get("reach"),
+                share=problem.get("share"),
             )
         else:
+            if problem.get("reach") is not None:
+                raise NotImplementedError(
+                    "the reach term of the uniform chain is in the solver's energy, not the"
+                    " annealer's; set [simulation_arcs] solver = lbfgs"
+                )
             if float(s.gyration_weight) > 0.0:
                 raise NotImplementedError(
                     "the gyration term is in the solver's energy, not the annealer's; set "

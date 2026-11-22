@@ -41,6 +41,8 @@ class JobRequest:
     upload_vcf: str = ""
     overrides: dict[str, str] = field(default_factory=_no_overrides)
     background: str = "hic"
+    # The chain of the model, `anchors` or `uniform`, see CHAINS.
+    chain: str = "anchors"
     own: dict[str, object] = field(default_factory=_no_own)
     # The expression of the job by its source, its columns, the kind, the unit and the label. Empty
     # for a job without expression.
@@ -64,6 +66,9 @@ def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
     d["hicdiffusion"] = d["background"] == "hicdiffusion"
     if d["background"] in ("hic", "hicdiffusion"):
         del d["background"]
+    # The key of a request on loop anchors is the one it had before the chain was a choice.
+    if d["chain"] == "anchors":
+        del d["chain"]
     # The key of a request without expression is the one it had before expression existed. A
     # table is in the key by its source, its columns and its kind. Its label is not.
     if not d["expression"]:

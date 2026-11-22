@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from gnome3d.data import ContactData
     from gnome3d.settings import Settings
     from gnome3d.skeleton import IBSeed
-    from gnome3d.types import BeadOut, BedRegion
+    from gnome3d.types import BeadOut, BedRegion, BoolArray
 
 LOG = log.get("reconstruct")
 
@@ -122,21 +122,37 @@ def _beads(output: State) -> list[BeadOut]:
     return output.beads
 
 
+def _fixed(output: State) -> BoolArray:
+    """Returns the beads of a terminal smooth node that the smooth stage did not move."""
+    assert isinstance(output, Smoothed)
+    return output.fixed
+
+
 def _assemble(
-    per_chr: dict[str, list[list[BeadOut]]], settings: Settings, seed: int = 0
+    per_chr: dict[str, list[list[BeadOut]]],
+    settings: Settings,
+    seed: int = 0,
+    fixed: dict[str, list[BoolArray]] | None = None,
 ) -> dict[str, list[BeadOut]]:
     """Joins the beads of each chromosome's blocks into one list in genomic order.
 
     With `use_hole_beads` the holes between blocks get beads first, drawn from generators seeded
-    by `seed`. With `use_boundary_stitch` the blocks are stitched at their edges.
+    by `seed`. With `use_boundary_stitch` the blocks are stitched at their edges. `fixed` gives
+    the nodes of each block of a uniform chain, which the relaxation holds.
     """
+    if fixed is not None and (settings.use_hole_beads or settings.use_boundary_stitch):
+        raise ValueError(
+            "[main] uniform_chain is on with hole beads or the boundary stitch. Both read the"
+            " anchors from the kind of a bead and are not stated on the nodes of the uniform"
+            " chain. Set [holes] use_hole_beads and [boundary_stitch] use_boundary_stitch to no."
+        )
     out: dict[str, list[BeadOut]] = {}
     for chr_, blocks in per_chr.items():
         blocks = fill_holes(blocks, settings, chr_, seed)
         if settings.use_boundary_stitch:
             blocks = stitch_blocks(blocks, settings)
         if settings.use_cross_block_relax:
-            blocks = relax_blocks(blocks, settings)
+            blocks = relax_blocks(blocks, settings, None if fixed is None else fixed[chr_])
         out[chr_] = sorted((b for block in blocks for b in block), key=lambda b: b.start)
     return out
 
@@ -161,10 +177,13 @@ def reconstruct(
     outputs = (executor or SerialExecutor()).run(dag)
 
     per_chr: dict[str, list[list[BeadOut]]] = defaultdict(list)
+    fixed: dict[str, list[BoolArray]] = defaultdict(list)
     for ibs in ib_sink:
-        per_chr[ibs.chr_].append(_beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)]))
+        out = outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)]
+        per_chr[ibs.chr_].append(_beads(out))
+        fixed[ibs.chr_].append(_fixed(out))
 
-    return _assemble(per_chr, settings, seed_offset)
+    return _assemble(per_chr, settings, seed_offset, fixed if settings.uniform_chain else None)
 
 
 def reconstruct_ensemble(
@@ -209,10 +228,19 @@ def reconstruct_ensemble(
     results: list[dict[str, list[BeadOut]]] = []
     for m, ibseeds in enumerate(member_seeds):
         per_chr: dict[str, list[list[BeadOut]]] = defaultdict(list)
+        fixed: dict[str, list[BoolArray]] = defaultdict(list)
         for ibs in ibseeds:
             nid = ib_node_id(f"m{m} :: {ibs.ib_id}", StageKind.SMOOTH)
             per_chr[ibs.chr_].append(_beads(outputs[nid]))
+            fixed[ibs.chr_].append(_fixed(outputs[nid]))
 
-        results.append(_assemble(per_chr, settings, base_seed_offset + m * MEMBER_SEED_STRIDE))
+        results.append(
+            _assemble(
+                per_chr,
+                settings,
+                base_seed_offset + m * MEMBER_SEED_STRIDE,
+                fixed if settings.uniform_chain else None,
+            )
+        )
 
     return results

@@ -1,0 +1,17 @@
+radius of gyration in bonds | bonds over ten per structure | structures with a stretched piece
+GM12878_chr1_10000000_15000000 | prod:    7.8   1.4 0/5 | s_c5k:    7.9   1.2 0/5 | s_c5k_drop:    8.0   1.0 0/5 | s_c5k_dropcontact:    7.4   1.4 0/5 | s_c5k_drop_scale05:    8.0   1.6 0/5 | s_c5k_drop_scale2:    7.9   1.4 0/5 | s_c5k_drop_sq03:    8.2   0.8 0/5 | s_c5k_drop_sq3:    7.9   1.0 0/5 | s_c5k_drop_fixed:    8.1   1.0 0/5
+GM12878_chr1_20000000_25000000 | prod:    8.2   0.0 0/5 | s_c5k:    8.1   0.0 0/5 | s_c5k_drop:    8.2   0.0 0/5 | s_c5k_dropcontact:    7.9   0.0 0/5 | s_c5k_drop_scale05:    7.8   0.2 0/5 | s_c5k_drop_scale2:    8.0   0.0 0/5 | s_c5k_drop_sq03:    8.5   0.0 0/5 | s_c5k_drop_sq3:    8.0   0.0 0/5 | s_c5k_drop_fixed:    8.4   0.0 0/5
+H1ESC_chr1_10000000_15000000 | prod:    9.6   0.2 0/5 | s_c5k:   10.8   1.0 0/5 | s_c5k_drop:    9.9   1.4 0/5 | s_c5k_dropcontact:   11.0   1.6 0/5 | s_c5k_drop_scale05:   10.7   1.4 0/5 | s_c5k_drop_scale2:    9.8   1.6 0/5 | s_c5k_drop_sq03:   10.2   1.4 0/5 | s_c5k_drop_sq3:    9.8   1.2 0/5 | s_c5k_drop_fixed:   10.0   1.4 0/5
+H1ESC_chr1_20000000_25000000 | prod:    8.8   0.0 0/5 | s_c5k:    8.7   0.8 0/5 | s_c5k_drop:    8.3   0.0 0/5 | s_c5k_dropcontact:    8.1   1.0 0/5 | s_c5k_drop_scale05:    8.2   0.0 0/5 | s_c5k_drop_scale2:    8.4   0.2 0/5 | s_c5k_drop_sq03:    8.6   0.0 0/5 | s_c5k_drop_sq3:    8.1   0.0 0/5 | s_c5k_drop_fixed:    8.4   0.0 0/5
+HFFC6_chr1_10000000_15000000 | prod:   10.4   1.0 0/5 | s_c5k:   11.4   1.0 0/5 | s_c5k_drop:   10.7   1.2 0/5 | s_c5k_dropcontact:   10.7   1.2 0/5 | s_c5k_drop_scale05:   11.1   1.2 0/5 | s_c5k_drop_scale2:   11.0   1.4 0/5 | s_c5k_drop_sq03:   11.0   1.2 0/5 | s_c5k_drop_sq3:   10.5   1.2 0/5 | s_c5k_drop_fixed:   10.8   1.2 0/5
+HFFC6_chr1_20000000_25000000 | prod:   10.6   0.0 0/5 | s_c5k:   10.1   0.2 0/5 | s_c5k_drop:    9.6   0.2 0/5 | s_c5k_dropcontact:    6.7   0.0 0/5 | s_c5k_drop_scale05:    9.7   0.2 0/5 | s_c5k_drop_scale2:    9.6   0.2 0/5 | s_c5k_drop_sq03:    9.9   0.6 0/5 | s_c5k_drop_sq3:    9.5   0.2 0/5 | s_c5k_drop_fixed:    9.8   0.0 0/5
+mean over the rows
+  prod                            9.2   0.4 0/30
+  s_c5k                           9.5   0.7 0/30
+  s_c5k_drop                      9.1   0.6 0/30
+  s_c5k_dropcontact               8.6   0.9 0/30
+  s_c5k_drop_scale05              9.2   0.8 0/30
+  s_c5k_drop_scale2               9.1   0.8 0/30
+  s_c5k_drop_sq03                 9.4   0.7 0/30
+  s_c5k_drop_sq3                  9.0   0.6 0/30
+  s_c5k_drop_fixed                9.2   0.6 0/30

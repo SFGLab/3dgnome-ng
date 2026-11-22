@@ -28,7 +28,7 @@ from personal3d.variants import SV
 from ..catalog.model import CellType
 from ..density import hosted_density, thin
 from ..regions import Region
-from .settings import apply_overrides
+from .settings import UNIFORM_KEYS, apply_overrides
 
 ENGINE_FACTOR = {"CTCF": "CTCF", "RNAPII": "RNAPOL2"}
 
@@ -159,10 +159,13 @@ def build_inputs(
     hic: tuple[np.ndarray, int] | None = None,
     background: str = "hic",
     own: Own | None = None,
+    chain: str = "anchors",
 ) -> Inputs:
     """Writes the inputs for one haplotype under `out` and returns the config and the region in the
     coordinates of the haplotype. `hic` is a predicted HiCDiffusion window and its reference start.
     `background` none turns off the contact terms and keeps the singletons for the exponent fit.
+    `chain` uniform gives the config the keys of the uniform chain, `UNIFORM_KEYS`. Its contact
+    cells are read from the map of the cell type under the Hi-C background alone.
     RNAPII alone has its loop ends as anchors, orientation N and no CTCF orientation term."""
     out.mkdir(parents=True, exist_ok=True)
     chrom = region.chrom
@@ -241,7 +244,7 @@ def build_inputs(
         data["factors"] = ",".join(names)
     # The beads of a stretch without loops are drawn against the cell type's map, which is in
     # reference coordinates and is this cell's. It is not used with variants or own contacts.
-    if cell.contact_map and not svs and not (own and own.contacts):
+    if cell.contact_map and not svs and not (own and own.contacts) and not (chain == "uniform" and background != "hic"):
         data["contact_map"] = cell.contact_map
     config = engine.write_config(cell.path("config"), data, out / "config.ini", header=f"{cell.name} {region} {factors}")
     fixed = {}
@@ -249,6 +252,8 @@ def build_inputs(
         fixed["motif_orientation.use_motif_orientation"] = "no"
     if background == "none":
         fixed |= {"springs.use_contact_background": "no", "anchor_heatmap.use_anchor_heatmap": "no"}
+    if chain == "uniform":
+        fixed |= UNIFORM_KEYS
     if fixed:
         apply_overrides(config, fixed)
     hap_region = f"{chrom}:{L.edge(region.start)}-{L.edge(region.end - 1) + 1}"

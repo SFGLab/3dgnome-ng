@@ -19,15 +19,19 @@ from gnome3d.mc.numba.common import (
     NO_F64_3,
     NO_F64_N3,
     NO_I32,
+    NO_I32_N1,
     NO_I64_3,
+    SMOOTH_STOP_RATIO,
     affinity_params,
     as_f64,
     dummy_bool,
     dummy_f64,
     dummy_i32,
     init_affinity_scores,
+    orientation_weight,
     prepare_orientation,
     run_outer_loop,
+    sites_of_moves,
 )
 from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
@@ -40,7 +44,7 @@ from gnome3d.mc.numba.terms import (
     local_smooth_nb,
     njit,
 )
-from gnome3d.types import F64Array, I32Array, I64Array
+from gnome3d.types import BoolArray, F64Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -271,11 +275,16 @@ def mc_smooth_numba(
     heat_dist: np.ndarray[Any, Any] | None = None,
     compartment: np.ndarray[Any, Any] | None = None,
     on_round: Callable[[F64Array], None] | None = None,
+    centre: BoolArray | None = None,
 ) -> float:
     """Anneals the chain in place and returns the final score.
 
     Fixed beads do not move. With `mc_smooth_chains` above 1 and only chain bonds and heat on, K
-    chains run in parallel and the best is kept.
+    chains run in parallel and the best is kept. A fixed bead of `centre` keeps the centre of
+    mass of itself, the bead before it and the bead after it: it moves with its two neighbours
+    taking minus half of its move each, and a neighbour moves with the other neighbour taking
+    minus its move. Two beads of `centre` are three beads or more apart and no bead beside one
+    is fixed.
     """
     n = pos.shape[0]
     if n <= 2:
@@ -291,6 +300,7 @@ def mc_smooth_numba(
             )
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
             and compartment is None
+            and centre is None
         )
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
@@ -306,7 +316,8 @@ def mc_smooth_numba(
     else:
         cap_r = NO_F64
         cap_home = NO_F64_N3
-        movable = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+        free = ~fixed if centre is None else (~fixed | centre)
+        movable = np.ascontiguousarray(np.where(free)[0], dtype=np.int64)
     if len(movable) == 0:
         return 0.0
 
@@ -326,7 +337,7 @@ def mc_smooth_numba(
         and anchor_neighbor_weights is not None
         and bool(settings.use_ctcf_motif)
     )
-    motif_weight = float(settings.motif_weight)
+    motif_weight = orientation_weight(settings)
     motifs_symmetric = bool(settings.motifs_symmetric)
     heat_weight = float(settings.subanchor_heatmap_dist_weight)
 
@@ -375,7 +386,6 @@ def mc_smooth_numba(
             nbr_indices,
             nbr_weights,
             orn_is_L,
-            bead_to_anchor_k,
             anchor_orn,
             score_orn,
         ) = prepare_orientation(
@@ -393,7 +403,6 @@ def mc_smooth_numba(
         nbr_indices = dummy_i32()
         nbr_weights = np.zeros(1, dtype=np.float64)
         orn_is_L = np.zeros(1, dtype=np.bool_)
-        bead_to_anchor_k = cast(I32Array, np.full(n, -1, dtype=np.int32))
         anchor_orn = np.zeros((1, 3), dtype=np.float64)
         score_orn = 0.0
 
@@ -444,6 +453,18 @@ def mc_smooth_numba(
         else 0.0
     )
 
+    use_centre = centre is not None and not use_cap
+    centre_of: I32Array = NO_I32
+    if centre is not None and use_centre:
+        owner = cast(I32Array, np.full(n, -1, dtype=np.int32))
+        for c in np.flatnonzero(centre):
+            owner[c - 1 : c + 2] = c
+        centre_of = owner
+
+    move_sites: I32Array = NO_I32_N1
+    if use_orn:
+        move_sites = sites_of_moves(n, anchor_ar, nbr_offsets, centre_of if use_centre else None)
+
     score = run_outer_loop(
         pw=pw,
         movable=movable,
@@ -467,7 +488,6 @@ def mc_smooth_numba(
         nbr_indices=nbr_indices,
         nbr_weights=nbr_weights,
         anchor_orn=anchor_orn,
-        bead_to_anchor_k=bead_to_anchor_k,
         motif_weight=motif_weight,
         motifs_symmetric=motifs_symmetric,
         use_excl=use_excl,
@@ -490,7 +510,7 @@ def mc_smooth_numba(
         stop_successes=int(settings.mc_stop_successes_smooth),
         strict_better=True,
         score_eps=1e-6,
-        stop_when_ratio_above=2.0,
+        stop_when_ratio_above=SMOOTH_STOP_RATIO,
         score_struct=score_struct,
         score_heat=score_heat,
         score_orn=score_orn,
@@ -516,6 +536,9 @@ def mc_smooth_numba(
         cap_home=cap_home,
         cap_r=cap_r,
         on_round=on_round,
+        use_centre=use_centre,
+        centre_of=centre_of,
+        move_sites=move_sites,
     )
     pos[:] = pw.astype(pos.dtype)
     return score
