@@ -1852,20 +1852,28 @@ make it a node. That is open.
 | the threshold of a cell | 3 Poisson deviations | `[springs] contact_background_z` 3 |
 | the loops of a conformation | each kept by its strength | `[springs] loop_dropout` |
 | the excluded volume of the arcs stage | the derived radius, from every loop of the chromosome, times the mean of the factors of the two nodes from the chain each stands for | `[excluded_volume] arcs_chain_radius` sum |
+| the long range, since 2026-11-22 | one node stands for each locus of 100 kb, and a pair of those nodes without a loop, without a cell and beyond `background_range_bp` holds the background of the law | no key |
 
-On 18 rows of twenty structures, on counts the run did not read, against the default chain: 0.335 and 0.360 of
-raw and balanced SCC per bead pair at 25 kb against 0.204 and 0.268, +0.131 ± 0.016 and +0.092 ± 0.017, on 18 and
-15 rows of 18. Spearman 0.564 against 0.532, on 17 rows. Balanced Pearson 0.721 against 0.705. 1.4 close pairs
-per thousand beads against 11.5. The exponent of the decay over that of Hi-C is 1.06 against 1.04. The ends of a
-region overlap in 18 structures of 360 against 12. No structure has a stretched piece.
+On 18 rows of twenty structures, on counts the run did not read, against the default chain, with the law
+between the loci: 0.330 and 0.357 of raw and balanced SCC per bead pair at 25 kb against 0.204 and 0.268.
+Spearman 0.635 against 0.532. Balanced Pearson 0.741 against 0.705. 1.4 close pairs per thousand beads against
+11.5. The exponent of the decay over that of Hi-C is 1.04 against 1.04. The ends of a region overlap in 1
+structure of 360 against 12. No structure has a stretched piece. Before the law between the loci the config had
+0.335 and 0.360 of SCC, a Spearman of 0.564, an exponent of 1.06 and the ends overlapping in 18 structures.
+
+`[data] components`, the track of five components per locus, is an input on top of the config and is off when
+empty. With it the correlation of the distances of two bins with Hi-C beyond 2 Mb is 0.46 against 0.10 and that
+of the pooled contacts 0.15 against 0.03, at the same SCC and Spearman.
 
 Measured and deleted: the ladder of resolutions with both sides and with the cells over their expectation alone,
 the pseudo count and the bound estimate of a cell, the cap of the radius of a pair by the chain and by the target,
 the product form of the radius from the chain, the midpoint draw, the fixed node, the bond limit of the
 orientation term. Each has its trial above.
 
-Open: the structure beyond 1 Mb, section "The scale beyond 1 Mb". The three bead move is not in the JAX kernel
-and the batch executor refuses the smooth stage of the uniform chain. The site has no control for the chain.
+Open: a locus without a loop end takes no part in the law between the loci or in the track, section "The loci of
+the uniform chain". The pooled contacts beyond 1 Mb reach 0.15 to 0.19 where the two halves of a map share 0.8 to
+0.9. The three bead move is not in the JAX kernel and the batch executor refuses the smooth stage of the uniform
+chain. The site has no control for the chain.
 
 ## Settings
 
