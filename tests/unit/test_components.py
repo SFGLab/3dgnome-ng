@@ -13,7 +13,6 @@ from gnome3d.pipeline.ib.components import (
     node_affinity,
     read_components,
 )
-from gnome3d.pipeline.ib.nodes import contact_nodes, locus_beads
 from gnome3d.polymer import PolymerLaw
 from gnome3d.settings import Settings
 
@@ -127,29 +126,3 @@ def test_a_track_of_another_bin_stops(tmp_path: Path) -> None:
     mat = np.array([[0.0, -0.5], [-0.5, 0.0]])
     with pytest.raises(ValueError, match="a locus is 100000 bp"):
         hold_loci(mat, mids, read_components(str(path))["chr1"], LAW, settings())
-
-
-def test_locus_beads_are_the_beads_nearest_to_the_middle_of_each_locus() -> None:
-    # one chain of 1 kb beads over 30 to 230 kb: the loci 0, 1 and 2
-    edges = [np.arange(30_000, 231_000, 1000, dtype=np.int64)]
-    beads, loci = locus_beads(edges, 100_000)
-    assert loci.tolist() == [0, 1, 2]
-    mid = (edges[0][beads] + edges[0][beads + 1]) // 2
-    assert np.abs(mid[:2] - np.array([50_000, 150_000])).max() <= 500, (
-        "the bead at the middle of a locus that the chain covers"
-    )
-    assert mid[2] == 229_500, "the bead nearest to the middle where the chain covers a part"
-
-
-def test_a_locus_bead_is_a_node_and_joins_the_bead_of_a_loop_end() -> None:
-    edges = [np.arange(0, 301_000, 1000, dtype=np.int64)]
-    anchor_block = np.zeros(2, dtype=np.int32)
-    ends = np.array([[0, 1]], dtype=np.int32)
-    extra, _loci = locus_beads(edges, 100_000)
-    beads = np.array([[int(extra[0]), 200]], dtype=np.int64)
-    nodes = contact_nodes(edges, anchor_block, ends, beads, np.ones(1), extra)
-    assert nodes.bead.tolist() == [int(extra[0]), int(extra[1]), 200, int(extra[2])], (
-        "the loop end at the middle of the first locus is one node with its locus bead"
-    )
-    assert nodes.loop_node.tolist() == [[0, 2]], "the loop joins its two nodes"
-    assert nodes.pair_i.tolist() == [0] and nodes.pair_j.tolist() == [2]

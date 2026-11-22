@@ -24,19 +24,13 @@ from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
 from gnome3d.pipeline.ib.cells import available_resolution, hold_by_cells, read_cells
-from gnome3d.pipeline.ib.components import (
-    LOCUS_BP,
-    ArmComponents,
-    hold_loci,
-    read_components,
-)
+from gnome3d.pipeline.ib.components import ArmComponents, hold_loci, read_components
 from gnome3d.pipeline.ib.maxent import anchor_draw
 from gnome3d.pipeline.ib.nodes import (
     ContactNodes,
     chain_share,
     contact_nodes,
     draw_ends,
-    locus_beads,
     mean_loop_target,
     node_targets,
     node_weights,
@@ -153,30 +147,6 @@ class ChromNodes(NamedTuple):
     nbr_w: list[list[float]]
 
 
-def locus_extra(
-    edges: list[I64Array],
-    anchor_block: I32Array,
-    ends: I32Array,
-    beads: I64Array,
-    s: Settings,
-) -> I64Array | None:
-    """Returns the locus beads that `[springs] locus_bead` makes nodes, counted along the
-    chromosome, or None for `node`.
-
-    `middle` gives every locus of the chains its locus bead. `fill` gives one to the loci where
-    no loop end of the conformation is.
-    """
-    if s.locus_bead == "node":
-        return None
-    extra, loci = locus_beads(edges, LOCUS_BP)
-    if s.locus_bead == "middle":
-        return extra
-    no_weight: F64Array = np.ones(int(ends.shape[0]), dtype=np.float64)
-    with_node: I64Array = contact_nodes(edges, anchor_block, ends, beads, no_weight).mid // LOCUS_BP
-    keep: I64Array = extra[~np.isin(loci, with_node)]
-    return keep
-
-
 def solve_nodes(
     state: CoarseState, chr_: str, work: list[tuple[str, int, list[int]]], seed: int
 ) -> ChromNodes:
@@ -228,9 +198,7 @@ def solve_nodes(
         ends,
         np.random.default_rng([seed, 11]),
     )
-    nodes = contact_nodes(
-        edges, anchor_block, ends, beads, strength, locus_extra(edges, anchor_block, ends, beads, s)
-    )
+    nodes = contact_nodes(edges, anchor_block, ends, beads, strength)
     m = int(nodes.mid.shape[0])
 
     # The orientation of a node and the nodes its CTCF loops join it to.
@@ -360,12 +328,7 @@ def solve_nodes(
             )
             every = int(
                 contact_nodes(
-                    edges,
-                    anchor_block,
-                    ends_all,
-                    beads_all,
-                    np.ones(len(arcs_all)),
-                    locus_extra(edges, anchor_block, ends_all, beads_all, s),
+                    edges, anchor_block, ends_all, beads_all, np.ones(len(arcs_all))
                 ).mid.shape[0]
             )
         share = chain_share(

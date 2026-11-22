@@ -1,0 +1,23 @@
+observed Hi-C chr1:200000000-205000000 at 25,000 bp: 200 bins
+exponent yardstick: nu 0.329 fitted on GM12878_hic_25kb_singletons.bedpe
+
+         arm   n   pearson  spearman      SCC   multimm  exponent  vs Hi-C  e20-100k  e100k-1M       Rg   wb-aa   wb-sa      xb
+  GM12878_chr1_200000000_205000000_prod  20     0.721     0.409    0.265     0.816     0.345    1.05x     0.273     0.380     9.08     4.0    30.0     9.3
+  GM12878_chr1_200000000_205000000_p_5k_both  20     0.737     0.415    0.263     0.857     0.346    1.05x     0.240     0.375     9.44     1.7     4.9     0.0
+  GM12878_chr1_200000000_205000000_L_node  20     0.744     0.435    0.238     0.873     0.345    1.05x     0.226     0.383     9.76     1.7     5.3     0.0
+  GM12878_chr1_200000000_205000000_L_fill  20     0.756     0.428    0.241     0.881     0.346    1.05x     0.251     0.374     9.84     1.8     4.3     0.0
+  GM12878_chr1_200000000_205000000_L_mid  20     0.754     0.412    0.208     0.886     0.343    1.04x     0.276     0.364     9.76     1.6     3.5     0.0
+  GM12878_chr1_200000000_205000000_L_fill_k5  20     0.752     0.431    0.254     0.883     0.339    1.03x     0.244     0.368     9.73     1.8     4.6     0.0
+  GM12878_chr1_200000000_205000000_L_mid_k5  20     0.751     0.410    0.214     0.885     0.337    1.02x     0.277     0.355     9.73     1.7     3.9     0.0
+
+  exponent target is 0.329, the fit a run makes on the same file;
+  the project's structures have measured flatter than that, so higher is better here.
+  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree
+  with each other and with the cell's measured nu, and a flat short band under a steep
+  long one is loops pulling pairs in with nothing holding the rest at the background.
+  the overlap columns count pairs closer than 0.7 of the structure's own subanchor
+  bond, per thousand beads. wb-aa is
+  anchors inside one block, which only the arcs
+  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two
+  blocks, which the boundary stitch and the cross block relaxation own. an arm whose
+  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.

@@ -49,7 +49,6 @@ def contact_nodes(
     ends: I32Array,
     beads: I64Array,
     strength: F64Array,
-    extra: I64Array | None = None,
 ) -> ContactNodes:
     """Builds the nodes of a conformation from the contact beads of its loops.
 
@@ -65,16 +64,12 @@ def contact_nodes(
         (L, 2) the contact bead of each loop end in the chain of its block, `draw_ends`.
     strength
         (L,) the strength of each loop by the law.
-    extra
-        Beads that are nodes without a loop, counted along the chromosome, `locus_beads`.
     """
     sizes = np.array([e.shape[0] - 1 for e in edges], dtype=np.int64)
     offset = np.concatenate([[0], np.cumsum(sizes)])
     along = offset[anchor_block[ends]] + beads  # bead counted along the chromosome
     kept = along[:, 0] != along[:, 1]
-    of_loops = along[kept].ravel()
-    nodes = np.unique(of_loops if extra is None else np.concatenate([of_loops, extra]))
-    inverse = np.searchsorted(nodes, of_loops)
+    nodes, inverse = np.unique(along[kept], return_inverse=True)
     loop_node: I32Array = np.full(along.shape, -1, dtype=np.int32)
     loop_node[kept] = inverse.reshape(-1, 2)
     pair = np.sort(inverse.reshape(-1, 2), axis=1)
@@ -97,30 +92,6 @@ def contact_nodes(
         strength=summed,
         loop_node=loop_node,
     )
-
-
-def locus_beads(edges: list[I64Array], size: int) -> tuple[I64Array, I64Array]:
-    """Returns the locus bead of every locus that the chains of the blocks cover, counted along the
-    chromosome, and the locus of each.
-
-    A locus is a stretch of `size` bp on a grid from the start of the chromosome. Its locus bead
-    is the bead of a chain nearest to the middle of the locus.
-    """
-    sizes = np.array([e.shape[0] - 1 for e in edges], dtype=np.int64)
-    offset = np.concatenate([[0], np.cumsum(sizes)])
-    parts: list[I64Array] = [
-        (int(offset[b]) + np.arange(int(sizes[b]), dtype=np.int64)) for b in range(len(edges))
-    ]
-    along: I64Array = np.concatenate(parts)
-    mid = np.concatenate([(e[:-1] + e[1:]) // 2 for e in edges])
-    locus = mid // int(size)
-    off = np.abs(mid - (locus * int(size) + int(size) // 2))
-    order = np.lexsort((off, locus))
-    first = np.ones(order.shape[0], dtype=np.bool_)
-    first[1:] = locus[order][1:] != locus[order][:-1]
-    beads: I64Array = along[order][first].astype(np.int64)
-    loci: I64Array = locus[order][first].astype(np.int64)
-    return beads, loci
 
 
 def mean_loop_target(

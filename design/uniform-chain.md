@@ -1805,6 +1805,41 @@ Two forms give a locus its node, and the trial measures both against the form of
 the loci without one, about 25, and the node of a locus then depends on the draw. The key for the trial is
 `[springs] locus_bead`. The forms that lose are deleted with the key.
 
+#### Trial of the locus bead
+
+`design/figures/uniform-2026-11-19/bead20/` and `scores-bead20/`, `TAG=bead20`, commit 1a1b93d. The locked config
+with the law between the loci under the three forms, and the two forms with a locus bead with the track of five
+components. Eighteen rows of twenty structures. On the first row 26 loci of 50 hold a node, 32 have chain in a
+block, and the nodes are 164, 170 and 193.
+
+| arm | SCC | Spearman | Pearson balanced | ends overlap | exponent over Hi-C | close pairs | contacts at 100 kb: 1 to 2 Mb | over 2 Mb | distance at 100 kb: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 12 of 360 | 1.044 | 11.5 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config before the loci | 0.335, 0.360 | 0.564 | 0.721 | 18 of 360 | 1.064 | 1.4 | 0.12 | 0.02 | 0.33 | 0.15 |
+| `node` | 0.330, 0.357 | 0.635 | 0.741 | 1 of 360 | 1.041 | 1.4 | 0.16 | 0.03 | 0.32 | 0.10 |
+| `fill` | 0.282, 0.336 | 0.628 | 0.768 | 0 of 360 | 1.072 | 1.2 | 0.09 | 0.03 | 0.28 | -0.03 |
+| `middle` | 0.258, 0.316 | 0.616 | 0.772 | 0 of 360 | 1.061 | 1.0 | 0.12 | 0.05 | 0.29 | 0.09 |
+| `node` with the track, of the trial before | 0.330, 0.355 | 0.637 | 0.739 | 0 of 360 | 1.033 | | 0.17 | 0.15 | 0.44 | 0.46 |
+| `fill` with the track | 0.284, 0.341 | 0.634 | 0.766 | 0 of 360 | 1.070 | 1.2 | 0.13 | 0.14 | 0.45 | 0.53 |
+| `middle` with the track | 0.256, 0.317 | 0.623 | 0.770 | 0 of 360 | 1.061 | 1.0 | 0.19 | 0.18 | 0.46 | 0.52 |
+
+- The arm `node` has the scores of the control of the trial before to the last digit. The rule in the chain is
+  the arm that was measured.
+- A locus bead costs SCC. Against `node`, `fill` loses 0.048 ± 0.011 of raw SCC and `middle` 0.072 ± 0.013, on
+  16 rows of 18, and `middle` loses 0.041 ± 0.012 of balanced SCC and 0.018 ± 0.003 of Spearman. Balanced
+  Pearson rises by 0.03.
+- It adds nothing beyond 1 Mb. With the track the bands of `fill` and `middle` are within 0.07 of those of
+  `node`, and no difference is over its error.
+- The beads 10 to 25 kb apart are 7 to 8 percent closer with a locus bead on every locus, 2.89 bonds against
+  3.11 at 10 kb. A node is not a mark on a bead. It holds the background with every node within 100 kb, has the
+  excluded volume of a node and moves by the centre of mass rule, and thirty more of them on a region change the
+  chain at the short range.
+
+`fill` and `middle` are deleted with the key. The node that stands for a locus is the node nearest to its middle,
+and a locus without a node takes no part. A locus without a loop end would need a term on a bead that does not
+make it a node. That is open.
+
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
