@@ -135,7 +135,8 @@ from a second. The term is in the energy of the solver on both backends. The ann
 | key | type | default | production | meaning |
 | --- | --- | --- | --- | --- |
 | `use_motif_orientation` | bool | no | yes | Scores the angle between the CTCF motif vectors of two anchors that a loop joins, in the smooth stage. |
-| `weight` | float | 1.0 | 50.0 | Weight of the term. |
+| `weight` | float | 1.0 | 50.0 | Weight of the term under `form = neighbours`. |
+| `form` | str | neighbours | neighbours | Under trial since 2026-11-22. `neighbours` takes the vector of an anchor from the bead before it to the bead after it, at `weight`. `stretch` takes it from the centroid of the three beads before it to the centroid of the three after it, weighs a loop by its share of the larger of the sums at its two anchors and sets the weight of the term to the energy of the six bonds of a stretch each one target too long. The numba kernel has both forms and the batch executor refuses `stretch`. `design/orientation-term.md`. |
 | `symmetric_motifs` | bool | yes | yes | Yes scores two motif vectors best when they point the same way. No flips the partner first and opposed vectors score best. |
 
 ## [anchor_heatmap]

@@ -174,6 +174,7 @@ NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
 NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 NO_F64: F64Array = np.zeros(1, dtype=np.float64)
 NO_F64_N3: F64Array = np.zeros((1, 3), dtype=np.float64)
+NO_I32_N1: I32Array = np.full((1, 1), -1, dtype=np.int32)
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -402,6 +403,119 @@ def _calc_orientation_nb(
         oy /= nm
         oz /= nm
     return ox, oy, oz
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def calc_orientation_stretch_nb(
+    pos: F64Array, cind: int, n: int, is_L: bool, stretch: int
+) -> tuple[float, float, float]:
+    """Returns the unit orientation vector of the anchor at `cind` over a stretch of chain: from
+    the centroid of the `stretch` beads before it to the centroid of the `stretch` beads after
+    it. A side with fewer beads has the centroid of those there are and a side with none has
+    the anchor bead.
+    """
+    lo = cind - stretch
+    if lo < 0:
+        lo = 0
+    hi = cind + stretch
+    if hi > n - 1:
+        hi = n - 1
+    bx = pos[cind, 0]
+    by = pos[cind, 1]
+    bz = pos[cind, 2]
+    if cind > lo:
+        bx = 0.0
+        by = 0.0
+        bz = 0.0
+        for i in range(lo, cind):
+            bx += pos[i, 0]
+            by += pos[i, 1]
+            bz += pos[i, 2]
+        bx /= cind - lo
+        by /= cind - lo
+        bz /= cind - lo
+    ax = pos[cind, 0]
+    ay = pos[cind, 1]
+    az = pos[cind, 2]
+    if hi > cind:
+        ax = 0.0
+        ay = 0.0
+        az = 0.0
+        for i in range(cind + 1, hi + 1):
+            ax += pos[i, 0]
+            ay += pos[i, 1]
+            az += pos[i, 2]
+        ax /= hi - cind
+        ay /= hi - cind
+        az /= hi - cind
+    ox = ax - bx
+    oy = ay - by
+    oz = az - bz
+    if is_L:
+        ox = -ox
+        oy = -oy
+        oz = -oz
+    nm = math.sqrt(ox * ox + oy * oy + oz * oz)
+    if nm > 1e-12:
+        ox /= nm
+        oy /= nm
+        oz /= nm
+    return ox, oy, oz
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def rescore_sites_nb(
+    pos: F64Array,
+    n: int,
+    sites: I32Array,
+    site_old: F64Array,
+    anchor_orn: F64Array,
+    anchor_ar: I32Array,
+    orn_is_L: BoolArray,
+    nbr_offsets: I32Array,
+    nbr_indices: I32Array,
+    nbr_weights: F64Array,
+    motif_weight: float,
+    motifs_symmetric: bool,
+    stretch: int,
+) -> float:
+    """Gives the sites of `sites` their vectors at the current positions, one after another,
+    and returns the change of the orientation score. `site_old` receives the vectors before, for
+    `restore_sites_nb`. `sites` ends at its first -1.
+    """
+    change = 0.0
+    for m in range(sites.shape[0]):
+        k = sites[m]
+        if k < 0:
+            break
+        site_old[m, 0] = anchor_orn[k, 0]
+        site_old[m, 1] = anchor_orn[k, 1]
+        site_old[m, 2] = anchor_orn[k, 2]
+        before = _local_score_orientation_nb(
+            anchor_orn, k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric
+        )
+        ar = int(anchor_ar[k])
+        ox, oy, oz = calc_orientation_stretch_nb(pos, ar, n, bool(orn_is_L[ar]), stretch)
+        anchor_orn[k, 0] = ox
+        anchor_orn[k, 1] = oy
+        anchor_orn[k, 2] = oz
+        after = _local_score_orientation_nb(
+            anchor_orn, k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric
+        )
+        change += 2.0 * (after - before)
+    return change
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def restore_sites_nb(sites: I32Array, site_old: F64Array, anchor_orn: F64Array) -> None:
+    """Puts back the vectors that `rescore_sites_nb` replaced."""
+    for m in range(sites.shape[0]):
+        k = sites[m]
+        if k < 0:
+            break
+        anchor_orn[k, 0] = site_old[m, 0]
+        anchor_orn[k, 1] = site_old[m, 1]
+        anchor_orn[k, 2] = site_old[m, 2]
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -1025,11 +1139,16 @@ def batch_mc_nb(
     use_centre: bool = False,
     centre_of: I32Array = NO_I32,
     site_of: I32Array = NO_I32,
+    orn_stretch: int = 0,
+    move_sites: I32Array = NO_I32_N1,
 ) -> tuple[float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     moves = np.zeros(3)
     site_k = np.full(3, -1, dtype=np.int32)
     site_old = np.zeros((3, 3))
+    # Under `orn_stretch` a move reads the sites of its row of `move_sites`.
+    stretch_on = use_orn and orn_stretch > 0
+    moved_old = np.zeros((move_sites.shape[1], 3))
     n_mov = movable.shape[0]
     n_ok = 0
     wall_cnt0 = 0
@@ -1118,10 +1237,16 @@ def batch_mc_nb(
                 d_cnt += dn
                 d_dep += dd
             d_orn = 0.0
+            if stretch_on:
+                d_orn = rescore_sites_nb(
+                    pos, n, move_sites[p], moved_old, anchor_orn, anchor_ar, orn_is_L,
+                    nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric,
+                    orn_stretch,
+                )  # fmt: skip
             for part in range(3):
                 site_k[part] = -1
                 bead = c - 2 + 2 * part
-                if use_orn and 0 <= bead < n:
+                if use_orn and not stretch_on and 0 <= bead < n:
                     site_k[part] = site_of[bead]
                 k = site_k[part]
                 if k < 0:
@@ -1187,6 +1312,8 @@ def batch_mc_nb(
                         anchor_orn[k, 0] = site_old[part, 0]
                         anchor_orn[k, 1] = site_old[part, 1]
                         anchor_orn[k, 2] = site_old[part, 2]
+                if stretch_on:
+                    restore_sites_nb(move_sites[p], moved_old, anchor_orn)
             T *= dt
             continue
 
@@ -1257,7 +1384,7 @@ def batch_mc_nb(
         prev_oy = 0.0
         prev_oz = 0.0
         loc_orn_prev = 0.0
-        if use_orn:
+        if use_orn and not stretch_on:
             orn_k = int(bead_to_anchor_k[p])
             if orn_k >= 0:
                 prev_ox = anchor_orn[orn_k, 0]
@@ -1374,6 +1501,11 @@ def batch_mc_nb(
                 motifs_symmetric,
             )
             score_orn_new = score_orn + 2.0 * (loc_orn_curr - loc_orn_prev)
+        if stretch_on:
+            score_orn_new = score_orn + rescore_sites_nb(
+                pos, n, move_sites[p], moved_old, anchor_orn, anchor_ar, orn_is_L, nbr_offsets,
+                nbr_indices, nbr_weights, motif_weight, motifs_symmetric, orn_stretch,
+            )  # fmt: skip
 
         score_new = (
             score_struct_new
@@ -1421,6 +1553,8 @@ def batch_mc_nb(
                 anchor_orn[orn_k, 0] = prev_ox
                 anchor_orn[orn_k, 1] = prev_oy
                 anchor_orn[orn_k, 2] = prev_oz
+            if stretch_on:
+                restore_sites_nb(move_sites[p], moved_old, anchor_orn)
         T *= dt
     return (
         T,

@@ -19,7 +19,9 @@ from gnome3d.mc.numba.common import (
     NO_F64_3,
     NO_F64_N3,
     NO_I32,
+    NO_I32_N1,
     NO_I64_3,
+    ORIENTATION_STRETCH,
     SMOOTH_STOP_RATIO,
     affinity_params,
     as_f64,
@@ -29,6 +31,7 @@ from gnome3d.mc.numba.common import (
     init_affinity_scores,
     prepare_orientation,
     run_outer_loop,
+    sites_of_moves,
 )
 from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
@@ -335,6 +338,12 @@ def mc_smooth_numba(
         and bool(settings.use_ctcf_motif)
     )
     motif_weight = float(settings.motif_weight)
+    orn_stretch = 0
+    if use_orn and str(settings.motif_form) == "stretch":
+        # A site at its worst has the energy of the bonds of its stretch each one target too
+        # long, design/orientation-term.md.
+        orn_stretch = ORIENTATION_STRETCH
+        motif_weight = 2.0 * orn_stretch * stretch_k * dist_w
     motifs_symmetric = bool(settings.motifs_symmetric)
     heat_weight = float(settings.subanchor_heatmap_dist_weight)
 
@@ -394,6 +403,7 @@ def mc_smooth_numba(
             anchor_neighbor_weights,
             motif_weight,
             motifs_symmetric,
+            orn_stretch,
         )
     else:
         anchor_ar = dummy_i32()
@@ -464,6 +474,12 @@ def mc_smooth_numba(
         if use_orn:
             sites[anchor_ar] = np.arange(anchor_ar.shape[0], dtype=np.int32)
         site_of = sites
+
+    move_sites: I32Array = NO_I32_N1
+    if orn_stretch > 0:
+        move_sites = sites_of_moves(
+            n, anchor_ar, nbr_offsets, centre_of if use_centre else None, orn_stretch
+        )
 
     score = run_outer_loop(
         pw=pw,
@@ -540,6 +556,8 @@ def mc_smooth_numba(
         use_centre=use_centre,
         centre_of=centre_of,
         site_of=site_of,
+        orn_stretch=orn_stretch,
+        move_sites=move_sites,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

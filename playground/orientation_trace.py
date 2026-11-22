@@ -2,8 +2,9 @@
 
     python playground/orientation_trace.py [--region chr1:11000000-13000000] [-n 4] [--cell GM12878]
 
-Builds the region with the default chain and with the uniform chain, each with the term on and
-off, on the production config of the cell line. Every call of the numba smooth kernel is recorded
+Builds the region with the default chain and with the uniform chain, each with the term as it
+is, with `[motif_orientation] form = stretch` and without the term, on the production config of
+the cell line. Every call of the numba smooth kernel is recorded
 with its chain before and after. Printed per arm, over all blocks and structures:
 
 - the bonds within two beads of an anchor with a motif direction and a loop partner, as a multiple
@@ -14,6 +15,7 @@ with its chain before and after. Printed per arm, over all blocks and structures
 - the chord of such an anchor, the distance of its two neighbours over the sum of the two bond
   targets, and the rank correlation of the chord with the misfit of the anchor,
 - the misfit of the term, the mean over loop pairs of ((1 - a.b) / 2)^2, before and after the stage,
+  with the vector of an anchor over its two neighbours and over three beads a side,
 - the bond energy and the orientation energy of the final chains in the units of the kernel,
 - the share of the beads within five beads of an anchor the term acts on.
 
@@ -41,6 +43,8 @@ from gnome3d.data import ContactData
 from gnome3d.io import parse_region
 from gnome3d.production import settings_for_cell
 from gnome3d.simulate import simulate
+from gnome3d.mc.numba.common import ORIENTATION_STRETCH
+from gnome3d.mc.numba.terms import calc_orientation_stretch_nb
 from gnome3d.util import calc_orientation
 
 parser = argparse.ArgumentParser()
@@ -78,10 +82,19 @@ def recorded(pos, dtn, fixed, step, s, chars=None, nbrs=None, nbr_w=None, *rest,
 mc_numba.mc_smooth_numba = recorded
 
 
-def misfit(pos: np.ndarray, sites: np.ndarray, chars: np.ndarray, nbrs: Any, nbr_w: Any) -> tuple[float, float, int]:
-    """Returns the weighted sum and the plain mean of ((1 - a.b) / 2)^2 over loop pairs."""
+def misfit(
+    pos: np.ndarray, sites: np.ndarray, chars: np.ndarray, nbrs: Any, nbr_w: Any, stretch: int = 0
+) -> tuple[float, float, int]:
+    """Returns the weighted sum and the plain mean of ((1 - a.b) / 2)^2 over loop pairs, with the
+    vector of an anchor over `stretch` beads a side, or over its two neighbours at 0.
+    """
     n = pos.shape[0]
-    orn = np.array([calc_orientation(pos, int(b), n, str(chars[b])) for b in sites])
+    if stretch > 0:
+        orn = np.array(
+            [calc_orientation_stretch_nb(pos, int(b), n, str(chars[b]) == "L", stretch) for b in sites]
+        )
+    else:
+        orn = np.array([calc_orientation(pos, int(b), n, str(chars[b])) for b in sites])
     total, plain, count = 0.0, 0.0, 0
     for k, partners in nbrs.items():
         for j, w in zip(partners, nbr_w[k], strict=True):
@@ -99,6 +112,7 @@ def summarise(tag: str, recs: list[dict[str, Any]], weight: float) -> None:
     bend_far: list[np.ndarray] = []
     beads = reach = 0
     fit_before = fit_after = 0.0
+    wide_before = wide_after = 0.0
     pairs = 0
     e_bond = e_orn = e_orn_before = 0.0
     longest = 0.0
@@ -165,6 +179,8 @@ def summarise(tag: str, recs: list[dict[str, Any]], weight: float) -> None:
             pairs += c0
             e_orn += weight * t1
             e_orn_before += weight * t0
+            wide_before += misfit(r["before"], sites, chars, r["nbrs"], r["nbr_w"], ORIENTATION_STRETCH)[1]
+            wide_after += misfit(pos, sites, chars, r["nbrs"], r["nbr_w"], ORIENTATION_STRETCH)[1]
 
     def row(name: str, parts: list[np.ndarray]) -> str:
         v = np.concatenate(parts) if parts else np.zeros(0)
@@ -201,11 +217,12 @@ def summarise(tag: str, recs: list[dict[str, Any]], weight: float) -> None:
     if pairs:
         print(
             f"TRACE   misfit over {pairs} loop pair entries: {fit_before / pairs:.3f} before the stage,"
-            f" {fit_after / pairs:.3f} after"
+            f" {fit_after / pairs:.3f} after; over three beads a side {wide_before / pairs:.3f} before,"
+            f" {wide_after / pairs:.3f} after"
         )
     print(
-        f"TRACE   energy of the final chains: bonds {e_bond:.2f}, orientation {e_orn:.2f}"
-        f" ({e_orn_before:.2f} before the stage)"
+        f"TRACE   energy of the final chains: bonds {e_bond:.2f}, orientation at the weight of the"
+        f" form neighbours {e_orn:.2f} ({e_orn_before:.2f} before the stage)"
     )
     if beads:
         print(f"TRACE   beads within five beads of an anchor of the term: {100 * reach / beads:.1f} %")
@@ -216,10 +233,12 @@ bed = parse_region(args.region)
 assert bed is not None, args.region
 for chain in args.chains.split(","):
     sites_of: dict[bytes, dict[str, Any]] = {}
-    for term in ("on", "off"):
+    for term in ("on", "stretch", "off"):
         s = settings_for_cell(args.cell, data_root=data_root, uniform=chain == "uniform")
         if term == "off":
             s.use_ctcf_motif = False
+        if term == "stretch":
+            s.motif_form = "stretch"
         log.setup(s.output_level)
         records.clear()
         data = ContactData.from_files(s, [bed.chr], bed)
@@ -228,6 +247,8 @@ for chain in args.chains.split(","):
         if term == "on":
             stage = [r for r in records if r["chars"] is not None]
             sites_of = {r["fixed"].tobytes(): r for r in stage}
+        elif term == "stretch":
+            stage = [r for r in records if r["chars"] is not None]
         else:
             stage = []
             for r in records:
