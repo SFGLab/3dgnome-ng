@@ -1932,7 +1932,39 @@ counts:
   not valid. The counts above are of `/tmp/close_where.py` on the workstation and of the lines of the
   relaxation in the logs.
 
-Open, for the maintainer: the weight of the law between the loci as the number of loci grows.
+### The pairs of loci that the law holds: four forms on chr1
+
+The maintainer chose on 2026-11-22 to measure four forms of the rule under `[springs] loci_pairs`, a key of the
+trial: `near`, the pairs up to 5 Mb apart, the span of the regions of the trials. `octave`, the pairs whose
+offset in the order of the loci is 1, 2, 3, 4, 6, 8, 12, 16 and on. `near_octave`, either. `segment`, the pairs
+of one segment of the coarse stage. Whole chr1 of GM12878, three structures a form, at e7025fd, beside the arms
+above. The close pairs and the density are means over the three structures, `/tmp/close_all.py`.
+
+| form | pairs held | SCC per bead pair at 25 kb, raw and balanced | raw Spearman | close pairs per 1000 beads | of those over 100 beads apart | beads within 3 bonds | 1 Mb | 4 Mb | 200 Mb |
+|---|---|---|---|---|---|---|---|---|---|
+| no rule, `u_pre` | 0 | 0.371, 0.339 | 0.169 | 67 | 31 | 161 | 12.6 | 20.9 | 58.2 |
+| `all`, `u_dev` | 873,058 | 0.366, 0.336 | 0.222 | 266 | 148 | 210 | 10.5 | 17.1 | 70.4 |
+| `near` | 40,279 | 0.369, 0.341 | 0.161 | 109 | 59 | 172 | 12.0 | 20.1 | 59.4 |
+| `octave` | 21,476 | 0.378, 0.350 | 0.169 | 47 | 20 | 151 | 12.0 | 19.6 | 64.6 |
+| `near_octave` | 51,090 | 0.381, 0.355 | 0.167 | 66 | 30 | 156 | 11.8 | 20.2 | 65.8 |
+| `segment` | 116,218 | 0.376, 0.349 | 0.184 | 115 | 59 | 175 | 11.3 | 19.3 | 56.4 |
+| the default chain, `prod` | | 0.242, 0.237 | 0.171 | 100 | 19 | 140 | 11.5 | 18.7 | 59.7 |
+
+The last three columns are the mean distance in beads at that separation. The law gives 10.8, 17.3 and 66.6.
+
+- `octave` and `near_octave` have the close pairs of the chain without the rule or fewer, and the highest SCC of
+  the forms. Their chromosome is at the law at 200 Mb and 10 % over it from 1 to 10 Mb, as a region built alone.
+- `near` and `segment` hold the middle range alone. They have 1.6 to 1.7 times the close pairs of the chain
+  without the rule.
+- `all` alone has the Spearman of 0.22 over the map of 60 Mb. Every other form has that of the chain without
+  the rule. Three structures give a sparse pooled map beyond 1 Mb, and the denser chain of `all` fills it.
+- The band of contacts from 1 to 2 Mb at 100 kb is 0.08 for `near` and `octave`, 0.13 for `near_octave` and
+  0.03 for `segment`, against 0.04 without the rule. Three structures do not carry that band.
+
+`near` and `near_octave` hold every pair of a region of 5 Mb and are the locked config there. The rows of
+`octave` and `segment` on the 18 regions are the trial `loci20`.
+
+Open, for the maintainer: the form of the rule, after `loci20`.
 
 ## The config locked on 2026-11-21
 
