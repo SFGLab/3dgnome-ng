@@ -1757,6 +1757,54 @@ Half of the loci of a region hold no node, 26 of 50 on the first row, and take n
 
 
 
+### The loci of the uniform chain
+
+Decided by the maintainer on 2026-11-22, on the two trials of the components.
+
+A locus is a stretch of 100 kb of a chromosome, on a grid from its start. 100 kb is the bin at which the two
+halves of a Hi-C map agree at 0.8 to 0.9 beyond 1 Mb and at which the component track is gathered.
+
+| part | rule | state |
+|---|---|---|
+| the law between the loci | one node stands for a locus, and every pair of those nodes without a loop, without a cell and beyond `background_range_bp` is held at the background of the law. It reads no Hi-C beyond the exponent of the law | a rule of the uniform chain, with no key |
+| the component track | with `[data] components` the distance of such a pair is the background times `exp(-affinity / 3)`. The affinity of two loci of different arms, or of a locus the track does not hold, is zero | an input, off when empty. The track has five components |
+| the gathering | `playground/component_track.py` on the whole map of the cell line, per chromosome arm, one file a cell line. The option that leaves regions out is for trials | |
+
+The node that stands for a locus. In the two trials it was the node nearest to the middle of the bin, and a locus
+without a node took no part. Half of the loci of a region have no node, 26 of 50 on one row: a node is the bead
+of a loop end.
+
+The design for a locus without a node, with every case:
+
+| case | rule |
+|---|---|
+| a locus inside the chain of a block | it has a locus bead, the bead of the chain nearest to the middle of its bin. The locus bead is a node |
+| a locus bead that is also the bead of a loop end | one node. It keeps its loops |
+| a locus of which the chain of a block covers a part | the bead of that part nearest to the middle of the bin |
+| a locus outside every block | no bead and no part in the term. The chain has no bead there |
+| the same locus in two conformations | the same bead. The locus beads do not depend on the draw of the loop ends or on the dropout |
+
+A locus bead is a node in every respect, and no stage has a rule of its own for it:
+
+| stage | a locus bead |
+|---|---|
+| node solve | is placed with the other nodes. It is held within the chain to its two neighbour nodes, holds the background with the nodes closer than `background_range_bp`, reads its contact cells, and has the excluded volume of a node with the radius from its chain |
+| densify | the chain between two consecutive nodes is filled as before |
+| smooth | it moves with its two neighbours, the centre of mass rule. It has no orientation |
+| the count of nodes with every loop, for the radius from the chain | the locus beads are in it |
+
+Two forms give a locus its node, and the trial measures both against the form of the trials before:
+
+| form | the node of a locus |
+|---|---|
+| `node` | the node nearest to the middle of the bin, none for a locus without a node. The form of the two trials |
+| `fill` | the same, and a locus bead for a locus without a node |
+| `middle` | a locus bead for every locus |
+
+`middle` is one rule for every locus and adds a node per locus, 50 on a region of 5 Mb. `fill` adds a node for
+the loci without one, about 25, and the node of a locus then depends on the draw. The key for the trial is
+`[springs] locus_bead`. The forms that lose are deleted with the key.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
