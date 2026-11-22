@@ -4,6 +4,7 @@ import { CitedText } from '../components/CitedText'
 import { Equation, type EquationName } from '../components/Equation'
 import { TermSketch } from '../components/TermSketch'
 import { REFERENCES, referenceLink, referenceText } from '../content/references'
+import { hidden } from '../flags'
 import engineBatching from '../assets/engine/engine_batching.svg'
 import engineGraph from '../assets/engine/engine_graph.svg'
 import methodAnchorTerms from '../assets/method_anchor_terms.png'
@@ -21,18 +22,26 @@ import methodUniformTargets from '../assets/method_uniform_targets.png'
 import { METHOD_REFERENCES } from '../content/methodReferences'
 
 const SECTIONS = [
-  ['inputs', '1. Inputs'],
-  ['targets', '2. Blocks and target distances'],
-  ['anchors', '3. Anchor phase'],
-  ['chain', '4. Chain phase'],
-  ['uniform', '5. One bead per kilobase'],
-  ['ensemble', '6. Ensemble and output'],
-  ['engine', '7. Engine'],
-  ['variants', '8. Structural variants'],
-  ['validation', '9. Validation'],
-  ['limitations', '10. Limitations'],
+  ['inputs', 'Inputs'],
+  ['targets', 'Blocks and target distances'],
+  ['anchors', 'Anchor phase'],
+  ['chain', 'Chain phase'],
+  ['uniform', 'One bead per kilobase'],
+  ['ensemble', 'Ensemble and output'],
+  ['engine', 'Engine'],
+  ['variants', 'Structural variants'],
+  ['validation', 'Validation'],
+  ['limitations', 'Limitations'],
   ['references', 'References'],
 ] as const
+
+type SectionId = (typeof SECTIONS)[number][0]
+
+/** Returns the sections of the page with their numbers. The chain of one bead per kilobase is left out on a site that turns it off. */
+function numbered(): [SectionId, string][] {
+  const shown = SECTIONS.filter(([id]) => id !== 'uniform' || !hidden('uniform_chain'))
+  return shown.map(([id, title], i) => [id, id === 'references' ? title : `${i + 1}. ${title}`])
+}
 
 const INPUTS = [
   ['Loops, one file per factor', 'BEDPE with PET counts', 'Loop springs between anchors. The PET count of a loop is compared with the typical count of loops of the same span and factor.'],
@@ -91,8 +100,8 @@ function Terms({ label, terms, phase }: { label: string; terms: Term[]; phase: '
   )
 }
 
-function Section({ id, children }: { id: (typeof SECTIONS)[number][0]; children: ReactNode }) {
-  const title = SECTIONS.find(([s]) => s === id)![1]
+function Section({ id, children }: { id: SectionId; children: ReactNode }) {
+  const title = numbered().find(([s]) => s === id)![1]
   return (
     <section id={id}>
       <h2>{title}</h2>
@@ -123,14 +132,16 @@ function P({ children }: { children: string }) {
 
 /** One job from its inputs to its output, with the energies and their sources. */
 export function Method() {
+  const uniform = !hidden('uniform_chain')
+  const engineFigure = uniform ? 11 : 8
   return (
     <DocPage
       title="Method"
-      sections={SECTIONS}
+      sections={numbered()}
       lead={
         <>
           <CitedText>
-            {'3D-GNOMEᴺᴳ turns chromatin loops and a contact map into an ensemble of 3D structures. It follows the multiscale approach of 3D-GNOME [1, 2]. The loop anchors are placed first and the chromatin between them second. The form offers two chains. Sections 3 and 4 describe the chain of loop anchors and section 5 the chain of one bead per kilobase. This page follows one job from its inputs to its output.'}
+            {`3D-GNOMEᴺᴳ turns chromatin loops and a contact map into an ensemble of 3D structures. It follows the multiscale approach of 3D-GNOME [1, 2]. The loop anchors are placed first and the chromatin between them second.${uniform ? ' The form offers two chains. Sections 3 and 4 describe the chain of loop anchors and section 5 the chain of one bead per kilobase.' : ''} This page follows one job from its inputs to its output.`}
           </CitedText>
         </>
       }
@@ -277,6 +288,7 @@ export function Method() {
         </p>
       </Section>
 
+      {uniform && (
       <Section id="uniform">
         <P>{"The chain of sections 3 and 4 is built in two layers, the anchors first and the chromatin between them second. An anchor is one bead of that chain while it covers several kilobases of the genome. Every loop of an anchor therefore ends at the same point and the beads between two anchors are added after the loops are fitted. The second chain of the form has no layers. Every kilobase of the region is one bead from the start and a loop ends on a bead inside its anchor. This section follows the steps that differ from sections 3 and 4, in the order of a job."}</P>
 
@@ -312,25 +324,26 @@ export function Method() {
         <h3>The chain between the nodes</h3>
         <P>{"The chain phase of section 4 moves the beads between the nodes with the same five terms, yet two of its rules differ. A node is not fixed in this chain and moves together with the bead before it and the bead after it, while the centre of mass of the three stays in place. Each neighbour moves by minus half of the step of the node, which lets the node turn among its neighbours at the position the anchor phase gave it. The second rule is the bond, which resists compression ten times as strongly as stretching and keeps two neighbouring beads from overlapping."}</P>
       </Section>
+      )}
 
       <Section id="ensemble">
         <P>{'The anchor and chain phases repeat from new random starts, one structure per start. Parts of the region with many loops are similar across structures and parts with few loops vary more. Each structure is saved as an mmCIF file. The job then computes, for every gene, the 3D distance from its promoter to its nearest enhancer within 1 Mb over all structures, as in enhancer3D [10].'}</P>
       </Section>
 
       <Section id="engine">
-        <P>A run is a graph of tasks that grows while it runs, figure 8a. The region task adds one task per chromosome, a chromosome task adds its blocks and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order and a run with the same settings and seed gives the same structures.</P>
-        <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 8b. Each block is padded to the next size on a fixed ladder and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU and the output does not depend on the number of GPUs.'}</P>
+        <P>{`A run is a graph of tasks that grows while it runs, figure ${engineFigure}a. The region task adds one task per chromosome, a chromosome task adds its blocks and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order and a run with the same settings and seed gives the same structures.`}</P>
+        <P>{`The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure ${engineFigure}b. Each block is padded to the next size on a fixed ladder and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU and the output does not depend on the number of GPUs.`}</P>
         <P>The chain tasks can also run on the CPU cores, one chain per thread, while the anchor fit stays on the GPU. This is faster on a computer with many CPU cores and the server runs its jobs this way.</P>
         <figure className="figure">
           <img src={engineGraph} alt="Task graph of a run on two chromosomes: a region task, one task per chromosome, its blocks, one anchor fit per chromosome on the CPU with the energy on the GPU, the chains of seven blocks in one batched launch and the assembly" />
           <figcaption>
-            <b>Figure 8a</b>Task graph of a run on two chromosomes.
+            <b>Figure {engineFigure}a</b>Task graph of a run on two chromosomes.
           </figcaption>
         </figure>
         <figure className="figure padded">
           <img src={engineBatching} alt="Nine blocks of 300 to 3600 beads, each padded to a ladder size of 512 to 4096, sorted largest first and packed into two launches padded to 4096 and 1024" />
           <figcaption>
-            <b>Figure 8b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
+            <b>Figure {engineFigure}b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
           </figcaption>
         </figure>
       </Section>
@@ -361,7 +374,9 @@ export function Method() {
           {[
             ['Population average', 'Loops and contacts are measured over millions of cells. A structure fits that average and is not the conformation of a single cell. Statistics over the ensemble are more reliable than any one structure.'],
             ['Bead units', 'Distances are in bead units. One unit is the target distance between beads 1 kb apart. Bead units are not nanometres.'],
-            ['No loops, no beads', 'The chain of loop anchors has no beads on a stretch without loops and genes there are missing from the distance table. The chain of one bead per kilobase has a bead on every kilobase of a block.'],
+            ['No loops, no beads', uniform
+              ? 'The chain of loop anchors has no beads on a stretch without loops and genes there are missing from the distance table. The chain of one bead per kilobase has a bead on every kilobase of a block.'
+              : 'Stretches without loops have no beads. Genes there are missing from the distance table.'],
           ].map(([title, text]) => (
             <div key={title} className="card">
               <h3>{title}</h3>

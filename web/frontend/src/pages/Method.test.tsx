@@ -32,6 +32,44 @@ describe('Method page', () => {
     ])
   })
 
+  it('numbers every figure once, in the order of the page', () => {
+    const { container } = renderMethod()
+    const labels = [...container.querySelectorAll('figcaption b, p.panel-caption > b')].map((b) => b.textContent).filter((s) => s?.startsWith('Figure'))
+    expect(labels).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `Figure ${n}`).concat(['Figure 11a', 'Figure 11b']))
+    expect(document.getElementById('engine')).toHaveTextContent('figure 11a')
+    expect(document.getElementById('engine')).toHaveTextContent('figure 11b')
+  })
+
+  it('leaves the chain of one bead per kilobase out where the site turns it off', () => {
+    const meta = document.createElement('meta')
+    meta.name = 'site-hide'
+    meta.content = 'uniform_chain'
+    document.head.appendChild(meta)
+    try {
+      const { container } = renderMethod()
+      expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual([
+        '1. Inputs',
+        '2. Blocks and target distances',
+        '3. Anchor phase',
+        '4. Chain phase',
+        '5. Ensemble and output',
+        '6. Engine',
+        '7. Structural variants',
+        '8. Validation',
+        '9. Limitations',
+        'References',
+      ])
+      expect(document.getElementById('uniform')).toBeNull()
+      expect(container).not.toHaveTextContent('two chains')
+      expect(container).not.toHaveTextContent('one bead per kilobase')
+      expect(document.getElementById('engine')).toHaveTextContent('figure 8a')
+      expect([...container.querySelectorAll('#engine figcaption b')].map((b) => b.textContent)).toEqual(['Figure 8a', 'Figure 8b'])
+      expect(checkCopy(container)).toEqual([])
+    } finally {
+      meta.remove()
+    }
+  })
+
   it('gives every image a description', () => {
     const { container } = renderMethod()
     for (const img of container.querySelectorAll('img')) expect(img.getAttribute('alt'), img.getAttribute('src') ?? '').toBeTruthy()

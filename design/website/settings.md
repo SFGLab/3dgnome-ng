@@ -67,7 +67,7 @@ and no build.
 |---|---|---|
 | `features.results`, `features.method` | on | the two pages. Off, the page leaves the top bar and its address leads to the front page |
 | `features.trios` | on | the nine people on the Results page and their RNA-seq: an expression table with `"feature": "trios"` in the catalog, its row of the Cite page and its sentence of the Help page |
-| `features.uniform_chain` | off | the choice of the chain on the form, two cards at the top of step 6. On, the form opens on the chain of one bead per kilobase and a job may ask for it with `chain=uniform`. Off, the form shows no choice, a job is built on loop anchors and a request for the other chain is refused. It is the one feature that is off unless the file turns it on |
+| `features.uniform_chain` | off | the choice of the chain on the form, two cards at the top of step 6. On, the form opens on the chain of one bead per kilobase and a job may ask for it with `chain=uniform`. Off, the form shows no choice, a job is built on loop anchors and a request for the other chain is refused. The Method page follows the feature: off, it has no section on the chain of one bead per kilobase and numbers its sections and figures without it. It is the one feature that is off unless the file turns it on |
 | `limits.region_mb` | `MAX_REGION_MB`, 20 | the longest region of a job, in Mb |
 | `limits.hicdiffusion_mb` | 2 | the longest region of a job with a HiCDiffusion background, in Mb, 2.097152 at most |
 
