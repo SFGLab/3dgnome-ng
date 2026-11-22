@@ -213,6 +213,7 @@ note under `design/` states hardware by its model.
 - `design/anchor-placement.md` has the distance law, the placement of anchors and the end passes.
 - `design/gap-fill.md` has the gaps, the maximum entropy start, the hole beads and the long range.
 - `design/ab-compartments.md` has the compartment term and the steps that build its track.
+- `design/orientation-term.md` has the orientation term of the smooth stage, its trace and its open design.
 - `design/kernel-performance.md`, `design/parallel-mc-and-nn-reading.md` and `design/intra-chain-parallelism.md` have
   the performance work.
 - `design/algorithm-improvements.md` has the arcs solver.
