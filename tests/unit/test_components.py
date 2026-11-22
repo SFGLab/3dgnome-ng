@@ -7,7 +7,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from gnome3d.pipeline.ib.components import hold_by_components, node_affinity, read_components
+from gnome3d.pipeline.ib.components import (
+    hold_by_components,
+    locus_nodes,
+    node_affinity,
+    read_components,
+)
 from gnome3d.polymer import PolymerLaw
 from gnome3d.settings import Settings
 
@@ -46,7 +51,8 @@ def test_track_is_read_by_arm(track: str) -> None:
 def test_affinity_is_the_signed_sum_of_the_products(track: str) -> None:
     arms = read_components(track)["chr1"]
     mids = np.array([50_000, 150_000, 250_000, 450_000, 950_000], dtype=np.int64)
-    affinity, arm_of = node_affinity(arms, mids)
+    affinity, arm_of, bin_of = node_affinity(arms, mids)
+    assert bin_of.tolist() == [0, 1, 2, -1, 0], "the bin of each node in its arm"
     assert arm_of.tolist() == [0, 0, 0, -1, 1], "a node in a bin without a line has no arm"
     assert affinity[0, 1] == pytest.approx(1.0 * 1.0 - 0.5 * -0.5), (
         "1.25 with the second sign turned"
@@ -86,3 +92,19 @@ def test_a_pair_with_a_spring_keeps_it(track: str) -> None:
 def test_reading_a_missing_track_stops(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="is not a file"):
         read_components(str(tmp_path / "none.bed"))
+
+
+def test_one_node_stands_for_a_locus_and_the_affinity_is_in_the_energy_once(track: str) -> None:
+    arms = read_components(track)["chr1"]
+    # two nodes in the first bin, one in the second, two in the third
+    mids = np.array([10_000, 55_000, 150_000, 240_000, 295_000], dtype=np.int64)
+    affinity, arm_of, bin_of = node_affinity(arms, mids)
+    assert locus_nodes(arms, mids, arm_of, bin_of).tolist() == [1, 2, 3], (
+        "the node nearest to the middle of each bin"
+    )
+    mat = np.full((5, 5), -0.5)
+    np.fill_diagonal(mat, 0.0)
+    out = hold_by_components(mat, mids, arms, LAW, settings())
+    held = np.argwhere(np.triu(out != mat, 1)).tolist()
+    assert held == [[1, 2], [1, 3], [2, 3]], "one pair of nodes for each pair of loci"
+    assert out[0, 4] == -0.5 and out[0, 1] == -0.5, "the other nodes keep what they had"

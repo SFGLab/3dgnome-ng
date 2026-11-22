@@ -4,8 +4,8 @@
 The track holds a few numbers per bin of a chromosome arm, gathered from the Hi-C map of the cell
 line by `playground/component_track.py`. The affinity of two bins of one arm is
 `sum over c of sign_c * x_c(i) * x_c(j)`, an estimate of the log of their observed over expected
-count. A pair of nodes without a loop, without a cell and beyond `background_range_bp` is held at
-the background times `exp(-affinity / 3)`.
+count. Each locus is stood for by one node. A pair of those nodes without a loop, without a cell
+and beyond `background_range_bp` is held at the background times `exp(-affinity / 3)`.
 """
 
 from __future__ import annotations
@@ -82,13 +82,14 @@ def read_components(path: str) -> dict[str, list[ArmComponents]]:
     return out
 
 
-def node_affinity(arms: list[ArmComponents], mids: I64Array) -> tuple[F64Array, I64Array]:
-    """Returns the affinity of every pair of nodes and the arm of each node, -1 for a node whose
-    locus has no components. The affinity of two nodes of different arms, or with a node without
-    components, is 0.
+def node_affinity(arms: list[ArmComponents], mids: I64Array) -> tuple[F64Array, I64Array, I64Array]:
+    """Returns the affinity of every pair of nodes, the arm of each node and its bin in the arm.
+    A node whose locus has no components has arm -1. The affinity of two nodes of different arms,
+    or with a node without components, is 0.
     """
     m = int(mids.shape[0])
     arm_of: I64Array = np.full(m, -1, dtype=np.int64)
+    bin_of: I64Array = np.full(m, -1, dtype=np.int64)
     affinity: F64Array = np.zeros((m, m), dtype=np.float64)
     for a, arm in enumerate(arms):
         idx = np.searchsorted(arm.start, mids, side="right") - 1
@@ -97,9 +98,31 @@ def node_affinity(arms: list[ArmComponents], mids: I64Array) -> tuple[F64Array, 
         if sel.size == 0:
             continue
         arm_of[sel] = a
+        bin_of[sel] = idx[sel]
         x = arm.x[idx[sel]]
         affinity[np.ix_(sel, sel)] = (x * arm.sign) @ x.T
-    return affinity, arm_of
+    return affinity, arm_of, bin_of
+
+
+def locus_nodes(
+    arms: list[ArmComponents], mids: I64Array, arm_of: I64Array, bin_of: I64Array
+) -> I64Array:
+    """Returns one node per locus of the track that holds a node, the node nearest to the middle
+    of the bin. The track states the affinity of two loci once, and one pair of nodes carries it.
+    """
+    chosen: list[int] = []
+    for a, arm in enumerate(arms):
+        sel = np.flatnonzero(arm_of == a)
+        if sel.size == 0:
+            continue
+        bins = bin_of[sel]
+        off = np.abs(mids[sel] - 0.5 * (arm.start[bins] + arm.end[bins]))
+        order = np.lexsort((off, bins))
+        first = np.ones(sel.size, dtype=np.bool_)
+        first[1:] = bins[order][1:] != bins[order][:-1]
+        chosen.extend(int(k) for k in sel[order][first])
+    out: I64Array = np.array(sorted(chosen), dtype=np.int64)
+    return out
 
 
 def hold_by_components(
@@ -111,16 +134,26 @@ def hold_by_components(
 ) -> F64Array:
     """Returns the target matrix with the pairs that the components of their two loci hold.
 
-    A pair that holds -0.5, which is a pair without a loop, without a cell and beyond
-    `background_range_bp`, with both nodes in one arm of the track, is held at the background
-    times `exp(-affinity / 3)`, clipped to one bead and to `distance_heatmap_stretching`
-    backgrounds. It is entered as minus its distance, which the kernels score with the background
-    spring. Every other pair is left as it is.
+    Each locus of the track with a node is stood for by one node, the one nearest to the middle
+    of its bin. A pair of those nodes of one arm that holds -0.5, which is a pair without a loop,
+    without a cell and beyond `background_range_bp`, is held at the background times
+    `exp(-affinity / 3)`, clipped to one bead and to `distance_heatmap_stretching` backgrounds. It
+    is entered as minus its distance, which the kernels score with the background spring. Every
+    other pair is left as it is. The affinity of two loci is in the energy once.
     """
-    affinity, arm_of = node_affinity(arms, mids)
+    affinity, arm_of, bin_of = node_affinity(arms, mids)
     pos = mids.astype(np.float64)
     sep = np.abs(pos[:, None] - pos[None, :])
-    free = (mat == -0.5) & (arm_of[:, None] >= 0) & (arm_of[:, None] == arm_of[None, :])
+    stands: I64Array = locus_nodes(arms, mids, arm_of, bin_of)
+    is_locus = np.zeros(int(mids.shape[0]), dtype=np.bool_)
+    is_locus[stands] = True
+    free = (
+        (mat == -0.5)
+        & is_locus[:, None]
+        & is_locus[None, :]
+        & (arm_of[:, None] == arm_of[None, :])
+        & (bin_of[:, None] != bin_of[None, :])
+    )
     np.fill_diagonal(free, False)
     bg = np.maximum(1.0, (np.maximum(sep, 1.0) / max(int(law.s0_bp), 1)) ** law.nu)
     stretch = float(s.heatmap_distance_stretching)
@@ -131,9 +164,10 @@ def hold_by_components(
     spread = float(np.abs(affinity[free]).mean()) if held else 0.0
     log.status(
         LOG,
-        "components: %s pairs of nodes held, %s closer than the background and %s further,"
-        " mean absolute affinity %.2f",
+        "components: %s pairs of loci held over %d loci with a node, %s closer than the"
+        " background and %s further, mean absolute affinity %.2f",
         f"{held:,}",
+        int(stands.shape[0]),
         f"{closer:,}",
         f"{held - closer:,}",
         spread,

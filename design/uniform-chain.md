@@ -1691,6 +1691,39 @@ The term under trial, `[data] components`, off when empty:
 
 Hi-C enters as numbers per locus. The run reads no count of a pair beyond the cells at 5 kb.
 
+#### First trial: a spring on every pair of nodes
+
+`design/figures/uniform-2026-11-19/compo20/` and `scores-compo20/`, `TAG=compo20`, commit 15cdd18. The locked
+config with a track of one, three and five components, gathered from the whole map of each cell line with the
+blocks of the six regions left out, and a control with the law on every pair and no track,
+`background_range_bp` 6000000. In this commit every pair of nodes of the table above got its spring, 12,000 pairs
+on a region. Eighteen rows of twenty structures. The bands are at 100 kb against the balanced half the cells did
+not read, by the pooled contacts and by the mean distance of two bins. The bands of the distance are on the 10
+rows where every bin holds a bead in every structure.
+
+| arm | SCC | Spearman | ends overlap | exponent over Hi-C | distance at 4 Mb | contacts: 1 to 2 Mb | over 2 Mb | distance: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 12 of 360 | 1.044 | 15.0 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config | 0.335, 0.360 | 0.564 | 18 of 360 | 1.064 | 14.9 | 0.12 | 0.02 | 0.33 | 0.15 |
+| the law on every pair, no track | 0.316, 0.307 | 0.612 | 1 of 360 | 1.138 | 18.7 | 0.15 | -0.04 | 0.25 | 0.10 |
+| one component | 0.322, 0.312 | 0.632 | 0 of 360 | 1.099 | 18.1 | 0.18 | 0.01 | 0.40 | 0.37 |
+| three components | 0.317, 0.312 | 0.621 | 1 of 360 | 1.109 | 19.1 | 0.19 | 0.09 | 0.42 | 0.38 |
+| five components | 0.315, 0.310 | 0.617 | 1 of 360 | 1.119 | 19.3 | 0.22 | 0.04 | 0.43 | 0.50 |
+
+- The track carries structure into the model. Against the control with the law alone, five components raise the
+  correlation of the distances with Hi-C by 0.17 ± 0.06 between 1 and 2 Mb and by 0.40 ± 0.10 beyond, on 8 and
+  9 rows of 10, and that of the contacts by 0.07 ± 0.02 between 1 and 2 Mb, on 11 rows of 17. The control has no
+  more structure there than the locked config.
+- The cost is that of a spring on every pair, with or without the track. Balanced SCC falls by 0.05 ± 0.01 on
+  every arm with the springs, the control among them, the decay is 1.10 to 1.14 against 1.06, and the distance at
+  4 Mb is that of the law, 18 to 19 bonds. Spearman rises by 0.05 to 0.07 and the ends overlap in 0 or 1
+  structure of 360.
+- The number of components moves the bands of the distance beyond 2 Mb, 0.37, 0.38 and 0.50, and no other score.
+
+The affinity of two loci is one number. In this trial each pair of nodes of the two loci carried it, 40 pairs
+for one pair of loci on a region of 450 nodes. The second trial has one node stand for a locus.
+
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
