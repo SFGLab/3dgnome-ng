@@ -22,12 +22,15 @@ from gnome3d import log
 if TYPE_CHECKING:
     from gnome3d.polymer import PolymerLaw
     from gnome3d.settings import Settings
-    from gnome3d.types import F64Array, I64Array
+    from gnome3d.types import BoolArray, F64Array, I64Array
 
 LOG = log.get("components")
 # The two halves of a Hi-C map agree at 0.8 to 0.9 beyond 1 Mb at this bin, and the component
 # track is gathered at it, design/uniform-chain.md.
 LOCUS_BP = 100_000
+# The span of the regions that the law between the loci was measured on, design/uniform-chain.md.
+NEAR_BP = 5_000_000
+LOCI_PAIRS = ("all", "near", "octave", "near_octave", "segment")
 
 
 class ArmComponents(NamedTuple):
@@ -122,12 +125,59 @@ def locus_nodes(mids: I64Array) -> I64Array:
     return out
 
 
+def octave_offsets(count: int) -> BoolArray:
+    """Returns for each offset under `count` whether it is on the ladder with two offsets to a
+    doubling: 1, 2, 3, 4, 6, 8, 12, 16 and on, a power of two or three times one.
+    """
+    on: BoolArray = np.zeros(max(count, 1), dtype=np.bool_)
+    step = 1
+    while step < count:
+        on[step] = True
+        if 3 * step < count:
+            on[3 * step] = True
+        step *= 2
+    return on
+
+
+def loci_pairs(form: str, at: I64Array, segment: I64Array | None) -> BoolArray:
+    """Returns the pairs of loci that the law holds under `[springs] loci_pairs`, a square
+    matrix over the nodes that stand for a locus at the positions `at`.
+
+    `all` is every pair. `near` is a pair up to `NEAR_BP` apart. `octave` is a pair whose
+    offset in the order of the loci is on the ladder of `octave_offsets`. `near_octave` is
+    either. `segment` is a pair of one segment, with `segment` the segment of each locus.
+    """
+    count = int(at.shape[0])
+    if form == "all":
+        return np.ones((count, count), dtype=np.bool_)
+    rank = np.arange(count)
+    offset = np.abs(rank[:, None] - rank[None, :])
+    near: BoolArray = np.abs(at[:, None] - at[None, :]) <= NEAR_BP
+    ladder: BoolArray = octave_offsets(count)[offset]
+    if form == "near":
+        return near
+    if form == "octave":
+        return ladder
+    if form == "near_octave":
+        return near | ladder
+    if form == "segment":
+        if segment is None:
+            raise ValueError(
+                "[springs] loci_pairs = segment needs the segment of each node, which the node"
+                " solve of [main] uniform_chain gives. Set loci_pairs to another form."
+            )
+        same: BoolArray = segment[:, None] == segment[None, :]
+        return same
+    raise ValueError(f"[springs] loci_pairs must be one of {', '.join(LOCI_PAIRS)}, got {form!r}")
+
+
 def hold_loci(
     mat: F64Array,
     mids: I64Array,
     arms: list[ArmComponents],
     law: PolymerLaw,
     s: Settings,
+    segment: I64Array | None = None,
 ) -> F64Array:
     """Returns the target matrix with the pairs of loci held at the law.
 
@@ -137,7 +187,8 @@ def hold_loci(
     `distance_heatmap_stretching` backgrounds. The affinity comes from `arms`, the component
     track, and is zero without a track, for two loci of different arms and for a locus that the
     track does not hold. The pair is entered as minus its distance, which the kernels score with
-    the background spring. Every other pair is left as it is.
+    the background spring. Every other pair is left as it is. `[springs] loci_pairs` selects
+    the pairs of loci that are held, `loci_pairs`, with `segment` the segment of each node.
     """
     m = int(mids.shape[0])
     stands = locus_nodes(mids)
@@ -156,7 +207,8 @@ def hold_loci(
     pos = at.astype(np.float64)
     sep = np.abs(pos[:, None] - pos[None, :])
     block = mat[np.ix_(stands, stands)]
-    free = block == -0.5
+    form = str(s.loci_pairs)
+    free = (block == -0.5) & loci_pairs(form, at, None if segment is None else segment[stands])
     np.fill_diagonal(free, False)
     bg = np.maximum(1.0, (np.maximum(sep, 1.0) / max(int(law.s0_bp), 1)) ** law.nu)
     stretch = float(s.heatmap_distance_stretching)
@@ -168,10 +220,11 @@ def hold_loci(
     further = int((free & (affinity < 0.0)).sum()) // 2
     log.status(
         LOG,
-        "loci: %d nodes stand for the loci of %d nodes, %s pairs held, %s closer than the"
-        " background by the track and %s further",
+        "loci: %d nodes stand for the loci of %d nodes, pairs %s, %s pairs held, %s closer than"
+        " the background by the track and %s further",
         int(stands.shape[0]),
         m,
+        form,
         f"{held:,}",
         f"{closer:,}",
         f"{further:,}",

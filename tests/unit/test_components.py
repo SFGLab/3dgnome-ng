@@ -126,3 +126,60 @@ def test_a_track_of_another_bin_stops(tmp_path: Path) -> None:
     mat = np.array([[0.0, -0.5], [-0.5, 0.0]])
     with pytest.raises(ValueError, match="a locus is 100000 bp"):
         hold_loci(mat, mids, read_components(str(path))["chr1"], LAW, settings())
+
+
+def loci_grid(count: int) -> tuple[np.ndarray, np.ndarray]:
+    """One node in the middle of each of `count` loci and a matrix of free pairs."""
+    mids = (np.arange(count, dtype=np.int64) * 100_000) + 50_000
+    mat = np.full((count, count), -0.5)
+    np.fill_diagonal(mat, 0.0)
+    return mids, mat
+
+
+def held_offsets(form: str, count: int, segment: np.ndarray | None = None) -> list[int]:
+    """The offsets from the first locus that the form holds."""
+    mids, mat = loci_grid(count)
+    s = settings()
+    s.loci_pairs = form
+    out = hold_loci(mat, mids, [], LAW, s, segment)
+    return np.flatnonzero(out[0] != mat[0]).tolist()
+
+
+def test_near_holds_the_pairs_up_to_5_mb() -> None:
+    assert held_offsets("near", 80) == list(range(1, 51)), "50 loci of 100 kb are 5 Mb"
+
+
+def test_octave_holds_two_offsets_to_a_doubling() -> None:
+    assert held_offsets("octave", 80) == [1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64]
+
+
+def test_near_octave_holds_both() -> None:
+    assert held_offsets("near_octave", 80) == [*range(1, 51), 64]
+
+
+def test_segment_holds_the_pairs_of_one_segment() -> None:
+    segment = np.array([7] * 30 + [9] * 50, dtype=np.int64)
+    assert held_offsets("segment", 80, segment) == list(range(1, 30))
+
+
+def test_all_holds_every_pair_and_a_held_pair_is_at_the_law() -> None:
+    assert held_offsets("all", 80) == list(range(1, 80))
+    mids, mat = loci_grid(80)
+    s = settings()
+    s.loci_pairs = "octave"
+    out = hold_loci(mat, mids, [], LAW, s)
+    assert out[0, 64] == pytest.approx(-((6_400_000 / 1000) ** 0.5)), "the background at 6.4 Mb"
+    assert out[0, 65] == -0.5, "a pair off the ladder keeps what it had"
+    assert np.array_equal(out, out.T), "the matrix stays symmetric"
+
+
+def test_segment_needs_the_segments_and_the_loader_refuses_an_unknown_form() -> None:
+    mids, mat = loci_grid(10)
+    s = settings()
+    s.loci_pairs = "segment"
+    with pytest.raises(ValueError, match="segment of each node"):
+        hold_loci(mat, mids, [], LAW, s)
+    with pytest.raises(ValueError, match="loci_pairs must be"):
+        Settings.from_dict({"main": {"uniform_chain": "yes"}, "springs": {"loci_pairs": "some"}})
+    with pytest.raises(ValueError, match="uniform_chain is off"):
+        Settings.from_dict({"springs": {"loci_pairs": "near"}})
