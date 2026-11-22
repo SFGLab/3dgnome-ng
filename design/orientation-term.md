@@ -96,6 +96,74 @@ chain without the term, `prod` the default chain. Differences are over the rows 
   largest difference 0.001. The commits between them, with the terms of the arcs solve on the device, did not
   move the scores.
 
+## Design of the rewrite, 2026-11-22
+
+The maintainer chose to rewrite the term on 2026-11-22. This is the design on paper. Nothing of it is built.
+
+### The direction of a site
+
+The direction of a site at bead `a` is the unit vector from the centroid of the `k` beads before it to the
+centroid of the `k` beads after it, reversed for the motif L. The anchor bead itself is in neither centroid.
+
+- With `k` of 1 this is the vector of the term as it is.
+- One bead moved by one bond turns the vector of the term as it is by half a radian. It turns the vector over
+  `k` beads a side by `1 / (k (k + 1))` radians: 4.8 degrees at `k` 3. No single bead makes the direction. The
+  stretch of `2 k + 1` beads turns as a whole, and the chain beside it follows by its bonds.
+- `k` is 3, a documented choice: the shortest stretch in which a bead moved by one bond turns the vector by
+  under 5 degrees. On the uniform chain it is 3 kb a side.
+
+### The energy of a site
+
+A loop between the sites `i` and `j` keeps the form `((1 - v_i . v_j) / 2)^2`. Its weight changes.
+
+- The weight of a loop is the root of its PET count over the larger of the sums of those roots at its two
+  sites. The weights of the loops of a site then sum to one at most, and the weight of a loop is the same seen
+  from either site, which the update of the running score needs.
+- The weight of the term is the energy of the `2 k` bonds of a stretch each one target too long,
+  `2 k * stretch_constant * smooth_dist_weight`: 0.6 at `k` 3. A site at its worst misfit has the energy of
+  its own stretch pulled out by one bond a bead. `[motif_orientation] weight` is not read by this form.
+- The term stays non negative and its local scores sum to its full score.
+
+### The cases
+
+| case | rule |
+|---|---|
+| a site at the first or the last bead of a block | the centroid of the missing side is the anchor bead |
+| a site under `k` beads from an end of the block | the centroid of that side is of the beads there are |
+| two sites under `k` beads apart | each stretch holds the beads there are, the other anchor among them |
+| a moved bead within `k` beads of several sites | every one of those sites is scored again, one after another |
+| a node of the uniform chain moved with its two neighbours | the sites within `k` beads of any of the three are scored again |
+| an anchor without a CTCF loop inside the block | no term, as now |
+| an anchor without a motif on a CTCF loop | a site with its vector not reversed, as now |
+| a loop of another factor | no term, as now |
+| the cross block relaxation | no term, as now |
+
+The term as it is scores one site for a moved bead, the later of two anchors when the bead is between two. The
+running score of the orientation then leaves the full score when two anchors are two beads apart. The rewrite
+scores every site that reads the moved bead.
+
+### What each stage may move
+
+No stage before the smooth stage reads the direction. The smooth stage turns the stretch of a site with the
+moves it has, one bead or a node with its two neighbours. The arcs stage, the densify stage and the relaxation
+are as they are.
+
+### The build and the trial
+
+1. The numba kernel first, the executor of production: the vector over a stretch, the table of the sites that
+   a move reads, the weights. The term as it is stays beside it under `[motif_orientation] form`, `neighbours`
+   or `stretch`, a key under trial that is deleted with the losing form.
+2. Unit file after `tests/unit/test_terms.py`: the vector of a hand built chain in closed form, the local
+   scores against the full score with sites under `k` beads apart, the term non negative, the weights of the
+   loops of a site.
+3. The trace of `playground/orientation_trace.py` on the three arms: the term as it is, the rewrite and no
+   term. The rewrite is right when the bonds over twice their target at the sites are at the level of the arm
+   without the term and the misfit falls.
+4. The 18 held out rows at twenty structures: the rewrite against the term as it is and against no term, by
+   paired differences.
+5. With the rewrite adopted: the JAX kernel gets the same form, the term as it is and its key are deleted. The
+   batch executor refuses `stretch` until then.
+
 ## Open
 
 The term stretches a quarter to a third of the bonds at its sites and is worth 0.007 of balanced SCC on the
