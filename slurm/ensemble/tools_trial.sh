@@ -12,6 +12,10 @@
 # clusters as loops at the bead count and span of our arm, through playground/multimm_arm.py. Every
 # run is timed into OUT/timing.tsv. A region chr1 runs the whole chromosome and is scored on
 # chr1:1-60000000.
+#
+# INI_TAG is the config of our tool, slurm/ensemble/<cell>_<INI_TAG>.ini, hic_arcs by default and
+# hic_uniform for the uniform chain. With SCORE_MAPS the score reads SCORE_MAPS/<cell>.mcool in
+# place of the deep map, half b for a config that reads half a.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
@@ -34,7 +38,9 @@ TIMING="$OUT/timing.tsv"
 [ -f "$TIMING" ] || printf "cell\tregion\ttool\tstructures\tbeads\tseconds\n" > "$TIMING"
 git log --format="tools trial on %h %s" -1 >> "$LOG"
 
-mcool() { ls -S "$HIC/$1"/*.mcool | head -1; }
+INI_TAG="${INI_TAG:-hic_arcs}"
+SCORE_MAPS="${SCORE_MAPS:-}"
+mcool() { if [ -n "$SCORE_MAPS" ]; then echo "$SCORE_MAPS/$1.mcool"; else ls -S "$HIC/$1"/*.mcool | head -1; fi; }
 key() { .venv/bin/python -c "import configparser,sys; c=configparser.ConfigParser(); c.read(sys.argv[1]); print(c['data'][sys.argv[2]])" "$1" "$2"; }
 beads() { grep -c "^ATOM" "$(ls "$1"/*.cif | head -1)"; }
 
@@ -88,7 +94,7 @@ run_cudammc() {  # cell region n hcmdir cif dir
 
 for C in $CELLS; do
   c=$(echo "$C" | tr 'A-Z' 'a-z')
-  INI="slurm/ensemble/${c}_hic_arcs.ini"
+  INI="slurm/ensemble/${c}_${INI_TAG}.ini"
   M=$(mcool "$C")
   LOOPS="$DATA/$C/$(key "$INI" clusters)"
   for R in $REGIONS; do
