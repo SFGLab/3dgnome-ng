@@ -35,9 +35,9 @@ describe('Method page', () => {
   it('numbers every figure once, in the order of the page', () => {
     const { container } = renderMethod()
     const labels = [...container.querySelectorAll('figcaption b, p.panel-caption > b')].map((b) => b.textContent).filter((s) => s?.startsWith('Figure'))
-    expect(labels).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => `Figure ${n}`).concat(['Figure 11a', 'Figure 11b']))
-    expect(document.getElementById('engine')).toHaveTextContent('figure 11a')
-    expect(document.getElementById('engine')).toHaveTextContent('figure 11b')
+    expect(labels).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Figure ${n}`).concat(['Figure 10a', 'Figure 10b']))
+    expect(document.getElementById('engine')).toHaveTextContent('figure 10a')
+    expect(document.getElementById('engine')).toHaveTextContent('figure 10b')
   })
 
   it('leaves the chain of one bead per kilobase out where the site turns it off', () => {

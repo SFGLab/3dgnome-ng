@@ -17,8 +17,7 @@ import methodExponent from '../assets/method_exponent.png'
 import methodHic from '../assets/method_hic.png'
 import methodLoops from '../assets/method_loops.png'
 import methodUniformAnchor from '../assets/method_uniform_anchor.png'
-import methodUniformLoops from '../assets/method_uniform_loops.png'
-import methodUniformTargets from '../assets/method_uniform_targets.png'
+import methodUniformNodes from '../assets/method_uniform_nodes.png'
 import { METHOD_REFERENCES } from '../content/methodReferences'
 
 const SECTIONS = [
@@ -133,7 +132,7 @@ function P({ children }: { children: string }) {
 /** One job from its inputs to its output, with the energies and their sources. */
 export function Method() {
   const uniform = !hidden('uniform_chain')
-  const engineFigure = uniform ? 11 : 8
+  const engineFigure = uniform ? 10 : 8
   return (
     <DocPage
       title="Method"
@@ -295,14 +294,14 @@ export function Method() {
         <h3>The ends of a loop</h3>
         <P>{"The chain has one bead for each kilobase of a block. An anchor covers the beads inside its coordinates, three beads for an anchor of 3 kb. A loop joins two anchors and ends on one bead of each, which is drawn at random among the beads of the anchor for every structure. A bead with the end of a loop is called a node. Two loops of one anchor can end on different nodes, while the nodes of one loop differ between two structures, figure 8a."}</P>
         <P>{"Two anchors of the data can overlap. On the chain of loop anchors each of them is a bead of its own and the two beads then cover the same DNA. On the chain of one bead per kilobase the two anchors share the beads of their overlap, figure 8b. A loop of either anchor can end on a shared bead and two loop ends on one bead make one node."}</P>
-        <Figure n="8" src={methodUniformAnchor} alt="One anchor of 3 kb with three loops and two overlapping anchors, each drawn as the data give them, as beads of the chain of loop anchors and as beads of the chain of one bead per kilobase in two structures, with the bead of every loop end">
-          An example of an anchor on the two chains, chromosome 1 of GM12878. a, one anchor of 3 kb with three loops, near 237.85 Mb. The chain of loop anchors has one bead for the anchor and every loop ends on it. The chain of one bead per kilobase has three beads under the anchor, marked by the line under them. Each loop ends on one of the three, drawn anew in every structure. A dot is a node. b, two anchors that overlap near 238.23 Mb, the smaller one inside the larger. The chain of loop anchors has one bead for each and the two beads cover the same DNA. On the chain of one bead per kilobase the two anchors share two beads. Grey beads belong to another anchor. The loops are those of the anchors in the data.
+        <Figure n="8" src={methodUniformAnchor} alt="One anchor of 3 kb with three loops and two overlapping anchors, each drawn as the data give them, as the beads of the chain of loop anchors and as the beads of the chain of one bead per kilobase in two structures, every bead a circle and the beads with a loop end filled">
+          An example of an anchor on the two chains, chromosome 1 of GM12878. A circle is a bead and the line under the beads is the DNA of the anchor. a, one anchor of 3 kb with three loops, near 237.85 Mb. The chain of loop anchors has one bead for the anchor and every loop ends on it. The chain of one bead per kilobase has three beads on the anchor. Each loop ends on one of the three, drawn anew in every structure. A filled bead is a node. b, two anchors that overlap near 238.23 Mb, the smaller one inside the larger. The chain of loop anchors has one bead for each and the two beads cover the same DNA. On the chain of one bead per kilobase the two anchors share two beads. Grey beads belong to another anchor. The loops are those of the anchors in the data.
         </Figure>
 
         <h3>The loops of one structure</h3>
-        <P>{"A loop is present in a share of the cells of the experiment and that share is larger for a strong loop. A structure represents one conformation and therefore keeps a loop with a probability that grows with its strength. The probability is q / (q + 1), where q is the strength of the loop, its PET count over the typical count at its span, section 2. A loop of typical strength has q of 1 and is in half of the structures, while a loop four times as strong is in four of five, figure 9."}</P>
-        <Figure n="9" src={methodUniformLoops} alt="The share of the structures that keep a loop against the strength of the loop, a curve from 0.05 at a strength of 0.05 to 0.97 at 30 with the 46 loops of the example region as points on it">
-          An example of the loops that a structure keeps, the 46 loops of the region of figure 1. Each point is a loop at its strength q and the line is the share of the structures that keep it. The dashed lines mark a loop of typical strength, which is in half of the structures.
+        <P>{"A loop is present in a share of the cells of the experiment and that share is larger for a strong loop. A structure represents one conformation and therefore keeps a loop with a probability that grows with its strength. The probability is q / (q + 1), where q is the strength of the loop, its PET count over the typical count at its span, section 2. A loop of typical strength has q of 1 and is in half of the structures, while a loop four times as strong is in four of five, figure 9a."}</P>
+        <Figure n="9" src={methodUniformNodes} alt="Left, the share of the structures that keep a loop against the strength of the loop, a curve from 0.05 at a strength of 0.05 to 0.97 at 30 with the 46 loops of the example region as points on it. Right, a matrix of the pairs of the 31 nodes of one structure of the region coloured by the kind of target, with loops and background pairs under 100 kb near the diagonal and the background between two stretches of 100 kb across the blocks">
+          An example of the loops and the targets of one structure, the region of figure 1. a, the 46 loops of the region. Each point is a loop at its strength q and the line is the share of the structures that keep it. The dashed lines mark a loop of typical strength, which is in half of the structures. b, the targets of the 31 nodes of one structure. Every pair of nodes is coloured by its target. The pairs of two stretches of 100 kb reach across the blocks, where the chain of loop anchors has no target in figure 6a.
         </Figure>
 
         <h3>The nodes in the anchor phase</h3>
@@ -311,15 +310,12 @@ export function Method() {
 
         <h3>Contacts from the Hi-C map</h3>
         <P>{"Section 2 reads the Hi-C map for pairs of anchors. This chain reads it in cells of 5 kb, where a cell is the count of contacts between two stretches of 5 kb. A pair of nodes reads the cell that holds its two beads. The count of a cell is compared with its expected count, the mean count at the same genomic separation multiplied by the coverage of its two stretches. The coverage of a stretch is its share of contacts relative to an average stretch and comes from the balancing weights of the map."}</P>
-        <P>{"A count of rare events varies by about the square root of its expected value. A cell therefore counts as enriched when it is more than three such deviations above its expected count and as depleted when it is as far below. A cell with an expected count of 16 is enriched at 28 contacts or more and depleted at 4 or fewer. The two nodes of an enriched cell get a target under the background distance and those of a depleted cell a target over it, both by the rule of section 2 for the Hi-C map. Such cells are rare and the example of figure 10 has none."}</P>
+        <P>{"A count of rare events varies by about the square root of its expected value. A cell therefore counts as enriched when it is more than three such deviations above its expected count and as depleted when it is as far below. A cell with an expected count of 16 is enriched at 28 contacts or more and depleted at 4 or fewer. The two nodes of an enriched cell get a target under the background distance and those of a depleted cell a target over it, both by the rule of section 2 for the Hi-C map. Such cells are rare and the example of figure 9b has none."}</P>
         <P>{"The cells are read with the Hi-C background of the cell type. A job with structural variants, with your own contacts, with a predicted background or with no background has no cells."}</P>
 
         <h3>Distance of two distant parts</h3>
-        <P>{"The background spring of section 3 acts on pairs closer than 100 kb. A chain of single kilobases needs a second hold beyond that distance, since no other term keeps two parts of a region that are megabases apart from folding onto each other. The region is therefore divided into stretches of 100 kb and each stretch is represented by one node, the node closest to its middle. Two of these nodes are held at the background distance b(s) of section 2 when no loop and no cell gives them a target, figure 10."}</P>
+        <P>{"The background spring of section 3 acts on pairs closer than 100 kb. A chain of single kilobases needs a second hold beyond that distance, since no other term keeps two parts of a region that are megabases apart from folding onto each other. The region is therefore divided into stretches of 100 kb and each stretch is represented by one node, the node closest to its middle. Two of these nodes are held at the background distance b(s) of section 2 when no loop and no cell gives them a target, figure 9b."}</P>
         <P>{"Every pair up to 5 Mb apart is held. Beyond 5 Mb a node is paired with two others for each doubling of the separation. The number of springs of a node then grows with the logarithm of the length of the chromosome, while a number that grew with the length itself would outweigh the excluded volume on a whole chromosome."}</P>
-        <Figure n="10" src={methodUniformTargets} alt="A matrix of the pairs of the 31 nodes of one structure of a 6 Mb region coloured by the kind of target, with loops and background pairs under 100 kb near the diagonal and the background between two stretches of 100 kb across the blocks">
-          An example of the targets of the nodes, one structure of the region of figure 1 with 31 nodes. Every pair of nodes is coloured by its target. The pairs of two stretches of 100 kb reach across the blocks, where the chain of loop anchors has no target in figure 6a.
-        </Figure>
 
         <h3>The chain between the nodes</h3>
         <P>{"The chain phase of section 4 moves the beads between the nodes with the same five terms, yet two of its rules differ. A node is not fixed in this chain and moves together with the bead before it and the bead after it, while the centre of mass of the three stays in place. Each neighbour moves by minus half of the step of the node, which lets the node turn among its neighbours at the position the anchor phase gave it. The second rule is the bond, which resists compression ten times as strongly as stretching and keeps two neighbouring beads from overlapping."}</P>

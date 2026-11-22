@@ -664,61 +664,19 @@ def _loop_stub(ax: plt.Axes, x: float, y: float, side: int, reach: float, rise: 
 
 
 def uniform_anchor(tab: Path, out: Path) -> None:
-    """Draws one anchor and two overlapping anchors as the data give them, on the chain of loop
-    anchors and on the chain of one bead per kilobase in two structures."""
+    """Draws one anchor and two overlapping anchors as the data give them, as the beads of the
+    chain of loop anchors and as the beads of the chain of one bead per kilobase in two structures."""
+    from matplotlib.lines import Line2D
+
     both = json.loads((tab / "uniform_anchors.json").read_text())
     tints = [BLUE, "#eb6834"]
-    fig, axes = plt.subplots(1, 2, figsize=(WIDTH, 4.3))
+    edge = "#c9c8c3"
+    fig, axes = plt.subplots(1, 2, figsize=(WIDTH, 4.7))
     rows = ["anchor in the data", "loop anchors\nand segments", "one bead per kb,\nstructure 1", "one bead per kb,\nstructure 2"]
     for ax, key, tag in zip(axes, ("single", "overlap"), ("a", "b"), strict=True):
-        e = both[key]
-        w0, w1 = e["window"]
-        kb = 1e3
-
-        def x(v: float, w0: int = w0, kb: float = kb) -> float:
-            return (v - w0) / kb
-
-        span = x(w1)
-        # The anchors as the data give them, one bar each.
-        for n, a in enumerate(e["anchors"]):
-            y = 3.0 + (0.16 if n == 0 else -0.16) * (len(e["anchors"]) > 1)
-            ax.add_patch(plt.Rectangle((x(a["start"]), y - 0.11), x(a["end"]) - x(a["start"]), 0.22, fc=tints[n], ec="none"))
-        for i, lp in enumerate(e["loops"]):
-            a = e["anchors"][lp["anchor"]]
-            y = 3.0 + (0.16 if lp["anchor"] == 0 else -0.16) * (len(e["anchors"]) > 1)
-            mid = (x(a["start"]) + x(a["end"])) / 2 + 0.25 * lp["side"]
-            _loop_stub(ax, mid, y + 0.11, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
-        # The chain of loop anchors: one bead for an anchor, beads of about 1 kb between two anchors.
-        picked = {(a["start"], a["end"]): n for n, a in enumerate(e["anchors"])}
-        for b in e["default"]:
-            n = picked.get((b["start"], b["end"]))
-            y = 2.0 + ((0.16 if n == 0 else -0.16) if n is not None and len(e["anchors"]) > 1 else 0.0)
-            colour = tints[n] if n is not None else (OTHER if b["anchor"] else PALE)
-            left, right = max(x(b["start"]), 0.0), min(x(b["end"]), span)
-            ax.add_patch(FancyBboxPatch((left + 0.06, y - 0.11), right - left - 0.12, 0.22, boxstyle="round,pad=0.0,rounding_size=0.1", fc=colour, ec="none"))
-        for i, lp in enumerate(e["loops"]):
-            a = e["anchors"][lp["anchor"]]
-            y = 2.0 + (0.16 if lp["anchor"] == 0 else -0.16) * (len(e["anchors"]) > 1)
-            _loop_stub(ax, (x(a["start"]) + x(a["end"])) / 2, y + 0.11, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
-        # The chain of one bead per kilobase in two structures, with the bead of each loop end.
-        for row, draw in zip((1.0, 0.0), e["draws"], strict=True):
-            for b in e["uniform"]:
-                owners = b["anchors"]
-                left, right = max(x(b["start"]), 0.0), min(x(b["end"]), span)
-                colour = WASH if owners else (GAP if not b["covered"] else OTHER)
-                ax.add_patch(FancyBboxPatch((left + 0.06, row - 0.11), right - left - 0.12, 0.22, boxstyle="round,pad=0.0,rounding_size=0.1", fc=colour, ec=MID if owners else "#c9c8c3", lw=0.7))
-                if len(owners) > 1:
-                    ax.add_patch(plt.Rectangle((left + 0.06, row - 0.2), right - left - 0.12, 0.04, fc=tints[1], ec="none"))
-                    ax.add_patch(plt.Rectangle((left + 0.06, row - 0.16), right - left - 0.12, 0.04, fc=tints[0], ec="none"))
-                elif owners:
-                    ax.add_patch(plt.Rectangle((left + 0.06, row - 0.16), right - left - 0.12, 0.04, fc=tints[owners[0]], ec="none"))
-            for i, (lp, bead) in enumerate(zip(e["loops"], draw, strict=True)):
-                b = e["uniform"][bead]
-                centre = (x(b["start"]) + x(b["end"])) / 2
-                ax.plot([centre], [row], marker="o", ms=6.5, color=tints[lp["anchor"]], mec="white", mew=0.8, zorder=5)
-                _loop_stub(ax, centre, row + 0.11, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
-        ax.set_xlim(0, span)
-        ax.set_ylim(-0.45, 3.6)
+        w0, w1 = both[key]["window"]
+        ax.set_xlim(0, (w1 - w0) / 1e3)
+        ax.set_ylim(-0.5, 3.6)
         ax.set_yticks([3.0, 2.0, 1.0, 0.0])
         ax.set_yticklabels(rows if tag == "a" else [""] * 4, fontsize=8.5)
         ax.tick_params(axis="y", length=0)
@@ -728,59 +686,132 @@ def uniform_anchor(tab: Path, out: Path) -> None:
         title = "one anchor of 3 kb with three loops" if key == "single" else "two anchors that overlap"
         ax.set_title(title, fontsize=9.5, color=INK, pad=6)
         letter(ax, tag)
-    fig.tight_layout(w_pad=1.6)
+    fig.tight_layout(w_pad=1.6, rect=(0, 0.1, 1, 1))
+    fig.canvas.draw()
+    # A bead is a circle on the page. Its size comes from the scale of the panel with the longer window.
+    per_kb = min(ax.get_window_extent().width * 72 / fig.dpi / ax.get_xlim()[1] for ax in axes)
+    size = 0.84 * per_kb
+    for ax, key in zip(axes, ("single", "overlap"), strict=True):
+        e = both[key]
+        w0, w1 = e["window"]
+        span = (w1 - w0) / 1e3
+        top = size / 2 / (ax.get_window_extent().height * 72 / fig.dpi / 4.1)
+        two = len(e["anchors"]) > 1
+
+        def x(v: float, w0: int = w0) -> float:
+            return (v - w0) / 1e3
+
+        def centre(b: dict, x=x) -> float:  # noqa: ANN001
+            return (x(b["start"]) + x(b["end"])) / 2
+
+        def bead(at: float, y: float, fill: str, line: str, ax: plt.Axes = ax, span: float = span) -> None:
+            if 0.0 <= at <= span:
+                ax.plot([at], [y], marker="o", ms=size, color=fill, mec=line, mew=0.8, zorder=4, clip_on=False)
+
+        def dna(a: dict, y: float, n: int, ax: plt.Axes = ax, x=x, top: float = top) -> None:  # noqa: ANN001
+            ax.add_patch(plt.Rectangle((x(a["start"]), y - top - 0.1 - 0.07 * n), x(a["end"]) - x(a["start"]), 0.045, fc=tints[n], ec="none"))
+
+        # The anchors as the data give them, one bar each.
+        for n, a in enumerate(e["anchors"]):
+            y = 3.0 + (0.16 if n == 0 else -0.16) * two
+            ax.add_patch(plt.Rectangle((x(a["start"]), y - 0.11), x(a["end"]) - x(a["start"]), 0.22, fc=tints[n], ec="none"))
+        for i, lp in enumerate(e["loops"]):
+            a = e["anchors"][lp["anchor"]]
+            y = 3.0 + (0.16 if lp["anchor"] == 0 else -0.16) * two
+            _loop_stub(ax, centre(a) + 0.25 * lp["side"], y + 0.11, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
+        # The chain of loop anchors: an anchor is one bead, with the DNA it covers as a bar under it.
+        picked = {(a["start"], a["end"]): n for n, a in enumerate(e["anchors"])}
+        ax.plot([centre(b) for b in e["default"]], [2.0] * len(e["default"]), color=edge, lw=1.6, zorder=2)
+        for b in e["default"]:
+            n = picked.get((b["start"], b["end"]))
+            if n is not None:
+                bead(centre(b), 2.0, tints[n], "white")
+                dna(b, 2.0, n)
+            else:
+                bead(centre(b), 2.0, OTHER if b["anchor"] else PALE, "white")
+        for i, lp in enumerate(e["loops"]):
+            a = e["anchors"][lp["anchor"]]
+            _loop_stub(ax, centre(a), 2.0 + top, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
+        # The chain of one bead per kilobase in two structures: a loop ends on one bead of its anchor.
+        for row, draw in zip((1.0, 0.0), e["draws"], strict=True):
+            ax.plot([centre(b) for b in e["uniform"]], [row] * len(e["uniform"]), color=edge, lw=1.6, zorder=2)
+            ends = {bead_of: lp["anchor"] for lp, bead_of in zip(e["loops"], draw, strict=True)}
+            for k, b in enumerate(e["uniform"]):
+                owners = b["anchors"]
+                if k in ends:
+                    bead(centre(b), row, tints[ends[k]], "white")
+                elif owners:
+                    bead(centre(b), row, WASH, MID)
+                else:
+                    bead(centre(b), row, OTHER if b["covered"] else GAP, "white" if b["covered"] else edge)
+            for n, a in enumerate(e["anchors"]):
+                dna(a, row, n)
+            for i, (lp, bead_of) in enumerate(zip(e["loops"], draw, strict=True)):
+                _loop_stub(ax, centre(e["uniform"][bead_of]), row + top, lp["side"], span, 0.26 + 0.07 * i, tints[lp["anchor"]])
+    key_size = 7.5
+    handles = [
+        Line2D([], [], marker="o", ls="", ms=key_size, color=BLUE, mec="white", label="bead with the end of a loop"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=WASH, mec=MID, label="bead inside the anchor, no loop end"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=PALE, mec="white", label="bead between two anchors, loop anchors chain"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=GAP, mec=edge, label="bead outside the anchor, one bead per kb"),
+        Line2D([], [], marker="o", ls="", ms=key_size, color=OTHER, mec="white", label="bead of another anchor"),
+        Line2D([], [], color=BLUE, lw=3, label="DNA of the anchor"),
+    ]
+    fig.legend(handles=handles, frameon=False, fontsize=8.5, loc="lower center", ncol=2, handlelength=1.4, columnspacing=2.2)
     save(fig, out / "method_uniform_anchor.png")
 
 
-def uniform_loops(tab: Path, out: Path) -> None:
-    """Draws the share of the structures that keep a loop against its strength, with the loops of
-    the region."""
-    loops = pd.read_csv(tab / "uniform_loops.csv")
-    fig, ax = plt.subplots(figsize=(WIDTH * 0.62, 3.2))
-    q = np.geomspace(0.05, 30, 200)
-    ax.plot(q, q / (q + 1), color=INK, lw=1.4, label="q / (q + 1)")
-    ax.scatter(loops.strength, loops.kept, s=22, color=BLUE, alpha=0.75, lw=0, zorder=3, label=f"the {len(loops)} loops of the region")
-    ax.axhline(0.5, color="#c9c8c3", lw=0.7, ls=(0, (3, 3)))
-    ax.axvline(1.0, color="#c9c8c3", lw=0.7, ls=(0, (3, 3)))
-    ax.set_xscale("log")
-    ax.set_xticks([0.1, 0.3, 1, 3, 10, 30])
-    ax.set_xticklabels(["0.1", "0.3", "1", "3", "10", "30"])
-    ax.minorticks_off()
-    ax.set_ylim(0, 1.02)
-    ax.set_xlabel("strength of the loop, q", fontsize=9.5)
-    ax.set_ylabel("share of the structures\nthat keep the loop", fontsize=9.5)
-    ax.legend(frameon=False, fontsize=8.5, loc="lower right")
-    style(ax)
-    fig.tight_layout()
-    save(fig, out / "method_uniform_loops.png")
-
-
-def uniform_targets(tab: Path, out: Path) -> None:
-    """Draws the kind of target of every pair of nodes of one structure of the region."""
+def uniform_nodes(tab: Path, out: Path) -> None:
+    """Draws the share of the structures that keep a loop against its strength and the kind of
+    target of every pair of nodes of one structure of the region."""
     from matplotlib.colors import ListedColormap
     from matplotlib.patches import Patch
 
+    loops = pd.read_csv(tab / "uniform_loops.csv")
     kind = pd.read_csv(tab / "uniform_pairs.csv", header=None).to_numpy()
     nodes = pd.read_csv(tab / "uniform_nodes.csv")
     n_of = json.loads((tab / "fits.json").read_text())["uniform_pairs"]
     n = len(nodes)
+    fig, (left, right) = plt.subplots(1, 2, figsize=(WIDTH, 4.4), gridspec_kw={"width_ratios": [1.0, 1.0]})
+
+    q = np.geomspace(0.05, 30, 200)
+    left.plot(q, q / (q + 1), color=INK, lw=1.4, label="q / (q + 1)")
+    left.scatter(loops.strength, loops.kept, s=22, color=BLUE, alpha=0.75, lw=0, zorder=3, label=f"the {len(loops)} loops of the region")
+    left.axhline(0.5, color="#c9c8c3", lw=0.7, ls=(0, (3, 3)))
+    left.axvline(1.0, color="#c9c8c3", lw=0.7, ls=(0, (3, 3)))
+    left.set_xscale("log")
+    left.set_xticks([0.1, 0.3, 1, 3, 10, 30])
+    left.set_xticklabels(["0.1", "0.3", "1", "3", "10", "30"])
+    left.minorticks_off()
+    left.set_ylim(0, 1.02)
+    left.set_box_aspect(1.0)
+    left.set_anchor("N")
+    left.set_xlabel("strength of the loop, q", fontsize=9.5)
+    left.set_ylabel("share of the structures\nthat keep the loop", fontsize=9.5)
+    left.legend(frameon=False, fontsize=8.5, loc="lower right")
+    left.set_title("loops that a structure keeps", fontsize=9.5, color=INK, pad=6)
+    style(left)
+    letter(left, "a")
+
     colours = [GAP, BLUE, INK, "#eb6834", "#1baf7a", PALE]
-    fig, ax = plt.subplots(figsize=(WIDTH * 0.62, 4.6))
-    ax.imshow(np.ma.masked_less(kind, 0), cmap=ListedColormap(colours), vmin=0, vmax=5, interpolation="nearest")
+    right.imshow(np.ma.masked_less(kind, 0), cmap=ListedColormap(colours), vmin=0, vmax=5, interpolation="nearest")
     for c in np.flatnonzero(np.diff(nodes.block)) + 0.5:
-        ax.axhline(c, color="white", lw=1.6)
-        ax.axvline(c, color="white", lw=1.6)
+        right.axhline(c, color="white", lw=1.6)
+        right.axvline(c, color="white", lw=1.6)
     blocks_seen = sorted(nodes.block.unique())
     centres = [float(np.flatnonzero(nodes.block == b).mean()) for b in blocks_seen]
-    ax.set_xticks(centres)
-    ax.set_xticklabels([f"block {k + 1}" for k in range(len(centres))], fontsize=8.5)
-    ax.set_yticks(centres)
-    ax.set_yticklabels([f"block {k + 1}" for k in range(len(centres))], fontsize=8.5, rotation=90, va="center")
-    ax.tick_params(length=0)
-    for side in ax.spines.values():
+    right.set_xticks(centres)
+    right.set_xticklabels([str(k + 1) for k in range(len(centres))], fontsize=8.5)
+    right.set_yticks(centres)
+    right.set_yticklabels([str(k + 1) for k in range(len(centres))], fontsize=8.5)
+    right.set_xlabel("block", fontsize=9.5)
+    right.set_ylabel("block", fontsize=9.5)
+    right.tick_params(length=0)
+    for side in right.spines.values():
         side.set_visible(False)
-    ax.set_xlim(-0.5, n - 0.5)
-    ax.set_ylim(n - 0.5, -0.5)
+    right.set_xlim(-0.5, n - 0.5)
+    right.set_ylim(n - 0.5, -0.5)
+    right.set_anchor("N")
     handles = [
         Patch(fc=BLUE, label=f"loop, {n_of['loop']} pairs"),
         Patch(fc=INK, label=f"background under 100 kb, {n_of['background']} pairs"),
@@ -791,10 +822,11 @@ def uniform_targets(tab: Path, out: Path) -> None:
     if n_of["depleted"]:
         handles.append(Patch(fc="#1baf7a", label=f"depleted cell, {n_of['depleted']} pairs"))
     handles.append(Patch(fc=GAP, ec="#d9d8d3", label=f"no target, {n_of['none']:,} pairs"))
-    ax.legend(handles=handles, frameon=False, fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.07), ncol=1, handlelength=1.2)
-    ax.set_title(f"{n} nodes of one structure, {n_of['pairs']:,} pairs", fontsize=9.5, color=INK, pad=6)
-    fig.tight_layout(rect=(0, 0.02, 1, 1))
-    save(fig, out / "method_uniform_targets.png")
+    right.legend(handles=handles, frameon=False, fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=1, handlelength=1.2)
+    right.set_title(f"targets of the {n} nodes of one structure, {n_of['pairs']:,} pairs", fontsize=9.5, color=INK, pad=6)
+    letter(right, "b")
+    fig.tight_layout(rect=(0, 0.02, 1, 1), w_pad=2.0)
+    save(fig, out / "method_uniform_nodes.png")
 
 
 def main() -> None:
@@ -813,8 +845,7 @@ def main() -> None:
     hic_targets(tab, out)
     anchor_terms(tab, out)
     uniform_anchor(tab, out)
-    uniform_loops(tab, out)
-    uniform_targets(tab, out)
+    uniform_nodes(tab, out)
 
 
 if __name__ == "__main__":
