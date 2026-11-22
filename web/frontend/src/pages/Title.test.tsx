@@ -73,16 +73,16 @@ describe('Title page', () => {
   it('draws the locus with and without the RNAPII loop in one card, each with its distance', () => {
     renderTitle()
     const card = screen.getByRole('button', { name: /GCSAM with and without its RNAPII loop/ })
-    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*3\.5 ± 0\.5 bead units apart/ })).toBeInTheDocument()
-    expect(within(card).getByRole('img', { name: /CTCF loops alone.*5\.8 ± 0\.8 bead units apart/ })).toBeInTheDocument()
-    expect(card).toHaveTextContent('3.5 ± 0.5 bead units with the loop and 5.8 ± 0.8 with CTCF loops alone')
+    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*3\.2 ± 0\.6 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /CTCF loops alone.*5\.7 ± 2\.4 bead units apart/ })).toBeInTheDocument()
+    expect(card).toHaveTextContent('3.2 ± 0.6 bead units with the loop and 5.7 ± 2.4 with CTCF loops alone')
   })
 
   it('marks A, B and the distance on the picture at the top', () => {
     renderTitle()
     const art = screen.getByRole('img', { name: /A 3D structure of the GCSAM locus/ })
-    expect(art).toHaveTextContent('3.5 ± 0.5')
-    expect(screen.getByText('A to B 3.5 ± 0.5 bead units')).toBeInTheDocument()
+    expect(art).toHaveTextContent('3.2 ± 0.6')
+    expect(screen.getByText('A to B 3.2 ± 0.6 bead units')).toBeInTheDocument()
     expect(screen.queryByText(/stay private/)).toBeNull()
   })
 
