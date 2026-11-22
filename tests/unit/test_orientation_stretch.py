@@ -184,3 +184,24 @@ def test_the_loader_knows_two_forms_and_the_batch_executor_refuses_stretch() -> 
         Settings.from_dict({"motif_orientation": {"form": "some"}})
     with pytest.raises(ValueError, match="threaded or serial"):
         _batch_run([{"settings": stretch_settings()}])
+
+
+def test_the_multiple_under_trial_scales_the_term() -> None:
+    """The same chain and the same moves refused: with no steps the score is that of the start."""
+    scores = []
+    for multiple in (1.0, 10.0):
+        pos, dtn, fixed, chars = chain_with_sites()
+        s = stretch_settings()
+        s.motif_stretch_weight = multiple
+        s.max_temp_smooth = 0.0
+        s.mc_stop_steps_smooth = 1
+        s.mc_stop_successes_smooth = 10
+        start = pos.astype(np.float64).copy()
+        mc_numba.seed_numba(1)
+        total = mc_numba.mc_smooth_numba(pos, dtn, fixed, 1e-9, s, chars, NBRS, NBR_W)
+        bonds = init_smooth_nb(pos.astype(np.float64), np.ones(49), 0.1, 0.1, 0.1, 1.0, 1.0)
+        assert np.allclose(pos, start, atol=1e-6)
+        scores.append(total - bonds)
+    assert scores[1] == pytest.approx(10.0 * scores[0], rel=1e-4)
+    with pytest.raises(ValueError, match="above zero"):
+        Settings.from_dict({"motif_orientation": {"stretch_weight": "0"}})

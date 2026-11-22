@@ -341,9 +341,9 @@ def mc_smooth_numba(
     orn_stretch = 0
     if use_orn and str(settings.motif_form) == "stretch":
         # A site at its worst has the energy of the bonds of its stretch each one target too
-        # long, design/orientation-term.md.
+        # long, design/orientation-term.md, times the multiple under trial.
         orn_stretch = ORIENTATION_STRETCH
-        motif_weight = 2.0 * orn_stretch * stretch_k * dist_w
+        motif_weight = 2.0 * orn_stretch * stretch_k * dist_w * float(settings.motif_stretch_weight)
     motifs_symmetric = bool(settings.motifs_symmetric)
     heat_weight = float(settings.subanchor_heatmap_dist_weight)
 

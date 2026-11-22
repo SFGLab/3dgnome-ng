@@ -52,6 +52,7 @@ parser.add_argument("--region", default="chr1:11000000-13000000")
 parser.add_argument("-n", type=int, default=4)
 parser.add_argument("--cell", default="GM12878")
 parser.add_argument("--chains", default="default,uniform")
+parser.add_argument("--terms", default="on,stretch,off", help="on, stretch, stretchN for N times the weight, off")
 args = parser.parse_args()
 
 records: list[dict[str, Any]] = []
@@ -233,22 +234,21 @@ bed = parse_region(args.region)
 assert bed is not None, args.region
 for chain in args.chains.split(","):
     sites_of: dict[bytes, dict[str, Any]] = {}
-    for term in ("on", "stretch", "off"):
+    for term in args.terms.split(","):
         s = settings_for_cell(args.cell, data_root=data_root, uniform=chain == "uniform")
         if term == "off":
             s.use_ctcf_motif = False
-        if term == "stretch":
+        if term.startswith("stretch"):
             s.motif_form = "stretch"
+            s.motif_stretch_weight = float(term[len("stretch") :] or 1.0)
         log.setup(s.output_level)
         records.clear()
         data = ContactData.from_files(s, [bed.chr], bed)
         simulate(s, data, [bed.chr], args.n, region=bed)
         # The cross block relaxation calls the kernel without the term. It is left out.
-        if term == "on":
+        if term != "off":
             stage = [r for r in records if r["chars"] is not None]
             sites_of = {r["fixed"].tobytes(): r for r in stage}
-        elif term == "stretch":
-            stage = [r for r in records if r["chars"] is not None]
         else:
             stage = []
             for r in records:
