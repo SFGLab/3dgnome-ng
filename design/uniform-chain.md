@@ -1723,6 +1723,39 @@ rows where every bin holds a bead in every structure.
 The affinity of two loci is one number. In this trial each pair of nodes of the two loci carried it, 40 pairs
 for one pair of loci on a region of 450 nodes. The second trial has one node stand for a locus.
 
+#### Second trial: one node stands for a locus
+
+`design/figures/uniform-2026-11-19/locus20/` and `scores-locus20/`, `TAG=locus20`, commit c78ce00. One node
+stands for each locus of the track that holds a node, the node nearest to the middle of its bin, and a pair of
+loci has one spring: about 300 springs on a region of 26 loci with a node, where the first trial had 12,000. The
+control is a track of zeros, which holds every pair of loci at the law. Eighteen rows of twenty structures.
+
+| arm | SCC | Spearman | Pearson balanced | ends overlap | exponent over Hi-C | distance at 1 Mb, 4 Mb | contacts at 100 kb: 1 to 2 Mb | over 2 Mb | distance at 100 kb: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 12 of 360 | 1.044 | 11.4, 15.0 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config | 0.335, 0.360 | 0.564 | 0.721 | 18 of 360 | 1.064 | 11.9, 14.9 | 0.12 | 0.02 | 0.33 | 0.15 |
+| the law between the loci, a track of zeros | 0.330, 0.357 | 0.635 | 0.741 | 1 of 360 | 1.042 | 11.5, 18.4 | 0.16 | 0.03 | 0.32 | 0.10 |
+| three components | 0.328, 0.352 | 0.636 | 0.739 | 1 of 360 | 1.031 | 11.4, 18.7 | 0.18 | 0.00 | 0.46 | 0.42 |
+| five components | 0.330, 0.355 | 0.637 | 0.739 | 0 of 360 | 1.033 | 11.5, 18.7 | 0.17 | 0.15 | 0.44 | 0.46 |
+
+The result has two parts.
+
+- The law between the loci, with no track. One spring at the law for each pair of loci raises Spearman by
+  0.071 ± 0.011 on 18 rows of 18, takes the overlap of the ends from 18 structures of 360 to 1 and the exponent
+  over Hi-C from 1.064 to 1.042, and changes SCC by -0.004 ± 0.004. The distance of two beads grows up to 4 Mb,
+  18.4 bonds against 18.2 of the law, and the region no longer folds back. This part reads no Hi-C beyond the
+  exponent of the law.
+- The track on top of it. The correlation of the distances of two bins with Hi-C rises from 0.10 to 0.42 and 0.46
+  beyond 2 Mb, +0.32 ± 0.09 and +0.36 ± 0.09 on 8 and 9 rows of 10, and from 0.32 to 0.44 and 0.46 between 1 and
+  2 Mb. By the pooled contacts five components have 0.15 beyond 2 Mb against 0.03, +0.13 ± 0.07 on 11 rows of 15,
+  and three have none. SCC, Spearman, the ends and the decay are those of the control.
+
+Against the first trial the cost in SCC is gone, 0.005 ± 0.004 of balanced SCC against 0.050, and the decay is
+nearer to Hi-C than that of the locked config.
+
+Half of the loci of a region hold no node, 26 of 50 on the first row, and take no part in the term.
+
+
 
 ## The config locked on 2026-11-21
 
