@@ -1873,6 +1873,55 @@ the host, in 394 and 532 iterations against 422 and 535. The beads of the two st
 stage, with a correlation of the bead distances of 0.77 and 0.86 between the two builds. The annealer of the arcs
 stage refuses the three terms on both backends.
 
+### The whole chromosome: chr1 of GM12878
+
+The trials above are regions of 5 Mb. On 2026-11-22 whole chr1 of GM12878 was built on the workstation, three
+structures an arm, the arcs energy on an RTX 3090 and the smooth stage on threads: `prod` the default chain,
+`u_pre` the uniform chain before the law between the loci, at 4520d76, `u_loci` the locked config at c85dd1c
+and `u_loci_k5` the same with the component track. The first 60 Mb are scored against the whole map of the cell
+line. No held out half exists at this scale: the contact cells and the track read the map of the score.
+
+| arm | SCC per bead pair at 25 kb, raw and balanced | raw Spearman at 25 kb | contacts at 100 kb, 1 to 2 Mb | beyond 2 Mb |
+|---|---|---|---|---|
+| `prod` | 0.242, 0.237 | 0.171 | 0.049 | 0.030 |
+| `u_pre` | 0.371, 0.339 | 0.169 | 0.040 | 0.014 |
+| `u_loci` | 0.364, 0.336 | 0.223 | 0.119 | 0.054 |
+| `u_loci_k5` | 0.376, 0.345 | 0.222 | 0.233 | 0.171 |
+
+The scores repeat the regions: the uniform chain is 0.10 to 0.12 of SCC over the default chain, the law between
+the loci adds 0.05 of Spearman and the bands beyond 1 Mb, the track adds more of those bands.
+
+The chain itself does not repeat the regions. Mean distance in beads by separation, the first structure for the
+counts:
+
+| | 1 Mb | 4 Mb | 10 Mb | 50 Mb | 200 Mb | pairs under 0.7 bonds per 1000 beads | of those over 100 beads apart on the chain | beads within 3 bonds of a bead, median |
+|---|---|---|---|---|---|---|---|---|
+| the law at 0.344 | 10.8 | 17.3 | 23.8 | 41.3 | 66.6 | | | |
+| `prod` | 11.5 | 18.7 | 25.3 | 40.5 | 59.7 | 103 | 21 | 143 |
+| `u_pre` | 12.6 | 20.9 | 26.6 | 41.2 | 58.2 | 50 | 21 | 154 |
+| `u_loci` | 10.5 | 17.0 | 23.3 | 44.4 | 70.3 | 236 | 126 | 206 |
+| `u_loci`, chr1 10 to 15 Mb alone | 12.1 | 17.6 | | | | 7 | 0 | 101 |
+
+- With the law between the loci the chromosome is at the law at every separation. Without it the chain is 7 to
+  21 % over the law from 1 to 10 Mb.
+- At the law the chain is a third denser around a bead than without the rule, and the pairs of beads under 0.7
+  bonds are 236 per thousand beads against 50. The added pairs are of beads far apart on the chain. They are in
+  149 of 199 windows of 1 Mb.
+- A region of 5 Mb built alone has two thirds of the density of the same chain inside the chromosome and 7 close
+  pairs per thousand beads, with the rule and without it. A region has nothing around it. The trials on
+  regions could not show the cost of the rule.
+- The rule holds 873,058 pairs of 1,323 loci on chr1 and 1,225 pairs of 50 loci in a region of 5 Mb, each pair
+  at one weight. A locus of the chromosome has 1,322 springs and a locus of a region 49. The balance of the rule
+  against the excluded volume of the arcs stage changes with the length of the chromosome.
+- Before the relaxation a block holds 0.91 pairs of beads under 0.7 bonds per bead with the rule and 0.55
+  without it, against 0.40 in a region. The relaxation removes 98 % of them in a region and three quarters on
+  the chromosome with the rule.
+- The battery splits close pairs by block with a rule of the default chain. On the uniform chain that split is
+  not valid. The counts above are of `/tmp/close_where.py` on the workstation and of the lines of the
+  relaxation in the logs.
+
+Open, for the maintainer: the weight of the law between the loci as the number of loci grows.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
@@ -1905,7 +1954,9 @@ orientation term. Each has its trial above.
 
 Open: a locus without a loop end takes no part in the law between the loci or in the track, section "The loci of
 the uniform chain". The pooled contacts beyond 1 Mb reach 0.15 to 0.19 where the two halves of a map share 0.8 to
-0.9. The site has no control for the chain.
+0.9. On a whole chromosome the law between the loci packs the chain a third denser and leaves 236 close pairs per
+thousand beads against 50 without it, section "The whole chromosome: chr1 of GM12878". The site has no control
+for the chain.
 
 ## Settings
 
