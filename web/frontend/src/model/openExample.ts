@@ -4,9 +4,12 @@ import type { Factors } from './form'
 import { fromExample, toFormData } from './request'
 import { nameOf, rememberJob } from '../myjobs/recent'
 
-/** Structures an example job asks for. Ten keep the first run short. The server gives every later
- * visitor the same job, the first job of the request. */
-export const EXAMPLE_STRUCTURES = 10
+/**
+ * Structures an example job asks for. Ten left the mean distance of a pair too uncertain: two runs of one
+ * request differed by a third of the difference an example shows. The first run of an example takes minutes.
+ * The server gives every later visitor the same job, the first job of the request.
+ */
+export const EXAMPLE_STRUCTURES = 100
 
 /** Returns the request of an example for one loop set and one cell type, without the settings of the form. */
 const request = (e: Example, factors: Factors, cell = e.cell) => toFormData({ ...fromExample(e), cell, factors, structures: EXAMPLE_STRUCTURES }, {}, false)

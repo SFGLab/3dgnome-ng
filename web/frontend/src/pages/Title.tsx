@@ -17,8 +17,8 @@ import sheet from './title.module.css'
 
 const cn = scoped(sheet)
 
-/** The drawings of the GCSAM locus with and without RNAPII loops. A is the promoter and B the
- * enhancer 364 kb away. web/scripts/make_previews.py writes them from the two example jobs. */
+/** The drawings of the ECI2 locus with and without RNAPII loops. A is the promoter and B the
+ * enhancer 113 kb away. web/scripts/make_previews.py writes them from the two example jobs. */
 const WITH = previews.rnapii as PreviewData
 const WITHOUT = previews.ctcf as PreviewData
 const spread = (d: PreviewData) => `${d.mean.toFixed(1)} ± ${d.sd.toFixed(1)}`
@@ -59,8 +59,8 @@ const DELETION = deletion.deletion as PreviewData
 const DELETION_VIEW = viewOf(DELETION.points)
 
 /**
- * The drawings of the expression example, VPS13D in two cell types, each with the enhancer nearest to it in
- * that cell type, 20 kb away in GM12878 and 849 bp away in H1ESC.
+ * The drawings of the expression example, CD52 in two cell types, each with the enhancer nearest to it in
+ * that cell type, 12 kb away in GM12878 and 36 kb away in H1ESC.
  */
 const CELLS = [
   { tag: 'GM12878', data: expression.gm12878 as PreviewData },
@@ -76,8 +76,8 @@ const centred = (d: PreviewData): [number, number, number, number] => {
   const ys = d.points.map((p) => p[1])
   return [(Math.min(...xs) + Math.max(...xs) - CELLS_SIZE[0]) / 2, (Math.min(...ys) + Math.max(...ys) - CELLS_SIZE[1]) / 2, CELLS_SIZE[0], CELLS_SIZE[1]]
 }
-/** The expression of VPS13D in H1ESC over GM12878, from DESeq2 on the ENCODE counts of the site, read on 2026-11-21. */
-const VPS13D_FOLD = 1.7
+/** The expression of CD52 in GM12878 over H1ESC, from DESeq2 on the ENCODE counts of the site, log2 of 7.95, read on 2026-11-22. */
+const CD52_FOLD = 250
 
 /** The front page, with the output of the site, the examples and the previous services. */
 export function Title() {
@@ -104,15 +104,15 @@ export function Title() {
             <Link className="button primary" to={ROUTES.model}>
               Model a region <ArrowRight size={16} aria-hidden />
             </Link>
-            <Link className="button secondary" to={`${ROUTES.model}?example=GCSAM`}>
-              <Play size={14} aria-hidden /> Open the GCSAM example
+            <Link className="button secondary" to={`${ROUTES.model}?example=ECI2`}>
+              <Play size={14} aria-hidden /> Open the ECI2 example
             </Link>
           </div>
         </div>
         <figure className={cn('hero-image')}>
           {/* The rendered structure with its marks drawn over it. The picture is 1238 by 768 and
               A and B are at the middle of its promoter and its enhancer. */}
-          <svg className={cn('hero-art')} viewBox="0 0 1238 768" role="img" aria-label="A 3D structure of the GCSAM locus with its promoter, A, its enhancer, B and the distance between them">
+          <svg className={cn('hero-art')} viewBox="0 0 1238 768" role="img" aria-label="A 3D structure of the ECI2 locus with its promoter, A, its enhancer, B and the distance between them">
             <image href={structure} width="1238" height="768" />
             <line className={cn('hero-ab')} x1={HERO.a[0]} y1={HERO.a[1]} x2={HERO.b[0]} y2={HERO.b[1]} />
             <rect className={cn('hero-box')} x={HERO.box[0] - 62} y={HERO.box[1] - 23} width="124" height="46" rx="9" />
@@ -136,10 +136,10 @@ export function Title() {
           </svg>
           <figcaption>
             <span className={cn('key')}>
-              <span className={cn('dot promoter')} /> A, the GCSAM promoter
+              <span className={cn('dot promoter')} /> A, the ECI2 promoter
             </span>
             <span className={cn('key')}>
-              <span className={cn('dot enhancer')} /> B, its enhancer 364 kb away
+              <span className={cn('dot enhancer')} /> B, its enhancer 113 kb away
             </span>
             <span className={cn('key')}>{`A to B ${spread(WITH)} bead units`}</span>
           </figcaption>
@@ -177,18 +177,18 @@ export function Title() {
           </p>
         )}
         <div className={cn('example-row')}>
-          <button type="button" className={cn('example story')} disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'GCSAM')!)}>
+          <button type="button" className={cn('example story')} disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'ECI2')!)}>
             <span className={cn('story-panels')}>
               {STORY.map((p) => (
                 <span key={p.tag} className={cn('story-panel')}>
-                  <StructurePreview data={p.data} view={STORY_VIEW} label={`A structure of the GCSAM locus, ${p.tag}, with the promoter A and the enhancer B ${spread(p.data)} bead units apart`} />
+                  <StructurePreview data={p.data} view={STORY_VIEW} label={`A structure of the ECI2 locus, ${p.tag}, with the promoter A and the enhancer B ${spread(p.data)} bead units apart`} />
                   <span className={cn('story-tag')}>{p.tag}</span>
                 </span>
               ))}
             </span>
-            <span className={cn('example-title')}>GCSAM with and without its RNAPII loop</span>
+            <span className={cn('example-title')}>ECI2 with and without its RNAPII loop</span>
             <span className={cn('example-detail')}>
-              {busy === 'GCSAM'
+              {busy === 'ECI2'
                 ? 'Opening the job'
                 : `GM12878. From the promoter A to the enhancer B ${spread(WITH)} bead units with the loop and ${spread(WITHOUT)} with CTCF loops alone`}
             </span>
@@ -212,20 +212,20 @@ export function Title() {
               {busy === 'GSTM1' ? 'Opening the job' : 'GM12878, the 18 kb deletion of GSTM1 in HG00512'}
             </span>
           </button>
-          <button type="button" className={cn('example story')} disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'VPS13D')!)}>
+          <button type="button" className={cn('example story')} disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'CD52')!)}>
             <span className={cn('story-panels')}>
               {CELLS.map((p) => (
                 <span key={p.tag} className={cn('story-panel')}>
-                  <StructurePreview data={p.data} view={centred(p.data)} label={`A structure of the VPS13D locus in ${p.tag}, with the promoter A and its nearest enhancer B ${apart(p.data)}`} />
+                  <StructurePreview data={p.data} view={centred(p.data)} label={`A structure of the CD52 locus in ${p.tag}, with the promoter A and its nearest enhancer B ${apart(p.data)}`} />
                   <span className={cn('story-tag')}>{p.tag}</span>
                 </span>
               ))}
             </span>
-            <span className={cn('example-title')}>VPS13D in GM12878 and H1ESC, distance beside expression</span>
+            <span className={cn('example-title')}>CD52 in GM12878 and H1ESC, distance beside expression</span>
             <span className={cn('example-detail')}>
-              {busy === 'VPS13D'
+              {busy === 'CD52'
                 ? 'Opening the jobs'
-                : `The promoter A and its nearest enhancer B are ${apart(CELLS[0].data)} in GM12878 and ${apart(CELLS[1].data)} in H1ESC, expression ${VPS13D_FOLD} times higher in H1ESC`}
+                : `The promoter A and its nearest enhancer B are ${apart(CELLS[0].data)} in GM12878 and ${apart(CELLS[1].data)} in H1ESC, expression about ${CD52_FOLD} times higher in GM12878`}
             </span>
           </button>
         </div>

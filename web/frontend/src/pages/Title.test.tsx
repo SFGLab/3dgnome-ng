@@ -63,26 +63,26 @@ describe('Title page', () => {
     expect(screen.getByRole('link', { name: /Open enhancer3D/ })).toHaveAttribute('href', 'https://3dgnome.mini.pw.edu.pl/old/enhancer3D/')
   })
 
-  it('shows the GCSAM comparison and the contact map as examples', () => {
+  it('shows the ECI2 comparison and the contact map as examples', () => {
     renderTitle()
-    for (const t of ['GCSAM with and without its RNAPII loop', 'Contacts against Hi-C', 'Deletion at GSTM1', 'VPS13D in GM12878 and H1ESC, distance beside expression']) {
+    for (const t of ['ECI2 with and without its RNAPII loop', 'Contacts against Hi-C', 'Deletion at GSTM1', 'CD52 in GM12878 and H1ESC, distance beside expression']) {
       expect(screen.getByText(t)).toBeInTheDocument()
     }
   })
 
   it('draws the locus with and without the RNAPII loop in one card, each with its distance', () => {
     renderTitle()
-    const card = screen.getByRole('button', { name: /GCSAM with and without its RNAPII loop/ })
-    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*3\.2 ± 0\.6 bead units apart/ })).toBeInTheDocument()
-    expect(within(card).getByRole('img', { name: /CTCF loops alone.*5\.7 ± 2\.4 bead units apart/ })).toBeInTheDocument()
-    expect(card).toHaveTextContent('3.2 ± 0.6 bead units with the loop and 5.7 ± 2.4 with CTCF loops alone')
+    const card = screen.getByRole('button', { name: /ECI2 with and without its RNAPII loop/ })
+    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*3\.4 ± 1\.3 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /CTCF loops alone.*4\.3 ± 1\.6 bead units apart/ })).toBeInTheDocument()
+    expect(card).toHaveTextContent('3.4 ± 1.3 bead units with the loop and 4.3 ± 1.6 with CTCF loops alone')
   })
 
   it('marks A, B and the distance on the picture at the top', () => {
     renderTitle()
-    const art = screen.getByRole('img', { name: /A 3D structure of the GCSAM locus/ })
-    expect(art).toHaveTextContent('3.2 ± 0.6')
-    expect(screen.getByText('A to B 3.2 ± 0.6 bead units')).toBeInTheDocument()
+    const art = screen.getByRole('img', { name: /A 3D structure of the ECI2 locus/ })
+    expect(art).toHaveTextContent('3.4 ± 1.3')
+    expect(screen.getByText('A to B 3.4 ± 1.3 bead units')).toBeInTheDocument()
     expect(screen.queryByText(/stay private/)).toBeNull()
   })
 
@@ -93,21 +93,21 @@ describe('Title page', () => {
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?tab=contacts'))
     const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
     expect(body.get('region')).toBe('chr1:20,000,000-25,000,000')
-    expect(body.get('n_models')).toBe('10')
+    expect(body.get('n_models')).toBe('100')
     vi.unstubAllGlobals()
   })
 
-  it('opens the GCSAM example compared with CTCF loops alone', async () => {
+  it('opens the ECI2 example compared with CTCF loops alone', async () => {
     let n = 0
     const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: n++ === 0 ? '/jobs/aaaa1111bbbb2222' : '/jobs/cccc3333dddd4444' }]]])
     renderTitle()
-    fireEvent.click(screen.getByRole('button', { name: /GCSAM with and without its RNAPII loop/ }))
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=GCSAM&enhancer=112497118'))
+    fireEvent.click(screen.getByRole('button', { name: /ECI2 with and without its RNAPII loop/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=ECI2&enhancer=4022561'))
     const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))
     expect(posted).toEqual(['CTCF+RNAPII', 'CTCF'])
     expect(JSON.parse(localStorage.getItem('gnome3d.recentJobs') ?? '[]').map((j: { label: string }) => j.label)).toEqual([
-      'GM12878 GCSAM, CTCF loops',
-      'GM12878 GCSAM, CTCF and RNAPII loops',
+      'GM12878 ECI2, CTCF loops',
+      'GM12878 ECI2, CTCF and RNAPII loops',
     ])
     localStorage.clear()
     vi.unstubAllGlobals()
@@ -122,18 +122,14 @@ describe('Title page', () => {
     ])
   })
 
-  it('draws VPS13D in the two cell types, each with its own nearest enhancer, and says the enhancers differ', () => {
+  it('draws CD52 in the two cell types, each with its own nearest enhancer, beside its expression', () => {
     renderTitle()
-    const card = screen.getByRole('button', { name: /VPS13D in GM12878 and H1ESC/ })
-    expect(within(card).getByRole('img', { name: /VPS13D locus in GM12878.*3\.3 ± 1\.3 bead units apart/ })).toBeInTheDocument()
-    expect(within(card).getByRole('img', { name: /VPS13D locus in H1ESC.*nearest enhancer B on one bead/ })).toBeInTheDocument()
-    // The enhancer of H1ESC is 849 bp from the promoter, one bead of the chain of one bead per kilobase.
-    expect(card).toHaveTextContent('The promoter A and its nearest enhancer B are 3.3 ± 1.3 bead units apart in GM12878 and on one bead in H1ESC, expression 1.7 times higher in H1ESC')
-    // A and B on one bead are drawn side by side at it, with no line between them.
-    const h1 = within(card).getByRole('img', { name: /VPS13D locus in H1ESC/ })
-    expect(h1).toHaveTextContent('one bead')
-    expect(h1.querySelector('line')).toBeNull()
-    expect(within(card).getByRole('img', { name: /VPS13D locus in GM12878/ }).querySelector('line')).not.toBeNull()
+    const card = screen.getByRole('button', { name: /CD52 in GM12878 and H1ESC/ })
+    expect(within(card).getByRole('img', { name: /CD52 locus in GM12878.*2\.3 ± 0\.9 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /CD52 locus in H1ESC.*2\.6 ± 0\.8 bead units apart/ })).toBeInTheDocument()
+    expect(card).toHaveTextContent('The promoter A and its nearest enhancer B are 2.3 ± 0.9 bead units apart in GM12878 and 2.6 ± 0.8 bead units apart in H1ESC, expression about 250 times higher in GM12878')
+    // The fold of the card is the DESeq2 log2 fold change of the site, 7.95.
+    expect(Math.round(2 ** 7.95 / 10) * 10).toBe(250)
     // The two drawings have one size of view, each about the middle of its own structure.
     const views = [...card.querySelectorAll('svg.structure-preview')].map((s) => s.getAttribute('viewBox')!.split(' ').map(Number))
     expect(views[0].slice(2)).toEqual(views[1].slice(2))
@@ -146,12 +142,12 @@ describe('Title page', () => {
     let n = 0
     const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: n++ === 0 ? '/jobs/aaaa1111bbbb2222' : '/jobs/cccc3333dddd4444' }]]])
     renderTitle()
-    fireEvent.click(screen.getByRole('button', { name: /VPS13D in GM12878 and H1ESC/ }))
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=VPS13D'))
+    fireEvent.click(screen.getByRole('button', { name: /CD52 in GM12878 and H1ESC/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=CD52'))
     const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => i!.body as FormData)
     expect(posted.map((b) => [b.get('cell_type'), b.get('expression'), b.get('region'), b.get('fresh')])).toEqual([
-      ['GM12878', 'ENCODE', 'chr1:11,500,000-12,600,000', null],
-      ['H1ESC', 'ENCODE', 'chr1:11,500,000-12,600,000', null],
+      ['GM12878', 'ENCODE', 'chr1:25,900,000-26,900,000', null],
+      ['H1ESC', 'ENCODE', 'chr1:25,900,000-26,900,000', null],
     ])
     localStorage.clear()
     vi.unstubAllGlobals()

@@ -157,7 +157,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, enhancer 
             }
           />
         )}
-        {row && <GeneCard row={row} chrom={region.chrom} onOpenGenes={onOpenGenes} marked={named ? enhancer! : undefined} />}
+        {row && <GeneCard row={row} chrom={region.chrom} onOpenGenes={onOpenGenes} marked={named && pair[1] !== row.enhancer_bead ? enhancer! : undefined} />}
         {!row && loop && <LoopCard loop={loop} />}
       </div>
     </div>
