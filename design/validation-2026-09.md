@@ -193,7 +193,7 @@ term on the saddle rises on H1ESC and HFFC6 at a cost in SCC and MultiMM, record
 
 ## The stitch and the relaxation at chromosome scope
 
-Measured 2026-09-19, `slurm/ensemble/assemble_ablation.sh`, GM12878 chr1:1-60 Mb, three
+Measured 2026-09-19, `data/figures/retired/slurm/ensemble/assemble_ablation.sh`, GM12878 chr1:1-60 Mb, three
 structures per arm. Boundary ratio is a boundary anchor pair's distance over the structure's
 own within block curve, from `playground/restitch_model.py` on the first structure before its
 replayed stitch.

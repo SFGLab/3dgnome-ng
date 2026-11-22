@@ -26,7 +26,7 @@ below.
 - This repository. The engine, the two factor loader (`[data] clusters` takes several files,
   `[data] factors` names them), the validation battery (`playground/validation_battery.py`,
   `playground/saddle_offline.py`), the GM12878 RNAPII prep (`playground/rnapii/prep_gm12878.py`,
-  `anchor_union.py`) and the arm scripts (`slurm/ensemble/rnapii_arms.sh`,
+  `anchor_union.py`) and the arm scripts (`data/figures/retired/slurm/ensemble/rnapii_arms.sh`,
   `rnapii_strength_arms.sh`).
 - The summary arc fix, commit `75bedc1`, only on `origin/triosformer-expression`. Before it a
   pair joined by both a CTCF and an RNAPII loop was held at the background, 406 strong pairs

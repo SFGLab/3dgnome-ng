@@ -429,7 +429,7 @@ decides nothing. The trial runs 10, 25 and 50 kb on the six rows.
 
 ### Trial of the gyration windows, and the cause of the close pairs
 
-`design/figures/uniform-2026-11-19/gyr/` and `scores-gyr/`, step 1 of `slurm/ensemble/uniform_night.sh`, commit
+`design/figures/uniform-2026-11-19/gyr/` and `scores-gyr/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night.sh`, commit
 5f98a91, cells at 5 kb. Mean over the six rows, close pairs per thousand beads:
 
 | arm | SCC raw | SCC balanced | Spearman raw | close pairs | not next to each other |
@@ -557,7 +557,7 @@ close pairs.
 
 ### Trial on counts the run did not read, with the singletons of the deep map
 
-`design/figures/uniform-2026-11-19/heldw/` and `scores-heldw/`, step 1 of `slurm/ensemble/uniform_night2.sh`, commit
+`design/figures/uniform-2026-11-19/heldw/` and `scores-heldw/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night2.sh`, commit
 0b653a9. The earlier trials score a run against the map its contact cells read. Here
 `playground/thin_cooler.py` splits every count of the deep map of a cell into two halves by a binomial draw. The
 halves of a Poisson count are independent. A run reads half a and is scored against half b. The base of every
@@ -592,12 +592,12 @@ The round has two faults of its setup. Both were found by a check of the instrum
   not with the earlier trials. The close pairs of the default chain fall from 10.2 to 3.3 per thousand beads with
   these inputs, which is a result of its own: deeper singletons and a larger exponent leave the chain more room.
 
-The round was stopped in its second step. `slurm/ensemble/uniform_night3.sh` repeats it on the data of production,
+The round was stopped in its second step. `data/figures/retired/slurm/ensemble/uniform_night3.sh` repeats it on the data of production,
 with the contact cells from half a alone.
 
 ### Trial on counts the run did not read, with the inputs of production
 
-`design/figures/uniform-2026-11-19/held3/` and `scores-held3/`, step 1 of `slurm/ensemble/uniform_night3.sh`, commit
+`design/figures/uniform-2026-11-19/held3/` and `scores-held3/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night3.sh`, commit
 1b62c1d. A run reads the data of production. Its contact cells alone come from half a of the deep map, and its
 score is against half b with the weights of the whole map. The default chain and the chain without cells are the
 structures of the earlier trials, scored on half the counts. Mean over the six rows:
@@ -680,12 +680,12 @@ The check over the thirty structures of every arm of the earlier trials, six row
 
 No arm without the dropout has a stretched piece, in these trials and in the trials of the rules, the smooth stage
 and the arcs stage. Their scores stand. A third of the structures of every arm with `loop_dropout` has one, and
-the scores of those arms are not a result. The arms run again in `slurm/ensemble/uniform_night4.sh`, which also
+the scores of those arms are not a result. The arms run again in `data/figures/retired/slurm/ensemble/uniform_night4.sh`, which also
 keeps the stretch check of every step.
 
 ### Trial of the loop dropout with the tails on a coil
 
-`design/figures/uniform-2026-11-19/tail/` and `scores-tail/`, step 1 of `slurm/ensemble/uniform_night4.sh`, commit
+`design/figures/uniform-2026-11-19/tail/` and `scores-tail/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_night4.sh`, commit
 f5ec43a. The inputs are those of the trial above: the data of production, the contact cells from half a, the score
 against half b. The default chain and the chain without cells are the structures of the earlier trials. Mean over
 the six rows, thirty structures per arm:
@@ -733,7 +733,7 @@ every resolution of the score. Five structures make a sparse pooled map at 5 kb.
 ### The larger trial on counts the run did not read
 
 `design/figures/uniform-2026-11-19/large4/` and `scores-large4/`, with `scores-large4_10k/` and `scores-large4_5k/`,
-step 2 of `slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Three cells, six regions of 5 Mb of chr1, twenty
+step 2 of `data/figures/retired/slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Three cells, six regions of 5 Mb of chr1, twenty
 structures per arm. No structure of 360 per arm has a stretched piece. Mean over the eighteen rows, raw and
 balanced SCC and raw Spearman:
 
@@ -806,7 +806,7 @@ holds this share. Those are not scored again.
 ### The resolution of the contact cells on the larger trial
 
 `design/figures/uniform-2026-11-19/res20p/` and `scores-res20p/`, with `scores-res20p_10k/` and
-`scores-res20p_5k/`. Step 1 of `slurm/ensemble/uniform_night5.sh` adds the ladder alone and the cells at 25 kb to
+`scores-res20p_5k/`. Step 1 of `data/figures/retired/slurm/ensemble/uniform_night5.sh` adds the ladder alone and the cells at 25 kb to
 the larger trial, commit f5ec43a. Eighteen rows of twenty structures, raw and balanced SCC per bead pair and raw
 Spearman. The ends overlap in a structure with more than 300 bead pairs between its end megabases:
 
@@ -831,7 +831,7 @@ Spearman. The ends overlap in a structure with more than 300 bead pairs between 
 ### Trial of the loops, the bonds and the node rule on the base
 
 `design/figures/uniform-2026-11-19/combo4p/` and `scores-combo4p/`, with `scores-combo4p_10k/` and
-`scores-combo4p_5k/`, step 3 of `slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Every arm has the cells at
+`scores-combo4p_5k/`, step 3 of `data/figures/retired/slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Every arm has the cells at
 5 kb and `loop_dropout`, six rows of five structures. Raw and balanced SCC per bead pair, raw Spearman at 25 kb,
 the close pairs, and the structures with more than 300 bead pairs between the end megabases,
 `playground/uniform_ends_check.py`:
@@ -888,14 +888,14 @@ the uniform chain and 7.1 at a radius of 3.0, with at most 216, 910 and 376 pair
 
 A node stands for the chain around it, and that chain needs room that a radius of one bead does not keep. A
 radius of 3.0 on every pair also asks two nodes with one bond of chain between them to be 3 bonds apart, against
-the reach term. The rule of the radius is open. `slurm/ensemble/uniform_night6.sh` measures the radius of 3.0 on
+the reach term. The rule of the radius is open. `data/figures/retired/slurm/ensemble/uniform_night6.sh` measures the radius of 3.0 on
 the larger trial, with and without `loop_dropout`, and `playground/uniform_ends_check.py` counts the overlap of
 the ends for every arm.
 
 ### Trial of the radius of the arcs excluded volume
 
 `design/figures/uniform-2026-11-19/ev20q/` and `scores-ev20q/`, with `scores-ev20q_10k/` and `scores-ev20q_5k/`,
-step 1 of `slurm/ensemble/uniform_night6.sh`, commit f5ec43a. The cells at 5 kb with `[excluded_volume]
+step 1 of `data/figures/retired/slurm/ensemble/uniform_night6.sh`, commit f5ec43a. The cells at 5 kb with `[excluded_volume]
 radius_arcs` 3.0, with and without `loop_dropout`, beside the same arms at the radius of a bead. Eighteen rows of
 twenty structures, raw and balanced SCC per bead pair:
 
@@ -992,7 +992,7 @@ twin, where the radius is one number now.
 ### Trial of the threshold of the contact cells
 
 `design/figures/uniform-2026-11-19/z20p/` and `scores-z20p/`, with `scores-z20p_10k/` and `scores-z20p_5k/`,
-`slurm/ensemble/uniform_night8.sh`, commit f5ec43a. The cells at 5 kb with `contact_background_z` 2 beside the
+`data/figures/retired/slurm/ensemble/uniform_night8.sh`, commit f5ec43a. The cells at 5 kb with `contact_background_z` 2 beside the
 same arms at 3, at the radius of a bead and at `[excluded_volume] radius_arcs` 3.0. Eighteen rows of twenty
 structures, raw and balanced SCC per bead pair:
 
@@ -1020,7 +1020,7 @@ close pairs and the ends of the radius of 3.0. It is a comparison of the sweep o
 ### Sweep at eight structures per arm
 
 `design/figures/uniform-2026-11-19/sweep8a/` and `scores-sweep8a/`, with `scores-sweep8a_10k/` and
-`scores-sweep8a_5k/`, step 1 of `slurm/ensemble/uniform_sweep8.sh`, commit 5636a87. The eighteen rows of the larger
+`scores-sweep8a_5k/`, step 1 of `data/figures/retired/slurm/ensemble/uniform_sweep8.sh`, commit 5636a87. The eighteen rows of the larger
 trial with eight structures per arm, the cells at 5 kb on counts the run does not read. The first five arms are
 the first eight structures of the arms of the larger trial, built at commit f5ec43a. A pooled map of eight
 structures scores lower than one of twenty, and the arms compare within this table alone. Raw and balanced SCC
@@ -1082,14 +1082,14 @@ The cap by the target against the same arm without it: +0.007 ± 0.003 of raw SC
 +0.008 ± 0.003 on the derived radius, p 0.02. On the larger trial of twenty structures the threshold of 2 against
 3 at a radius of 3.0 is +0.033 ± 0.005 of raw SCC, p 0.0003, and -0.035 ± 0.013 of Spearman, p 0.01.
 
-The second round, `slurm/ensemble/uniform_sweep8c.sh`, joins the ladder at a radius of 3.0 with the dropout, the
+The second round, `data/figures/retired/slurm/ensemble/uniform_sweep8c.sh`, joins the ladder at a radius of 3.0 with the dropout, the
 threshold of 2 and the cap by the target, and tries the ladder up to 50 kb, the ladder at a radius of 2.0 and the
 dropout at a radius of 3.85.
 
 ### Second round of the sweep
 
 `design/figures/uniform-2026-11-19/sweep8c/` and `scores-sweep8c/`, with `scores-sweep8c_10k/` and
-`scores-sweep8c_5k/`, `slurm/ensemble/uniform_sweep8c.sh`, commit 43163bd on the code of 5636a87. The rows and
+`scores-sweep8c_5k/`, `data/figures/retired/slurm/ensemble/uniform_sweep8c.sh`, commit 43163bd on the code of 5636a87. The rows and
 the inputs of the first round, eight structures per arm. Every new arm has the ladder to 25 kb. Raw and balanced
 SCC per bead pair:
 

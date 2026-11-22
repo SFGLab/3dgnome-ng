@@ -212,6 +212,8 @@ note under `design/` states hardware by its model.
 - `design/features.md` has every feature with its settings, its code and its measurements.
 - `design/figures/` has the figures of a trial and the tables a note cites. The tables per row and the run logs of a
   trial are in `data/figures/` under the same folder names, outside git.
+- The scripts, queues and configs of a finished trial are in `data/figures/retired/` under their earlier paths,
+  outside git. `playground/` and `slurm/ensemble/` hold the scripts in use.
 - `design/anchor-placement.md` has the distance law, the placement of anchors and the end passes.
 - `design/gap-fill.md` has the gaps, the maximum entropy start, the hole beads and the long range.
 - `design/ab-compartments.md` has the compartment term and the steps that build its track.

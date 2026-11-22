@@ -232,7 +232,7 @@ last section are dated records and are not rewritten when production moves on. `
 
   Motivation: at the IB level, EV pushes IBs apart but only nearest-neighbor chain bonds pull them back, so the segment stretches out into a long sausage. The IB tether (small packing factor → tight sphere around the segment centroid) softly holds the chain together while EV still keeps IB spheres from overlapping. At arc / smooth levels, confinement instead acts as a nuclear-like envelope for under-constrained small IBs.
 
-  The packing factor has a physical floor. The sphere diameter is `2 × pf × N^(1/3)` chain bonds, so below `pf ≈ 0.58` a segment of fewer than `(1/(2·pf))³` blocks is asked to fold into a sphere narrower than one of its own bonds, and the layout is then set by where EV and confinement jam rather than by genomic separation. Measured on GM12878 chr1 the block-layout distance exponent is 0.021 at 0.15, 0.214 at 0.75 and 0.297 at 1.0 against 0.285 from the cell line's own Hi-C contact-probability curve (`playground/ps_curve.py`, `playground/ib_confine_ablate.py`).
+  The packing factor has a physical floor. The sphere diameter is `2 × pf × N^(1/3)` chain bonds, so below `pf ≈ 0.58` a segment of fewer than `(1/(2·pf))³` blocks is asked to fold into a sphere narrower than one of its own bonds, and the layout is then set by where EV and confinement jam rather than by genomic separation. Measured on GM12878 chr1 the block-layout distance exponent is 0.021 at 0.15, 0.214 at 0.75 and 0.297 at 1.0 against 0.285 from the cell line's own Hi-C contact-probability curve (`playground/ps_curve.py`, `data/figures/retired/playground/ib_confine_ablate.py`).
 
 - **JAX/CUDA backend** — selected per stage via `mc_executor_<stage> = batch`. ([gnome3d/mc/jax/](../gnome3d/mc/jax/))
 
@@ -281,7 +281,7 @@ last section are dated records and are not rewritten when production moves on. `
     chr1:1-8 Mb 57 s to 6 s at 32, chr1:1-60 Mb 420 s to 125 s at 32 and slower at 64, since
     the kernel's full excluded volume scan is paid once per proposal. Three structures on 60 Mb
     at 32 against 1: every battery number level, MultiMM 0.665 against 0.669. Numba ignores the
-    key. Unit checks in `tests/unit/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
+    key. Unit checks in `tests/unit/test_smooth_levers.py`, sweep in `data/figures/retired/slurm/ensemble/prefetch_sweep.sh`,
     reading and numbers in `design/parallel-mc-and-nn-reading.md`.
   - **The excluded volume and the wall run on a cell grid in the JAX kernel:
     `[simulation_arcs_smooth] jax_grid`, default no, production yes since 2026-09-19, on
@@ -322,7 +322,7 @@ last section are dated records and are not rewritten when production moves on. `
     Several instances that share a card on purpose set the variable in each, adding up to less
     than 1. A process with a smaller pool packs its launches differently, so its structures are
     not bit identical to a run on a free card; at a fixed pool it reproduces. Unit checks in
-    `tests/unit/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
+    `tests/unit/test_gpu_share.py`, two instances on one card in `data/figures/retired/playground/gpu_share_run.py`.
   - **The smooth stage is threaded numba in production since 2026-11-16, and `auto` picks it
     from four workers.** Measured on 36 cores against an RTX 3090 on GM12878 chr1: the stage of
     52 blocks takes 53 to 80 s threaded, 92 s on 8 workers, and 122 to 146 s on the device, and
@@ -471,7 +471,7 @@ last section are dated records and are not rewritten when production moves on. `
   cross block overlaps down four to ten times. The realised exponent runs 1.3 to 1.5 times the
   measured input on every cell, which one correction on the background exponent would absorb;
   not built. The old keys are not read and warn if present. Unit checks in
-  `tests/unit/test_polymer.py` and `tests/unit/test_arc_matrix.py`; `playground/ps_from_singletons.py`
+  `tests/unit/test_polymer.py` and `tests/unit/test_arc_matrix.py`; `data/figures/retired/playground/ps_from_singletons.py`
   fits the exponent on a file by hand. See `design/anchor-placement.md`, option H.
 
   **Tried and rejected, 2026-09-06: every arcless pair on the background.** The realised
@@ -487,7 +487,7 @@ last section are dated records and are not rewritten when production moves on. `
   in three dimensions, so the least squares compromise is a mean field blob. The `1/d` never
   constrained an arcless pair, which is why it did not hit this. The sweep could not see it
   because every isolated block came out at Rg 3.8 whatever the weight. Reverted the same day;
-  the sweep is kept as `playground/background_weight_sweep.py` for the record and the battery
+  the sweep is kept as `data/figures/retired/playground/background_weight_sweep.py` for the record and the battery
   reports the two band exponents from here on. Any future fix for the kink has to be short
   range only, holding pairs under about 100 kb and leaving the long range free.
 
@@ -499,7 +499,7 @@ last section are dated records and are not rewritten when production moves on. `
   weight sits in every kernel beside the cutoff rather than replacing it, so weight zero is
   byte exact against the previous commit. JAX matches numba on a matrix carrying both arcless
   kinds, and the batched driver runs with the background on, both in
-  `tests/unit/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`. Production since
+  `tests/unit/test_arc_matrix.py`. Swept in `data/figures/retired/playground/short_range_sweep.py`. Production since
   2026-09-07 at weight 0.1: with it the anchors sit on the input curve on all three cells,
   within blocks and across them. Weights 0.3 and 1.0 pull the closest pairs closer and cost
   Hi-C at every step.
@@ -649,7 +649,7 @@ last section are dated records and are not rewritten when production moves on. `
   pull in, since beyond a few megabases the expectation is under a count and nothing is ever
   significantly below it; the within block pairs carry the correlation and the across block
   pairs the shrinkage, and weakening the pull loses both together. Removed the same day.
-  Tables in `design/validation-2026-09.md`; `playground/far_pairs_from_map.py` measures what a
+  Tables in `design/validation-2026-09.md`; `data/figures/retired/playground/far_pairs_from_map.py` measures what a
   map holds.
 
 - **A contact term in the block layout: `[simulation_ib] heatmap_weight`, default 0.**
@@ -768,7 +768,7 @@ last section are dated records and are not rewritten when production moves on. `
   sits near 1e-6 with no plateau; the energy at 800 is 1.7 percent above the value at 8,000, at
   2,400 under one percent. The tolerance is L-BFGS-B's own `ftol`, so at zero the options are
   unchanged and the parity gate holds. `GNOME3D_ARCS_TRACE` names a file that receives every
-  evaluation's energy, which is how the value was chosen, `playground/trace_analysis.py`.
+  evaluation's energy, which is how the value was chosen, `data/figures/retired/playground/trace_analysis.py`.
 
   The annealer is kept by decision, 2026-09-06, not as a leftover. The solver's justification
   is a funnel landscape measured on a few real blocks. A dataset or an energy change that
@@ -854,7 +854,7 @@ last section are dated records and are not rewritten when production moves on. `
   0.033 to 0.043, cuts overlaps five to seven times within blocks and three to four across at
   the same Rg, and flattens the short band exponent from 0.33 to 0.21; the cap adds a few
   percent fewer overlaps and nothing else. Unit checks in `tests/unit/test_smooth_levers.py`;
-  three cell arms in `slurm/ensemble/overlap_levers.sh`.
+  three cell arms in `data/figures/retired/slurm/ensemble/overlap_levers.sh`.
 
   **Tried and dropped, 2026-11-13: a law spring on bead pairs in the smooth stage.** Traced on a
   web job, GM12878 chr1:20-25 Mb with CTCF and RNAPII loops, the squares in the contact map are
@@ -865,8 +865,8 @@ last section are dated records and are not rewritten when production moves on. `
   0.366 to 0.243, MultiMM 0.671 to 0.630 and 0.613 to 0.545, the 20 to 100 kb contact exponent
   0.31 to 0.47. A spring at the mean distance removes the fluctuations contacts come from. A
   wider range was worse and 2 Mb compressed the block, as the all pairs springs did. The smooth
-  wall tripled. Removed the same day; `playground/trace_square_blocks.py`,
-  `playground/law_spring_readout.py` and `slurm/ensemble/law_spring_trial.sh` are the record.
+  wall tripled. Removed the same day; `data/figures/retired/playground/trace_square_blocks.py`,
+  `playground/law_spring_readout.py` and `data/figures/retired/slurm/ensemble/law_spring_trial.sh` are the record.
 
   **Tried and dropped, 2026-11-13: a gap start that follows the law.** Under `start = law` each
   subanchor took the clear candidate whose distances to the beads 2 to 128 places behind it best
@@ -877,8 +877,8 @@ last section are dated records and are not rewritten when production moves on. `
   times, across blocks on chr1 11.7 to 20.5 per thousand. Gaps ended at about 1.2 of the law,
   since the smooth stage holds bonds and nothing holds a gap's interior, so its size is the
   start's. Without the hard wall overlaps rose tenfold, and with the subanchor heat term SCC
-  went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
-  `slurm/ensemble/gap_start_overnight.sh` and `data/figures/square_blocks/gapnight/` are the record.
+  went negative. Removed the same day; `data/figures/retired/slurm/ensemble/law_start_trial.sh`,
+  `data/figures/retired/slurm/ensemble/gap_start_overnight.sh` and `data/figures/square_blocks/gapnight/` are the record.
 
   **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, measured 2026-11-14
   and left opt in.** ([pipeline/ib/maxent.py](../gnome3d/pipeline/ib/maxent.py)) Both dropped
@@ -892,7 +892,7 @@ last section are dated records and are not rewritten when production moves on. `
   motion variogram. The draw comes from the problem's seed. `line` and `coil` are unchanged.
   On three cells, three 5 Mb regions and chr1 it lost Pearson by 0.01 to 0.05 against the coil
   with SCC level and the distance exponent nearer Hi-C. The smooth stage widens the drawn gaps to
-  1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
+  1.2 of the law, where the coil ends under it. `data/figures/retired/slurm/ensemble/gap_maxent_trial.sh` and
   `data/figures/square_blocks/gapme/` are the record.
   Unit checks in `tests/unit/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
 

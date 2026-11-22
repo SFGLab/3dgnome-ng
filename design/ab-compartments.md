@@ -73,8 +73,8 @@ change, not a force, and the open item from `anchor-placement.md` as well.
 ## Instruments built on the way
 
 `playground/saddle_offline.py` scores finished structures for the saddle, eigenvector
-correlation and kappa; `playground/saddle_split.py` splits the saddle over within block and
-cross block pairs, each class on its own decay; `playground/stage_trace.py` runs placement
+correlation and kappa; `data/figures/retired/playground/saddle_split.py` splits the saddle over within block and
+cross block pairs, each class on its own decay; `data/figures/retired/playground/stage_trace.py` runs placement
 in process with the true blocks, caches it, and reports what the stitch and the relaxation
 do to compartments and to beads. Two instrument faults were found and fixed: the split had
 shared one expectation between the classes, and the anchor heatmap was cut out of an N by N
