@@ -2022,7 +2022,65 @@ cudaMMC and MultiMM.
   Spearman in 16 and never lower. On raw SCC it is never higher and lower in 4, three of them regions of 20 Mb
   dense in loops, with ties on the balanced map.
 
-Open: the lower raw SCC on GM12878 and on the regions dense in loops is not traced.
+### The raw SCC of the two chains
+
+The lower pooled raw SCC of the uniform chain on GM12878 and on the regions dense in loops was traced on the nine
+runs of 20 Mb of the tools comparison, five structures each, against half b. The difference is in the measure.
+
+- The count of a cell of a pooled map grows with the number of beads in its two bins. The chain of loop anchors
+  has between 0 and 71 beads in a bin of 25 kb, with a standard deviation of 10 to 11. The uniform chain has 25
+  in every bin inside a block.
+- On the chain of loop anchors the number of beads of a bin follows the raw Hi-C coverage of the bin. The rank
+  correlation is +0.72 on GM12878 chr12 40 to 60 Mb, +0.62 on H1ESC chr12, +0.64 on H1ESC chr17 35 to 55 Mb and
+  +0.40 on HFFC6 chr11 60 to 80 Mb. On the uniform chain it is +0.33, +0.26, +0.19 and +0.33.
+- The raw Hi-C count of a cell also grows with the coverage of its two bins. The pooled map of the chain of loop
+  anchors therefore agrees with raw Hi-C through its bead counts, before any 3D position is read.
+- The SCC per bead pair of `playground/ensemble_score.py` divides a cell by the product of the bead counts of
+  its two bins. On it the uniform chain is higher on all nine runs, 0.416 against 0.228 on raw counts and 0.348
+  against 0.225 on balanced counts, p 0.004 for both. The plain raw SCC is 0.424 against 0.505.
+- On the genome runs the raw SCC per bead pair is 0.462, 0.399 and 0.489 for the uniform chain on GM12878,
+  H1ESC and HFFC6 against 0.374, 0.344 and 0.411 for the chain of loop anchors.
+
+Pooled SCC at 25 kb against half b. The arms are the chain of loop anchors, the uniform chain and the uniform
+chain without the loop dropout of the next section.
+
+| cell | region | raw: anchors | uniform | no dropout | raw per bead pair: anchors | uniform | no dropout | balanced per bead pair: anchors | uniform | no dropout |
+|---|---|---|---|---|---|---|---|---|---|---|
+| GM12878 | chr11 60 to 80 Mb | 0.444 | 0.376 | 0.363 | 0.152 | 0.370 | 0.356 | 0.190 | 0.360 | 0.351 |
+| GM12878 | chr12 40 to 60 Mb | 0.610 | 0.474 | 0.451 | 0.223 | 0.468 | 0.446 | 0.243 | 0.403 | 0.373 |
+| GM12878 | chr17 35 to 55 Mb | 0.550 | 0.459 | 0.450 | 0.195 | 0.455 | 0.445 | 0.092 | 0.318 | 0.309 |
+| H1ESC | chr11 60 to 80 Mb | 0.389 | 0.379 | 0.363 | 0.258 | 0.374 | 0.357 | 0.290 | 0.330 | 0.329 |
+| H1ESC | chr12 40 to 60 Mb | 0.567 | 0.415 | 0.420 | 0.168 | 0.405 | 0.405 | 0.194 | 0.245 | 0.241 |
+| H1ESC | chr17 35 to 55 Mb | 0.524 | 0.321 | 0.325 | 0.129 | 0.314 | 0.318 | 0.164 | 0.300 | 0.292 |
+| HFFC6 | chr11 60 to 80 Mb | 0.416 | 0.437 | 0.430 | 0.307 | 0.426 | 0.412 | 0.294 | 0.374 | 0.366 |
+| HFFC6 | chr12 40 to 60 Mb | 0.509 | 0.473 | 0.462 | 0.286 | 0.470 | 0.453 | 0.276 | 0.412 | 0.395 |
+| HFFC6 | chr17 35 to 55 Mb | 0.538 | 0.478 | 0.475 | 0.335 | 0.462 | 0.466 | 0.284 | 0.388 | 0.389 |
+| mean | | 0.505 | 0.424 | 0.415 | 0.228 | 0.416 | 0.406 | 0.225 | 0.348 | 0.338 |
+
+The plain raw SCC of a pooled map compares two chains with different beads per bin by their bead counts. The
+score of two such chains is the SCC per bead pair. The published panels still state the plain raw SCC.
+
+### The uniform chain without the loop dropout
+
+On 2026-11-23 the nine runs were repeated with `[springs] loop_dropout = no`, `slurm/ensemble/trace_nodrop.sh`.
+A structure then has every loop, 2,760 on GM12878 chr12 40 to 60 Mb against about 1,555 with the dropout. The
+scores are from `slurm/ensemble/trace_nodrop_score.sh`, in the table above. The tables per row are in
+`data/figures/redo-2026-11-23/nodrop/`.
+
+- Against the uniform chain with the dropout, paired over the nine runs: raw SCC per bead pair -0.010 ± 0.003,
+  higher on 2 of 9, p 0.04. Balanced SCC per bead pair -0.009 ± 0.003, higher on 1 of 9, p 0.01. Raw Spearman
+  -0.001 ± 0.003, p 0.95. Balanced Pearson -0.003 ± 0.002, p 0.12.
+- chr19 of GM12878, ten structures. With CTCF loops the raw and balanced SCC per bead pair are 0.542 and 0.442
+  without the dropout against 0.563 and 0.457 with it. With CTCF and RNAPII loops they are 0.348 and 0.367
+  against 0.411 and 0.421.
+- The distance of 2,506 enhancer to promoter pairs of chr19 that an RNAPII loop holds and no CTCF loop,
+  `playground/rnapii/ep_pairs.py`. With the dropout it is 4.80 bead units with CTCF loops and 4.23 with RNAPII
+  loops added, 12 % closer, closer for 0.70 of the pairs. Without the dropout it is 4.70 and 3.93, 16 % closer,
+  closer for 0.74 of the pairs. The 8,538 control pairs move by 1 % or less in both.
+
+The config is unchanged, with the dropout on. Without it the agreement with Hi-C is lower on every score that differs, most with RNAPII
+loops, while the effect of an RNAPII loop on its enhancer and promoter is larger by a third. chr19 is one
+chromosome without a test over rows.
 
 ## The config locked on 2026-11-21
 

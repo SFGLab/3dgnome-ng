@@ -287,7 +287,10 @@ structures and at ten.
 The four runs with a lower raw SCC are GM12878 chr12 40 to 60 Mb, 0.474 against 0.610, H1ESC
 chr12, 0.415 against 0.567, H1ESC chr17 35 to 55 Mb, 0.321 against 0.524, and GM12878 chr1 1 to
 60 Mb at three structures, 0.399 against 0.454. Three of the four are regions of 20 Mb chosen for
-their count of loops. On the balanced map the same runs are ties. The cause is not traced.
+their count of loops. On the balanced map the same runs are ties. The cause is the measure: the count of a
+cell of a pooled map grows with the beads of its two bins, which on the chain of loop anchors follow the raw
+coverage of Hi-C. Per bead pair the uniform chain is higher on all nine runs of 20 Mb, 0.416 against 0.228 of raw
+SCC, `design/uniform-chain.md`.
 
 ### Micro-C loops
 
