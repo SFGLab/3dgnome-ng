@@ -2006,6 +2006,24 @@ offset in the order of the loci is on the ladder of `octave_offsets`. `[springs]
 are deleted. A region of 5 Mb is the locked config, byte for byte on the gate. On chr1 a locus has about 110
 springs against 1,322.
 
+### The whole genome of three cell lines and the tools comparison
+
+On 2026-11-23 chromosomes 1 to 22 of GM12878, H1ESC and HFFC6 were built on the uniform chain with CTCF loops and
+with CTCF and RNAPII loops, ten structures each, beside the chain of loop anchors with CTCF loops, all at 2ff5766.
+The uniform arms read half a of the deep maps and every arm is scored against half b.
+`design/figures/redo-2026-11-23/summary.md` has the tables and `design/tools-comparison.md` the runs against
+cudaMMC and MultiMM.
+
+- Pooled raw SCC at 25 kb, the uniform chain against the chain of loop anchors: 0.495 against 0.524 on GM12878,
+  p 0.010 over the chromosomes, 0.435 against 0.446 on H1ESC, p 0.84, 0.513 against 0.468 on HFFC6, p 1e-06.
+- The link of the enhancer to promoter distance to expression and the share of Micro-C loops placed do not differ
+  between the two chains with CTCF loops.
+- On 24 runs of the tools comparison, 5 to 60 Mb, the uniform chain is higher on raw Pearson in 20 and on raw
+  Spearman in 16 and never lower. On raw SCC it is never higher and lower in 4, three of them regions of 20 Mb
+  dense in loops, with ties on the balanced map.
+
+Open: the lower raw SCC on GM12878 and on the regions dense in loops is not traced.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
