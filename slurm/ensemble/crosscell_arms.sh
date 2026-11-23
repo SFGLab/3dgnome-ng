@@ -10,13 +10,16 @@
 #   SPLIT=1 CHROMS="chr2 ... chr22" sbatch -A <account> --array=0-188%24 slurm/ensemble/crosscell_arms.sh
 #   ARMS="C UC UR" OUT=out/xu SPLIT=1 CHROMS="chr1 ... chr22" sbatch -A <account> --array=0-197%24 \
 #     --mem=96G --cpus-per-task=16 slurm/ensemble/crosscell_arms.sh
+#   ARMS="UCN URN" OUT=out/xu SPLIT=1 CHROMS="chr1 ... chr22" sbatch -A <account> --array=0-131%24 \
+#     --mem=96G --cpus-per-task=16 slurm/ensemble/crosscell_arms.sh
 #
 # ARMS is the list of arms, C R M by default. With n arms, task i runs line i / n of GM12878 H1ESC
 # HFFC6 and arm i % n. With SPLIT=1 it runs line and arm i % 3n on chromosome i / 3n of CHROMS. A
 # member whose .cif exists is skipped. After chr1 the arm is sliced to chr1:1-60000000. The inputs
 # come from playground/rnapii/crosscell_prep.py and the configs from
 # slurm/ensemble/crosscell_configs.py. UC and UR are C and R on the uniform chain. They read half a
-# of the deep map of the line, data/_hic_half/a/<LINE>.mcool of playground/thin_cooler.py.
+# of the deep map of the line, data/_hic_half/a/<LINE>.mcool of playground/thin_cooler.py. UCN and
+# URN are UC and UR without the loop dropout.
 
 #SBATCH --job-name=xc_rnapii
 #SBATCH --nodes=1
