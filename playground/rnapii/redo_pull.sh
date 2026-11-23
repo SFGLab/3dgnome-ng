@@ -20,7 +20,7 @@ HOST="${EDEN%%:*}"; DIR="${EDEN#*:}"
 mkdir -p "$ROOT/out/lr"
 printf "E\tcudaMMC models of %s\nC\tUC of crosscell_arms.sh, the uniform chain with CTCF loops\nR\tUR, the uniform chain with CTCF and RNAPII loops\nM\tC, the chain of loop anchors with CTCF loops\n" "$OLD" > "$ROOT/out/lr/ARMS.txt"
 for L in GM12878 H1ESC HFFC6; do [ -e "$ROOT/out/lr/${L}_E" ] || ln -s "$OLD/out/lr/${L}_E" "$ROOT/out/lr/${L}_E"; done
-READY=$(ssh "$HOST" "cd '$DIR' && for d in *_C/chr* *_UC/chr* *_UR/chr*; do [ -d \"\$d\" ] || continue; [ \$(ls \$d/*.cif 2>/dev/null | wc -l) -ge 10 ] && [ \$(ls \$d/*.beads.tsv 2>/dev/null | wc -l) -ge 10 ] && [ -z \"\$(find \$d -mmin -10 -print -quit)\" ] && echo \$d; done")
+READY=$(ssh "$HOST" "cd '$DIR' && for d in *_C/chr* *_UC/chr* *_UR/chr*; do [ -d \"\$d\" ] || continue; [ \$(ls \$d/*.cif 2>/dev/null | wc -l) -ge 10 ] && [ \$(ls \$d/*.beads.tsv 2>/dev/null | wc -l) -ge 10 ] && [ -z \"\$(find \$d -mmin -10 -print -quit)\" ] && echo \$d; done; true")
 n=0
 for d in $READY; do
   arm=${d%%/*}; chr=${d#*/}; L=${arm%%_*}; A=${arm#*_}
