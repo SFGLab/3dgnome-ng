@@ -218,3 +218,79 @@ at 2,380 to 50,631 beads.
 cudaMMC's count is 0.35 of 3dgnome's and its time 0.68. Per bead 3dgnome takes 2.1 ms and
 cudaMMC 4.1 ms. MultiMM ran without compartments, as on every other run here, and its own log
 says a genome run wants them.
+
+## The uniform chain, 2026-11-23
+
+The rows of 3dgnome measured again with the uniform chain, `slurm/ensemble/redo_tools.sh` and
+`redo_tools_readouts.sh`, on the machine of the first measurement at 7cfc081. The config is
+`slurm/ensemble/<cell>_hic_uniform.ini`: the production inputs, the keys of `UNIFORM_CHAIN` and the
+contact cells from half a of the deep map, `playground/thin_cooler.py --chromosomes`. Every tool is
+scored against half b. The structures of cudaMMC and MultiMM are those of the first measurement,
+and MultiMM keeps the bead count of the chain of loop anchors. Tables in
+`data/figures/redo-2026-11-23/tools/`, outside git.
+
+### Run time
+
+| Run | beads | seconds | chain of loop anchors |
+|---|---|---|---|
+| GM12878 chr1 11.5 to 12.6 Mb, one structure | 767 | 13.2 | 760 beads, 9.0 s |
+| GM12878 chr1 1 to 60 Mb, ten structures | 54,429 | 1,018 | 42,480 beads, 634 s |
+| H1ESC chr1 1 to 60 Mb, ten structures | 53,707 | 1,052 | 40,570 beads, 687 s |
+| HFFC6 chr1 1 to 60 Mb, ten structures | 51,285 | 779 | 36,765 beads, 374 s |
+| GM12878 chr1, one structure | 184,570 | 358 | 124,657 beads, 384 s |
+| GM12878 chr1, three structures | 184,570 | 1,015 | 124,657 beads, 673 s |
+| H1ESC chr1, three structures | 178,059 | 916 | 114,276 beads, 526 s |
+| HFFC6 chr1, three structures | 171,214 | 689 | 109,082 beads, 385 s |
+| GM12878 chr1 to chr22, one structure | 2,091,330 | 3,676 | 1,312,597 beads, 2,784 s |
+| GM12878 chr1 from 10 Mb, one structure, 1, 2, 5, 10, 20, 50 and 100 Mb | 811 to 83,099 | 14.3, 18.6, 20.2, 27.3, 48.2, 98.2, 152.5 | 662 to 56,458 beads, 9.1 to 124.4 s |
+
+The uniform chain has 1.3 to 1.6 times the beads of the chain of loop anchors on a chromosome. One
+structure of chr1 takes the same time. Further structures cost more: 329 s each after the first,
+where the chain of loop anchors took 144 s.
+
+### Hi-C agreement against the other tools
+
+Pooled raw SCC on chr1 1 to 60 Mb, ten structures: 0.481, 0.353 and 0.465 for GM12878, H1ESC and
+HFFC6. cudaMMC has 0.220, 0.143 and 0.145 and MultiMM 0.297, 0.163 and 0.181 against the same half.
+
+The paired block bootstrap over the 21 runs, leads by the 95 percent interval:
+
+| Score | against | 5 Mb and chr1, 12 runs | 20 Mb, 9 runs | chain of loop anchors, 12 and 9 |
+|---|---|---|---|---|
+| raw Pearson | MultiMM | 12 | 9 | 12 and 9 |
+| raw Pearson | cudaMMC | 12 | 9 | 12 and 9 |
+| raw Spearman | MultiMM | 12 | 9 | 12 and 9 |
+| raw Spearman | cudaMMC | 12 | 9 | 12 and 9 |
+| raw SCC | MultiMM | 5 | 2 | 5 and 7 |
+| raw SCC | cudaMMC | 7 | 5 | 6 and 9 |
+| balanced SCC, mapped bins | MultiMM | 5 | 7 | 3 and 5 |
+| balanced SCC, mapped bins | cudaMMC | 9 | 9 | 5 and 9 |
+
+The last column is the first measurement, scored against the whole map. No run is lost to another
+tool on any score. On the 20 Mb runs the raw SCC of the uniform chain is
+0.32 to 0.48, where the chain of loop anchors had 0.39 to 0.61, and its point value is above both
+tools in all nine. On chr1 1 to 60 Mb at three structures it leads both tools on all three cells.
+
+### The two chains on the same runs
+
+The structures of the two chains of each run against half b, the same bootstrap,
+`chain_bootstrap.txt`. 24 runs: the nine of 5 Mb, the nine of 20 Mb, chr1 1 to 60 Mb at three
+structures and at ten.
+
+| Score | uniform higher | tie | loop anchors higher |
+|---|---|---|---|
+| raw Pearson | 20 | 4 | 0 |
+| raw Spearman | 16 | 8 | 0 |
+| raw SCC | 0 | 20 | 4 |
+| balanced SCC, mapped bins | 6 | 18 | 0 |
+
+The four runs with a lower raw SCC are GM12878 chr12 40 to 60 Mb, 0.474 against 0.610, H1ESC
+chr12, 0.415 against 0.567, H1ESC chr17 35 to 55 Mb, 0.321 against 0.524, and GM12878 chr1 1 to
+60 Mb at three structures, 0.399 against 0.454. Three of the four are regions of 20 Mb chosen for
+their count of loops. On the balanced map the same runs are ties. The cause is not traced.
+
+### Micro-C loops
+
+The loops of chr1 0 to 60 Mb placed above moved loops, signal floor 15: 0.29, 0.53 and 0.51 for
+GM12878, H1ESC and HFFC6, where the chain of loop anchors had 0.26, 0.38 and 0.45. Beads at both
+ends of a loop: 0.98, 0.95 and 0.97 of the loops.
