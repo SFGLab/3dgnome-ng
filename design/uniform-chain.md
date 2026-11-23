@@ -2078,7 +2078,9 @@ scores are from `slurm/ensemble/trace_nodrop_score.sh`, in the table above. The 
   loops added, 12 % closer, closer for 0.70 of the pairs. Without the dropout it is 4.70 and 3.93, 16 % closer,
   closer for 0.74 of the pairs. The 8,538 control pairs move by 1 % or less in both.
 
-The config is unchanged, with the dropout on. Without it the agreement with Hi-C is lower on every score that differs, most with RNAPII
+Decided on 2026-11-23: the config and the panels on the agreement with Hi-C keep the dropout. The panels on RNAPII
+loops are made from runs without it and state so. Those runs are the arms UCN and URN of
+`slurm/ensemble/crosscell_arms.sh`, chromosomes 1 to 22 of the three cell lines. Without the dropout the agreement with Hi-C is lower on every score that differs, most with RNAPII
 loops, while the effect of an RNAPII loop on its enhancer and promoter is larger by a third. chr19 is one
 chromosome without a test over rows.
 
