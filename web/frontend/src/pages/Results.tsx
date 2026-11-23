@@ -71,18 +71,18 @@ const TOOLS_SCC: Group[] = [
 ]
 
 const RUN_TIME: [string, string, 'seconds' | 'minutes', ToolRun[]][] = [
-  ['One structure, 1 Mb', 'chr1:11.5-12.6 Mb.', 'seconds', runs([350, 6.4], [760, 7.4], [767, 13.2])],
-  ['Ten structures, 60 Mb', 'chr1:1-60 Mb.', 'minutes', runs([17321, 560.9], [42480, 1207.5], [54429, 1018.4])],
-  ['One structure, whole chromosome', 'chr1, 248 Mb.', 'minutes', runs([50631, 194.8], [124657, 853.1], [184570, 358.2])],
-  ['Three structures, whole chromosome', 'chr1, 248 Mb. cudaMMC was set to about the number of beads of MultiMM.', 'minutes', runs([126330, 641], [124657, 2528], [184570, 1015.3])],
-  ['One structure, whole genome', 'chr1 to chr22.', 'minutes', runs([458445, 1882.1], [1312597, null], [2091330, 3675.7], 'did not complete')],
+  ['One structure, 1 Mb', 'chr1:11.5-12.6 Mb.', 'seconds', runs([350, 6.4], [760, 7.4], [760, 9.0])],
+  ['Ten structures, 60 Mb', 'chr1:1-60 Mb.', 'minutes', runs([17321, 560.9], [42480, 1207.5], [42480, 634.4])],
+  ['One structure, whole chromosome', 'chr1, 248 Mb.', 'minutes', runs([50631, 194.8], [124657, 853.1], [124657, 384.2])],
+  ['Three structures at equal bead counts', 'chr1, 248 Mb. cudaMMC was set to about the same number of beads as the other two tools.', 'minutes', runs([126330, 641], [124657, 2528], [124657, 673])],
+  ['One structure, whole genome', 'chr1 to chr22.', 'minutes', runs([458445, 1882.1], [1312597, null], [1312597, 2784.0], 'did not complete')],
 ]
 
 /** One structure of GM12878 chr1 from 10 Mb per tool, as megabases, beads and seconds. The last is the whole chromosome. */
 const ONE_STRUCTURE: [Line['series'], string, [number, number, number][]][] = [
   ['cudammc', 'cudaMMC', [[1, 129, 6.5], [2, 448, 7.2], [5, 762, 8.9], [10, 2170, 13.7], [20, 7128, 25.5], [50, 14936, 53.3], [100, 20401, 79.4], [248, 50631, 194.8]]],
   ['multimm', 'MultiMM', [[1, 662, 7.3], [2, 1598, 8.2], [5, 2590, 8.5], [10, 6953, 15.8], [20, 15643, 33.9], [50, 36255, 97.6], [100, 56458, 189.7], [248, 124657, 853.1]]],
-  ['ctcf', '3D-GNOMEᴺᴳ', [[1, 811, 14.3], [2, 1831, 18.6], [5, 3623, 20.2], [10, 8820, 27.3], [20, 18108, 48.2], [50, 46155, 98.2], [100, 83099, 152.5], [248, 184570, 358.2]]],
+  ['ctcf', '3D-GNOMEᴺᴳ', [[1, 662, 9.1], [2, 1598, 13.0], [5, 2590, 15.4], [10, 6953, 22.0], [20, 15643, 45.1], [50, 36255, 88.2], [100, 56458, 124.4], [248, 124657, 384.2]]],
 ]
 
 const sized = (x: (mb: number, beads: number) => number): Line[] =>
@@ -232,7 +232,7 @@ export function Results() {
       <section id="runtime">
         <h2>Runtime</h2>
         <p className="intro">
-          The three tools were timed on the same GM12878 inputs and on one computer with an RTX 3090 and 36 CPU cores. At its default settings cudaMMC uses a fifth to a half of the beads of 3D-GNOMEᴺᴳ for the same region. MultiMM ran at the number of beads of the 3D-GNOMEᴺᴳ chain of loop anchors. Each chart therefore shows three numbers per tool, the number of beads in its model, its runtime and its runtime per 1,000 beads. A tick marks the lowest time in a column.
+          The three tools were timed on the same GM12878 inputs and on one computer with an RTX 3090 and 36 CPU cores. 3D-GNOMEᴺᴳ was timed with its default chain, the chain of loop anchors. At its default settings cudaMMC uses a third to a half of the beads of the other two tools for the same region. Each chart therefore shows three numbers per tool, the number of beads in its model, its runtime and its runtime per 1,000 beads. A tick marks the lowest time in a column.
         </p>
         <div className={cn('chart-row one')}>
           {RUN_TIME.map(([title, sub, unit, toolRuns]) => (
@@ -240,7 +240,7 @@ export function Results() {
           ))}
         </div>
         <p className={cn('reading-note')}>
-          Per 1,000 beads, 3D-GNOMEᴺᴳ is the fastest tool for ten structures of 60 Mb, for one structure of the chromosome and for the genome. MultiMM is the fastest tool at 1 Mb. For three structures of the chromosome cudaMMC takes 8 percent less time per 1,000 beads than 3D-GNOMEᴺᴳ.
+          Per 1,000 beads, 3D-GNOMEᴺᴳ is the fastest tool for ten structures of 60 Mb, for one structure of the chromosome and for the genome. MultiMM is the fastest tool at 1 Mb. At equal bead counts cudaMMC is 5 percent faster than 3D-GNOMEᴺᴳ.
         </p>
         <p className={cn('reading-note')}>
           3D-GNOMEᴺᴳ models the whole genome in one job. cudaMMC was run on one chromosome at a time and the chart shows the sum of its 22 runs. MultiMM ran out of memory on the 24 GB card at 1,312,597 beads and at half that number. At a quarter of that number it was stopped after 90 minutes.
@@ -268,7 +268,7 @@ export function Results() {
           />
         </div>
         <p className={cn('reading-note')}>
-          By region size, cudaMMC is the fastest tool from 10 Mb. Below 10 Mb cudaMMC and MultiMM take about the same time. 3D-GNOMEᴺᴳ takes as long as MultiMM at 50 Mb and less time from 100 Mb. By bead count, MultiMM is the fastest tool up to about 25,000 beads and 3D-GNOMEᴺᴳ is the fastest above that. cudaMMC takes less time than 3D-GNOMEᴺᴳ up to about 7,000 beads and more time above that. Each further structure of the same region costs 3D-GNOMEᴺᴳ less time than the first. One structure of chr1 takes 6.0 minutes and three structures take 16.9 minutes.
+          By region size, cudaMMC is the fastest tool from 10 Mb. Below 10 Mb cudaMMC and MultiMM take about the same time. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. By bead count, MultiMM is the fastest tool up to about 30,000 beads and 3D-GNOMEᴺᴳ is the fastest above that. cudaMMC takes about the same time as 3D-GNOMEᴺᴳ up to about 7,000 beads and more time above that. Each further structure of the same region costs 3D-GNOMEᴺᴳ less time than the first. One structure of chr1 takes 6.4 minutes and three structures take 11.2 minutes.
         </p>
       </section>
     </DocPage>

@@ -231,6 +231,9 @@ and MultiMM keeps the bead count of the chain of loop anchors. Tables in
 
 ### Run time
 
+The Results page of the site states the run times of the chain of loop anchors, the default chain of the form,
+by a decision of 2026-11-23. The table has the uniform chain beside it.
+
 | Run | beads | seconds | chain of loop anchors |
 |---|---|---|---|
 | GM12878 chr1 11.5 to 12.6 Mb, one structure | 767 | 13.2 | 760 beads, 9.0 s |
