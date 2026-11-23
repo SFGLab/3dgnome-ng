@@ -5,7 +5,7 @@ const cn = scoped(sheet)
 
 
 
-export type Series = 'original' | 'ctcf' | 'rnapii' | 'cudammc' | 'multimm'
+export type Series = 'original' | 'ctcf' | 'rnapii' | 'anchors' | 'cudammc' | 'multimm'
 export type Bar = { series: Series; value: number | null; label: string }
 export type Group = { name: string; bars: Bar[] }
 
@@ -13,6 +13,7 @@ const SERIES_NAME: Record<Series, string> = {
   original: 'original models, cudaMMC',
   ctcf: '3D-GNOMEᴺᴳ, CTCF loops',
   rnapii: '3D-GNOMEᴺᴳ, CTCF and RNAPII loops',
+  anchors: '3D-GNOMEᴺᴳ, chain of loop anchors, CTCF loops',
   cudammc: 'cudaMMC',
   multimm: 'MultiMM',
 }

@@ -521,7 +521,8 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     w = trio[trio.measure == "loop_pileup"].pivot(index="person", columns="arm", values="value")
     people = list(dict.fromkeys(trio.person))
     w = w.loc[people[::-1]]
-    pv, _ = paired(w.C.to_numpy(), w.R.to_numpy())
+    # A run without the nine people has no panel g.
+    pv = paired(w.C.to_numpy(), w.R.to_numpy())[0] if len(w) else 1.0
     ax = bottom[0].subplots()
     if pv < SHOWN:
         _row_title(
@@ -571,7 +572,7 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
         textwrap.fill(
             f"{LEGEND}. e: block bootstrap of the difference between the two model sets on the genes of both."
             + (" f: Wilcoxon signed rank test of the two model sets over the chromosomes. " if len(per_chrom) else " ")
-            + "g: Wilcoxon signed rank test over the nine individuals, exact. h: Mann-Whitney U test.", 150),
+            + ("g: Wilcoxon signed rank test over the nine individuals, exact. " if len(w) else "") + "h: Mann-Whitney U test.", 150),
         fontsize=6.5, color=MUTED,
     )
     _save(fig, out / "rnapii_figure2")

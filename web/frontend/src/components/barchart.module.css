@@ -68,6 +68,11 @@
   background: var(--rnapii);
 }
 
+.bar:global(.anchors),
+.swatch:global(.anchors) {
+  background: var(--anchors);
+}
+
 .bar:global(.multimm),
 .swatch:global(.multimm) {
   background: var(--multimm);

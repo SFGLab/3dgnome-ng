@@ -15,16 +15,16 @@ function renderResults() {
 const values = (chart: HTMLElement) => within(chart).getAllByTestId('bar-value').map((v) => v.textContent)
 
 describe('Results page', () => {
-  // The cell line charts hold the whole genome readouts of design/figures/rnapii-2026-11-19/genome.
+  // The cell line charts hold the whole genome readouts of the redo of 2026-11-23, design/figures/redo-2026-11-23.
   it('shows the agreement with Hi-C of the original and the new models', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.19', '0.53', '0.13', '0.45', '0.15', '0.47'])
+    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.19', '0.49', '0.52', '0.13', '0.44', '0.45', '0.15', '0.51', '0.47'])
   })
 
   it('shows the enhancer to promoter distances and the link to expression', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.3', '3.5', '4.0', '3.1', '4.6', '3.8'])
-    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.14', '0.19', '0.24', '0.14', '0.17', '0.21', '0.14', '0.23', '0.27'])
+    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.1', '3.5', '4.0', '3.6', '4.4', '4.0'])
+    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.14', '0.24', '0.31', '0.13', '0.19', '0.24', '0.14', '0.25', '0.30'])
   })
 
   it('shows the beads, the runtime and the runtime per 1,000 beads of each tool', () => {
@@ -73,8 +73,8 @@ describe('Results page', () => {
 
   it('shows the share of Micro-C loops placed, for the model sets and for the three tools', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.12', '0.23', '0.31', '0.12', '0.35', '0.40', '0.10', '0.39', '0.47'])
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.13', '0.66', '0.18', '0.58', '0.23', '0.64'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.12', '0.25', '0.30', '0.12', '0.38', '0.42', '0.10', '0.42', '0.49'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.13', '0.54', '0.16', '0.53', '0.21', '0.59'])
     expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' }))).toEqual(['0.14', '0.25', '0.29', '0.21', '0.16', '0.53', '0.16', '0.15', '0.51'])
     expect(values(screen.getByRole('figure', { name: 'Micro-C loops with beads at both ends' }))).toEqual(['0.25', '1.00', '0.98', '0.26', '1.00', '0.95', '0.22', '1.00', '0.97'])
   })
@@ -89,13 +89,14 @@ describe('Results page', () => {
     expect(screen.getByText(/on chromosomes 1 to 22/)).toBeInTheDocument()
   })
 
-  it('has a key for the three kinds of model', () => {
+  it('has a key for the kinds of model', () => {
     renderResults()
     const key = screen.getByRole('list', { name: 'Key' })
     expect(within(key).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'original models, cudaMMC',
       '3D-GNOMEᴺᴳ, CTCF loops',
       '3D-GNOMEᴺᴳ, CTCF and RNAPII loops',
+      '3D-GNOMEᴺᴳ, chain of loop anchors, CTCF loops',
     ])
   })
 

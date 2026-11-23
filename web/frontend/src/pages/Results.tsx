@@ -16,21 +16,21 @@ const bar = (series: Bar['series'], value: number | null, digits = 2): Bar => ({
 })
 
 const SCC: Group[] = [
-  { name: 'GM12878', bars: [bar('original', 0.19), bar('ctcf', 0.53)] },
-  { name: 'H1ESC', bars: [bar('original', 0.13), bar('ctcf', 0.45)] },
-  { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.47)] },
+  { name: 'GM12878', bars: [bar('original', 0.19), bar('ctcf', 0.49), bar('anchors', 0.52)] },
+  { name: 'H1ESC', bars: [bar('original', 0.13), bar('ctcf', 0.44), bar('anchors', 0.45)] },
+  { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.51), bar('anchors', 0.47)] },
 ]
 
 const DISTANCE: Group[] = [
-  { name: 'GM12878, 19% closer', bars: [bar('ctcf', 4.3, 1), bar('rnapii', 3.5, 1)] },
-  { name: 'H1ESC, 24% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.1, 1)] },
-  { name: 'HFFc6, 17% closer', bars: [bar('ctcf', 4.6, 1), bar('rnapii', 3.8, 1)] },
+  { name: 'GM12878, 14% closer', bars: [bar('ctcf', 4.1, 1), bar('rnapii', 3.5, 1)] },
+  { name: 'H1ESC, 10% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.6, 1)] },
+  { name: 'HFFc6, 11% closer', bars: [bar('ctcf', 4.4, 1), bar('rnapii', 4.0, 1)] },
 ]
 
 const EXPRESSION: Group[] = [
-  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.14), bar('ctcf', 0.19), bar('rnapii', 0.24)] },
-  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.14), bar('ctcf', 0.17), bar('rnapii', 0.21)] },
-  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14), bar('ctcf', 0.23), bar('rnapii', 0.27)] },
+  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.14), bar('ctcf', 0.24), bar('rnapii', 0.31)] },
+  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.13), bar('ctcf', 0.19), bar('rnapii', 0.24)] },
+  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14), bar('ctcf', 0.25), bar('rnapii', 0.3)] },
 ]
 
 /** Returns the runs of the three tools on one task, each as beads and seconds. A null time is a run that did not finish. */
@@ -41,15 +41,15 @@ const runs = (cudammc: [number, number], multimm: [number, number | null], ours:
 ]
 
 const MICROC: Group[] = [
-  { name: 'GM12878, 25,783 loops', bars: [bar('original', 0.12), bar('ctcf', 0.23), bar('rnapii', 0.31)] },
-  { name: 'H1ESC, 10,046 loops', bars: [bar('original', 0.12), bar('ctcf', 0.35), bar('rnapii', 0.4)] },
-  { name: 'HFFc6, 19,192 loops', bars: [bar('original', 0.1), bar('ctcf', 0.39), bar('rnapii', 0.47)] },
+  { name: 'GM12878, 25,783 loops', bars: [bar('original', 0.12), bar('ctcf', 0.25), bar('rnapii', 0.3)] },
+  { name: 'H1ESC, 10,046 loops', bars: [bar('original', 0.12), bar('ctcf', 0.38), bar('rnapii', 0.42)] },
+  { name: 'HFFc6, 19,192 loops', bars: [bar('original', 0.1), bar('ctcf', 0.42), bar('rnapii', 0.49)] },
 ]
 
 const MICROC_RNAPII: Group[] = [
-  { name: 'GM12878, 2,130 loops', bars: [bar('ctcf', 0.13), bar('rnapii', 0.66)] },
-  { name: 'H1ESC, 586 loops', bars: [bar('ctcf', 0.18), bar('rnapii', 0.58)] },
-  { name: 'HFFc6, 1,318 loops', bars: [bar('ctcf', 0.23), bar('rnapii', 0.64)] },
+  { name: 'GM12878, 2,130 loops', bars: [bar('ctcf', 0.13), bar('rnapii', 0.54)] },
+  { name: 'H1ESC, 586 loops', bars: [bar('ctcf', 0.16), bar('rnapii', 0.53)] },
+  { name: 'HFFc6, 1,318 loops', bars: [bar('ctcf', 0.21), bar('rnapii', 0.59)] },
 ]
 
 const TOOLS_MICROC: Group[] = [
@@ -116,14 +116,14 @@ export function Results() {
       wide
       lead={
         <>
-          This page compares 3D-GNOMEᴺᴳ models with measured data and with two other tools. It also shows the change in the models when RNAPII loops are added to the CTCF loops. Unless a chart states another region, the models cover chromosomes 1 to 22 in the cell lines GM12878, H1ESC and HFFc6, with ten structures per chromosome. The original models are the cudaMMC models of 3D-GNOME 3.0.
+          This page compares 3D-GNOMEᴺᴳ models with measured data and with two other tools. It also shows the change in the models when RNAPII loops are added to the CTCF loops. Unless a chart states another region, the models cover chromosomes 1 to 22 in the cell lines GM12878, H1ESC and HFFc6, with ten structures per chromosome. The 3D-GNOMEᴺᴳ models are built on the chain of one bead per kilobase. Their contact cells read one half of the Hi-C counts and every comparison with Hi-C uses the other half. The original models are the cudaMMC models of 3D-GNOME 3.0.
         </>
       }
     >
-      <ChartKey />
+      <ChartKey series={['original', 'ctcf', 'rnapii', 'anchors']} />
       <div className={cn('chart-row')}>
         <div id="agreement">
-          <BarChart title="Agreement with Hi-C" subtitle="The stratum adjusted correlation between the contact map of a model and the Hi-C map, at 25 kb. The contact map of a model is the sum of the contacts of its ten structures." better="higher" groups={SCC} />
+          <BarChart title="Agreement with Hi-C" subtitle="The stratum adjusted correlation between the contact map of a model and the Hi-C map, at 25 kb. The contact map of a model is the sum of the contacts of its ten structures. The chain of loop anchors is shown beside the chain of one bead per kilobase." better="higher" groups={SCC} />
         </div>
         <div id="distance">
           <BarChart title="Enhancer to promoter distance" subtitle="The median 3D distance between an enhancer and its promoter, in bead units. Only the pairs joined by an RNAPII loop are counted." groups={DISTANCE} />
@@ -150,10 +150,10 @@ export function Results() {
         </figure>}
       </div>
       <p className={cn('reading-note')}>
-        With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower for H1ESC, 0.42 against 0.45. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart on GM12878 and HFFc6 and lower for pairs 100 to 500 kb apart on all three cell lines.
+        With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is higher for GM12878, 0.51 against 0.49. It does not change for the other two cell lines. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart and lower for pairs 100 to 500 kb apart on all three cell lines.
       </p>
       <p className={cn('reading-note')}>
-        Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p = 0.002 or less in a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
+        Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. Between the two chains the same test finds the chain of loop anchors higher for GM12878 with p = 0.01, the chain of one bead per kilobase higher for HFFc6 with p &lt; 0.001 and no difference for H1ESC. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p &lt; 0.001 in a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
       </p>
       <section id="microc">
         <h2>Micro-C loops</h2>

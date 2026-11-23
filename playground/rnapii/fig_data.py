@@ -8,6 +8,7 @@ drawing module consumes. Arms are carried as letters here and spelled out only o
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -21,6 +22,10 @@ ARM_NAME = {
     "M": "3D-GNOMEᴺᴳ, RNAPII ends merged into CTCF anchors",
 }
 ARM_COLOUR = {"E": "#8c8c8c", "C": "#2a78d6", "R": "#eb6834", "M": "#1baf7a"}
+
+# A run whose arms are other model sets gives their names in a JSON file, {"M": "..."}.
+if os.environ.get("ARM_NAMES"):
+    ARM_NAME.update(json.loads(Path(os.environ["ARM_NAMES"]).read_text()))
 
 # An arm is named by its line, its letter and its scope, chr1:1-60 Mb or the whole genome.
 _ARM = re.compile(r"^(?P<name>[A-Za-z0-9]+)_(?P<arm>[ECRM])_(?:60mb|genome)$")
