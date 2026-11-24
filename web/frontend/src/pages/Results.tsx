@@ -71,15 +71,15 @@ const MICROC_RNAPII: Group[] = [
 ]
 
 const TOOLS_MICROC: Group[] = [
-  { name: 'GM12878, 902 loops', bars: [bar('cudammc', 0.14), bar('multimm', 0.25), bar('ctcf', 0.29)] },
-  { name: 'H1ESC, 385 loops', bars: [bar('cudammc', 0.21), bar('multimm', 0.16), bar('ctcf', 0.53)] },
-  { name: 'HFFc6, 639 loops', bars: [bar('cudammc', 0.16), bar('multimm', 0.15), bar('ctcf', 0.51)] },
+  { name: 'GM12878, 902 loops', bars: [bar('cudammc', 0.14, 2, LOW), bar('multimm', 0.25, 2, 0.21), bar('ctcf', 0.29)] },
+  { name: 'H1ESC, 385 loops', bars: [bar('cudammc', 0.21, 2, LOW), bar('multimm', 0.16, 2, LOW), bar('ctcf', 0.53)] },
+  { name: 'HFFc6, 639 loops', bars: [bar('cudammc', 0.16, 2, LOW), bar('multimm', 0.15, 2, LOW), bar('ctcf', 0.51)] },
 ]
 
 const TOOLS_MICROC_BEADS: Group[] = [
-  { name: 'GM12878', bars: [bar('cudammc', 0.25), bar('multimm', 1.0), bar('ctcf', 0.98)] },
-  { name: 'H1ESC', bars: [bar('cudammc', 0.26), bar('multimm', 1.0), bar('ctcf', 0.95)] },
-  { name: 'HFFc6', bars: [bar('cudammc', 0.22), bar('multimm', 1.0), bar('ctcf', 0.97)] },
+  { name: 'GM12878', bars: [bar('cudammc', 0.25, 2, LOW), bar('multimm', 1.0, 2, LOW), bar('ctcf', 0.98)] },
+  { name: 'H1ESC', bars: [bar('cudammc', 0.26, 2, LOW), bar('multimm', 1.0, 2, LOW), bar('ctcf', 0.95)] },
+  { name: 'HFFc6', bars: [bar('cudammc', 0.22, 2, LOW), bar('multimm', 1.0, 2, LOW), bar('ctcf', 0.97)] },
 ]
 
 /** Returns the bar of another tool. Its bootstrap of 1,000 resamples has no resample with the tool ahead, a p value under 0.002. */
@@ -255,7 +255,7 @@ export function Results() {
           />
         </div>
         <p className={cn('reading-note')}>
-          cudaMMC has beads at both ends of about a quarter of the Micro-C loops and this limits the share it places. MultiMM has beads at every loop. It places nearly as many loops as 3D-GNOMEᴺᴳ on GM12878 and a third as many on the other two cell lines.
+          cudaMMC has beads at both ends of about a quarter of the Micro-C loops and this limits the share it places. MultiMM has beads at every loop. It places nearly as many loops as 3D-GNOMEᴺᴳ on GM12878 and a third as many on the other two cell lines. The share of loops placed is tested by 10,000 resamples of the loops and of the moved loops. The share of loops with beads is tested with an exact sign test over the loops.
         </p>
         <p className={cn('reading-note')}>
           The p value beside the bar of a tool is that of its difference from 3D-GNOMEᴺᴳ in a paired block bootstrap, which resamples the bins of the region 1,000 times. A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ has the higher value against cudaMMC in eight and against MultiMM in seven. By the interval it is better than cudaMMC in four and better than MultiMM in one. On chr1:1-60 Mb it is better than both tools in every cell line.

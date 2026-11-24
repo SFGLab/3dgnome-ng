@@ -318,3 +318,10 @@ SCC, `design/uniform-chain.md`.
 The loops of chr1 0 to 60 Mb placed above moved loops, signal floor 15: 0.29, 0.53 and 0.51 for
 GM12878, H1ESC and HFFC6, where the chain of loop anchors had 0.26, 0.38 and 0.45. Beads at both
 ends of a loop: 0.98, 0.95 and 0.97 of the loops.
+
+Tests of the uniform chain against each tool on these loops, `playground/rnapii/microc_tools_test.py` on the
+table of `microc_loop_compare.py` with the ratios of the moved loops, `toolpage60/microc_moved/`. The share
+placed above the moved loops, 10,000 resamples of the loops and of the moved loops: against cudaMMC +0.141,
++0.319 and +0.354 on GM12878, H1ESC and HFFC6, p under 0.001 each. Against MultiMM +0.032 with p 0.21, +0.372
+and +0.361 with p under 0.001. The share of loops with beads at both ends, exact sign test over the loops: over
+cudaMMC on every line, under MultiMM by 22, 19 and 19 loops, p under 0.001 each.
