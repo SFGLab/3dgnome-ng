@@ -2063,6 +2063,22 @@ score of two such chains is the SCC per bead pair. Since 2026-11-24 the Results 
 22 chromosomes of every cell line. `design/figures/redo-2026-11-23/summary.md` has the table and the bead
 counts of the two chains over the genome.
 
+### RNAPII loops and the agreement at 25 kb
+
+On the Results page the models with RNAPII loops do not differ from those with CTCF loops at 25 kb on H1ESC and
+HFFC6, p 0.50 and 0.52 over the 22 chromosomes, while they are higher at 5 and 10 kb on every line. Traced on
+2026-11-24 on the scores per bead pair, runs with the dropout:
+
+- The change of a chromosome at 25 kb follows its density of RNAPII loops. The rank correlation over the 22
+  chromosomes is -0.84, -0.84 and -0.80 on GM12878, H1ESC and HFFC6.
+- chr17 and chr19 have 62 to 132 RNAPII loops per Mb against a median of 22 to 36. They fall by 0.10 to 0.21 on
+  every line. Most other chromosomes rise by 0.01 to 0.07.
+- By separation at 10 kb the rise is under 100 kb, +0.087, +0.034 and +0.065 on average. The fall is between 100
+  and 500 kb, -0.070, -0.027 and -0.112 on average and -0.065 to -0.178 on chr17 and chr19.
+
+The two effects cancel at 25 kb on two lines. Open: the pairs between 100 and 500 kb that lose agreement on a
+chromosome dense in RNAPII loops are not identified yet.
+
 ### The uniform chain without the loop dropout
 
 On 2026-11-23 the nine runs were repeated with `[springs] loop_dropout = no`, `slurm/ensemble/trace_nodrop.sh`.
