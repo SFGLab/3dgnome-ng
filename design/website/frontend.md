@@ -95,3 +95,12 @@ every part of a job page.
 An open figure is saved as a PNG with its title, `job/export/savePng.ts`. The tables of a job,
 the genes, the loops and the two tables of the comparison, are saved whole as CSV, `lib/csv.ts`.
 `design/website/data.md` has the tables and the comparison.
+
+## The contact map tab and its picture on the title page
+
+The tab opens with the Hi-C of the cell type above and the contacts of the structures within the median bond
+below, on a linear colour scale. Each half has its own range from zero to the 99th percentile of its nonzero
+values. The log scale and the map of 1/(d+1)³ are choices of the card. The picture of the contacts example of
+the title page, `src/assets/contacts.png`, is the tab as it opens on the job of the example:
+`web/design/render_contacts.py` draws it from the answer of `/api/jobs/<key>/contacts`.
+

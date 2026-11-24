@@ -33,7 +33,7 @@ function renderTab(files = SUMMARY_DONE.files) {
 describe('ContactMapTab', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('asks for the job region at 25 kb with Hi-C above and the model below', async () => {
+  it('asks for the job region at 25 kb with Hi-C above and the counted contacts of the model below', async () => {
     const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
     await screen.findByText('0.21')
@@ -41,7 +41,7 @@ describe('ContactMapTab', () => {
     expect(url).toContain('region=chr1%3A11500000-11575000')
     expect(url).toContain('res=25000')
     expect(url).toContain('upper=hic')
-    expect(url).toContain('lower=model')
+    expect(new URL(url, 'http://site').searchParams.get('lower')).toBe('model_count')
   })
 
   it('opens the longest job at 25 kb and a longer region at the finest resolution it fits', async () => {
@@ -157,9 +157,10 @@ describe('ContactMapTab', () => {
     await screen.findByText('0.21')
     const lower = screen.getByLabelText('Lower half')
     expect(within(lower).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['model', 'model_count', 'hic', 'loops_ctcf', 'loops_rnapii'])
-    fireEvent.change(lower, { target: { value: 'model_count' } })
+    expect((lower as HTMLSelectElement).value).toBe('model_count')
+    fireEvent.change(lower, { target: { value: 'model' } })
     await new Promise((r) => setTimeout(r, 50))
-    expect(f.mock.calls.some(([u]) => String(u).includes('lower=model_count'))).toBe(true)
+    expect(f.mock.calls.some(([u]) => new URL(String(u), 'http://site').searchParams.get('lower') === 'model')).toBe(true)
   })
 
   it('offers the HiCDiffusion prediction of a job that kept it, in either half', async () => {
@@ -179,10 +180,13 @@ describe('ContactMapTab', () => {
     expect((screen.getByLabelText('Resolution') as HTMLSelectElement).value).toBe('10000')
   })
 
-  it('starts the log colour range at a low percentile, not at zero', async () => {
+  it('opens on a linear scale and starts the log colour range at a low percentile, not at zero', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
     await screen.findByText('0.21')
+    const log = screen.getByRole('checkbox', { name: /Log scale, separate for each half/ })
+    expect(log).not.toBeChecked()
+    fireEvent.click(log)
     expect(Number((screen.getByLabelText(/min/) as HTMLInputElement).value)).toBeGreaterThan(0)
   })
 
