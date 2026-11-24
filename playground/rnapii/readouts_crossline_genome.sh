@@ -14,6 +14,8 @@
 #   pile-up at the line's RNAPII loops at 10 kb, under out/readouts/structure.
 # shortrange: the same summed maps at 5, 10 and 25 kb on the pairs up to 2 Mb apart, under
 #   out/readouts/shortrange.
+# resolutions: the score of shortrange and the same score of the contacts per bead pair, under
+#   out/readouts/resolutions.
 # pairs: the enhancer to promoter pairs an RNAPII loop alone joins and their reference pairs,
 #   under out/readouts/pairs. It needs the bead tables beside the structures and the expression
 #   step's gene list of the chromosome.
@@ -108,6 +110,24 @@ shortrange() {
     "$PY" "$REPO/playground/rnapii/short_range_scc.py" "$(deep_map "$L")" "$CHR" "$OUT/shortrange/${L}_${CHR}.json.part" "${DIRS[@]}" \
       2>&1 | grep -vE "INFO|WARN" > "$OUT/shortrange/${L}_${CHR}.txt"
     mv "$OUT/shortrange/${L}_${CHR}.json.part" "$OUT/shortrange/${L}_${CHR}.json"
+  done
+}
+
+# The score of shortrange with the contacts per bead pair beside it, under another folder. The runs
+# of shortrange before the columns existed stay as they are.
+resolutions() {
+  mkdir -p "$OUT/resolutions" "$ROOT/out/links"
+  for L in "${LINES[@]}"; do
+    [ -s "$OUT/resolutions/${L}_${CHR}.json" ] && continue
+    local DIRS=()
+    for A in "${ARMS[@]}"; do
+      local DEST="$ROOT/out/links/${L}_${A}_${CHR}"
+      [ -e "$DEST" ] || ln -s "$ROOT/out/lr/${L}_${A}/$CHR" "$DEST"
+      DIRS+=("$DEST")
+    done
+    "$PY" "$REPO/playground/rnapii/short_range_scc.py" "$(deep_map "$L")" "$CHR" \
+      "$OUT/resolutions/${L}_${CHR}.json.part" "${DIRS[@]}" 2>&1 | grep -vE "INFO|WARN" > "$OUT/resolutions/${L}_${CHR}.txt"
+    mv "$OUT/resolutions/${L}_${CHR}.json.part" "$OUT/resolutions/${L}_${CHR}.json"
   done
 }
 

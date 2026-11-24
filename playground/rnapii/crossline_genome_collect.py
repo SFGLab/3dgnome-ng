@@ -21,7 +21,9 @@ out dir gets `readouts/` and `fig_inputs/` as `figures_two.py` takes them.
   `hic`, the raw stratum adjusted correlation of the summed map, `microc_loops`, the share of
   Micro-C loops placed above the moved loops, and the same per class of loop as
   `microc_loops, <class>`, and the correlation with Hi-C at short range as
-  `hic <res> kb, <from> to <to> kb`. The figures test two arms over these.
+  `hic <res> kb, <from> to <to> kb`. With the `resolutions` step the same correlation of the
+  contacts per bead pair on the pairs up to 2 Mb is `hic per bead pair, <res> kb`, and against the
+  balanced map `hic per bead pair, balanced, <res> kb`. The figures test two arms over these.
 
 A chromosome whose file is missing is named and left out of that sum, so a partial run can be
 looked at. The counts of chromosomes read are printed per file.
@@ -227,6 +229,16 @@ def by_chromosome(src: Path, out: Path) -> None:
                     if r["bins"] == "all" and np.isfinite(r["scc"]):
                         rows.append({"line": line, "arm": str(r["arm"])[len(line) + 1 : -len(chrom) - 1], "chrom": chrom,
                                      "measure": short_range_measure(int(r["res"]), int(r["sep_lo"]), int(r["sep_hi"])), "value": float(r["scc"])})
+            path = src / "resolutions" / f"{line}_{chrom}.json"
+            if path.is_file():
+                for r in json.loads(path.read_text())["rows"]:
+                    if r["bins"] != "all" or (int(r["sep_lo"]), int(r["sep_hi"])) != (0, 2_000_000):
+                        continue
+                    arm = str(r["arm"])[len(line) + 1 : -len(chrom) - 1]
+                    for key, name in (("scc_pair", "hic per bead pair"), ("scc_pair_bal", "hic per bead pair, balanced")):
+                        if np.isfinite(r[key]):
+                            rows.append({"line": line, "arm": arm, "chrom": chrom,
+                                         "measure": f"{name}, {int(r['res']) // 1000} kb", "value": float(r[key])})
     if rows:
         d = out / "readouts"
         d.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,6 @@
 """Hi-C agreement of each arm's pooled ensemble map at short range and fine resolution.
 
-    python playground/rnapii/short_range_scc.py MCOOL CHROM OUT.json ARM_DIR [ARM_DIR ...]
+    python playground/rnapii/short_range_scc.py [--res BP,BP,...] MCOOL CHROM OUT.json ARM_DIR [ARM_DIR ...]
 
 `playground/ensemble_score.py` scores the whole chromosome at 25 kb, where the distance decay
 and the compartments carry the correlation. RNAPII loops span tens to hundreds of kilobases,
@@ -9,8 +9,15 @@ The measure fixed before the run is the stratum adjusted correlation with the ra
 over every bin, the convention of the whole map score. The other resolutions, the three bands
 of separation at 10 kb and the scores over the mapped bins are printed beside it as context.
 
-Only the diagonals up to 2 Mb are held, one row a bin, so a chromosome at 5 kb fits in memory.
-The map is read in slabs of rows for the same reason.
+The count of a cell of a pooled map grows with the number of beads in its two bins, and a chain
+with beads of unequal width carries that pattern without any 3D position. `scc_pair` is the same
+correlation of the contacts per bead pair, the count of a cell over the product of the bead counts
+of its two bins, against the raw map. `scc_pair_bal` is against the balanced map.
+`playground/ensemble_score.py` has the same columns for the whole chromosome at 25 kb.
+
+`--res` gives other resolutions, each on the pairs up to 2 Mb apart. Only the diagonals up to 2 Mb
+are held, one row a bin, and a chromosome at 5 kb fits in memory. The map is read in slabs of rows
+for the same reason.
 """
 
 from __future__ import annotations
@@ -34,11 +41,11 @@ BANDS = ((0, 100_000), (100_000, 500_000), (500_000, 2_000_000))
 SLAB_BP = 10_000_000
 
 
-def observed_band(mcool: str, chrom: str, res: int, depth: int) -> tuple[np.ndarray, np.ndarray]:
+def observed_band(mcool: str, chrom: str, res: int, depth: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """The raw counts of one chromosome on the diagonals 0 to `depth`.
 
-    Returns the band, entry `[i, d]` the count between bins `i` and `i + d`, and the mask of the
-    bins the map's balancing kept.
+    Returns the band, entry `[i, d]` the count between bins `i` and `i + d`, the mask of the
+    bins the map's balancing kept and the balanced band, zero where a bin has no weight.
     """
     import cooler
 
@@ -55,16 +62,24 @@ def observed_band(mcool: str, chrom: str, res: int, depth: int) -> tuple[np.ndar
             row = np.diagonal(m, d)[: s1 - s0]
             band[s0 : s0 + len(row), d] = row
     weight = c.bins().fetch(chrom)["weight"].to_numpy()
-    return band, np.isfinite(weight)
+    w = np.nan_to_num(weight)
+    balanced = np.zeros_like(band)
+    for d in range(depth + 1):
+        balanced[: n - d, d] = band[: n - d, d] * w[: n - d] * w[d:]
+    return band, np.isfinite(weight), balanced
 
 
-def simulated_band(cifs: list[Path], res: int, n: int, depth: int) -> np.ndarray:
-    """The summed contacts of an ensemble on the diagonals 1 to `depth`, at the battery's contact radius."""
+def simulated_band(cifs: list[Path], res: int, n: int, depth: int) -> tuple[np.ndarray, np.ndarray]:
+    """The summed contacts of an ensemble on the diagonals 1 to `depth`, at the battery's contact
+    radius, and the same contacts per bead pair."""
     from scipy.spatial import cKDTree
 
     band = np.zeros((n, depth + 1))
+    beads = np.zeros(n)
     for cif in cifs:
         pos, start, _, _ = load(cif)
+        idx = start // res
+        beads += np.bincount(idx[(idx >= 0) & (idx < n)], minlength=n)[:n]
         radius = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(pos, axis=0), axis=1)))
         pairs = cKDTree(pos).query_pairs(radius, output_type="ndarray")
         if pairs.size == 0:
@@ -73,7 +88,11 @@ def simulated_band(cifs: list[Path], res: int, n: int, depth: int) -> np.ndarray
         lo, d = np.minimum(bi, bj), np.abs(bi - bj)
         ok = (d >= 1) & (d <= depth) & (lo >= 0) & (lo + d < n)
         np.add.at(band, (lo[ok], d[ok]), 1.0)
-    return band
+    per_pair = np.zeros_like(band)
+    for d in range(1, depth + 1):
+        pairs_of_beads = beads[: n - d] * beads[d:]
+        np.divide(band[: n - d, d], pairs_of_beads, out=per_pair[: n - d, d], where=pairs_of_beads > 0)
+    return band, per_pair
 
 
 def scc(sim: np.ndarray, obs: np.ndarray, d_lo: int, d_hi: int, keep: np.ndarray) -> float:
@@ -96,27 +115,34 @@ def scc(sim: np.ndarray, obs: np.ndarray, d_lo: int, d_hi: int, keep: np.ndarray
 
 
 def main() -> None:
+    resolutions = RESOLUTIONS
+    if sys.argv[1] == "--res":
+        resolutions = tuple(int(x) for x in sys.argv[2].split(","))
+        del sys.argv[1:3]
     mcool, chrom, out = sys.argv[1], sys.argv[2], Path(sys.argv[3])
     arms = [(d, sorted(d.glob("*.cif"))) for d in map(Path, sys.argv[4:])]
     rows = []
-    for res in RESOLUTIONS:
+    for res in resolutions:
         depth = MAX_BP // res
-        obs, mapped = observed_band(mcool, chrom, res, depth)
+        obs, mapped, balanced = observed_band(mcool, chrom, res, depth)
         every = np.ones(len(mapped), dtype=bool)
         bands = [(0, MAX_BP)] + (list(BANDS) if res == 10_000 else [])
         for d, cifs in arms:
             if not cifs:
                 continue
-            sim = simulated_band(cifs, res, obs.shape[0], depth)
+            sim, per_pair = simulated_band(cifs, res, obs.shape[0], depth)
             for lo, hi in bands:
                 for name, keep in (("all", every), ("mapped", mapped)):
                     rows.append({"arm": d.name, "n_models": len(cifs), "res": res, "sep_lo": lo, "sep_hi": hi, "bins": name,
-                                 "scc": scc(sim, obs, lo // res, hi // res, keep)})
+                                 "scc": scc(sim, obs, lo // res, hi // res, keep),
+                                 "scc_pair": scc(per_pair, obs, lo // res, hi // res, keep),
+                                 "scc_pair_bal": scc(per_pair, balanced, lo // res, hi // res, keep)})
     out.write_text(json.dumps({"map": Path(mcool).name, "chrom": chrom, "rows": rows}, indent=1))
     print(f"{chrom} against {Path(mcool).name}, raw counts, pairs up to {MAX_BP // 1_000_000} Mb")
     for r in rows:
         if r["bins"] == "all":
-            print(f"  {r['arm']:>24s}  {r['res'] // 1000:2d} kb  {r['sep_lo'] // 1000:5d} to {r['sep_hi'] // 1000:5d} kb  scc {r['scc']:.3f}")
+            print(f"  {r['arm']:>24s}  {r['res'] // 1000:3d} kb  {r['sep_lo'] // 1000:5d} to {r['sep_hi'] // 1000:5d} kb  scc {r['scc']:.3f}"
+                  f"  per bead pair {r['scc_pair']:.3f}  per bead pair, balanced map {r['scc_pair_bal']:.3f}")
 
 
 if __name__ == "__main__":
