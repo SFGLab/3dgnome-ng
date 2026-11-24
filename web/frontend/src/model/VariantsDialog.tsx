@@ -4,8 +4,9 @@ import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, Upload } from 'luc
 import { useEffect, useState } from 'react'
 import { Dialog } from '../components/Dialog'
 import { Pager } from '../components/Pager'
+import { LoopPreview } from './LoopPreview'
 import { usePage } from '../components/usePage'
-import type { FormState } from './form'
+import type { Factors, FormState } from './form'
 import { type OwnChoice, ownField } from './upload'
 import { megabytes } from '../lib/format'
 import { scoped } from '../lib/css'
@@ -95,10 +96,14 @@ export function VariantsDialog(props: {
   sample: string
   haplotype: 0 | 1
   own?: OwnChoice | null
+  /** The longest region of a job in bp. */
+  maxSpan?: number
+  /** Takes the region the visitor drags to in the picture. Without it the picture is still. */
+  onRegion?: (text: string) => void
   onClose: () => void
   onApply: (patch: Partial<FormState>) => void
 }) {
-  const { catalog, cell, region, factors, onClose, onApply } = props
+  const { catalog, cell, region, factors, maxSpan, onRegion, onClose, onApply } = props
   const [mode, setMode] = useState<VariantsMode>(props.mode)
   const [file, setFile] = useState<File | null>(props.file)
   const [upload, setUpload] = useState<UploadResult | null>(props.upload ?? null)
@@ -258,12 +263,17 @@ export function VariantsDialog(props: {
             <LoaderCircle size={14} aria-hidden className={cn('spin')} /> Applying the variants to the loops of the region.
           </p>
         )}
+        {/* The picture of the loops of the cell type takes the drags of the region, as the one of step 1
+            does, and stays while the variants of the new region are read. */}
+        {region && onRegion && !own?.loops.length && (
+          <LoopPreview cell={cell} region={region} factors={factors as Factors} maxSpan={maxSpan} onRegion={onRegion} variants={check.data?.variants ?? []} />
+        )}
         {check.data && region && (
           <>
             <p className={cn('sv-box good')}>
               <CircleCheck size={15} aria-hidden /> {check.data.summary}
             </p>
-            <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />
+            {!(onRegion && !own?.loops.length) && <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />}
             {check.data.variants.length > 0 && (
               <>
                 <Pager page={variantPage} noun="variants" />

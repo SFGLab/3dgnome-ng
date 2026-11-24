@@ -11,6 +11,8 @@ const cn = scoped(sheet)
 const W = 780
 const H = 150
 const AXIS = 75
+/** The height of the band of variants under the loops. */
+const BAND = 34
 /** The shortest region a drag leaves and the step of a rounded position, in bp. */
 const MIN_SPAN = 20_000
 const STEP = 1_000
@@ -35,8 +37,24 @@ type Drag = { kind: 'start' | 'end' | 'move'; at: number; from: [number, number]
  * `maxSpan` is the longest region of a job in bp. A drag does not make the region longer than
  * that. A region that is longer already is drawn in the colour of an error and a drag makes it
  * shorter.
+ *
+ * `variants` are structural variants of the region, drawn in a band under the loops with their type.
  */
-export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegion }: { cell: string; region: Region; factors: Factors; maxSpan?: number; onRegion?: (text: string) => void }) {
+export function LoopPreview({
+  cell,
+  region,
+  factors,
+  maxSpan = Infinity,
+  onRegion,
+  variants,
+}: {
+  cell: string
+  region: Region
+  factors: Factors
+  maxSpan?: number
+  onRegion?: (text: string) => void
+  variants?: { type: string; pos: number; end: number }[]
+}) {
   // The server draws three times the longest region at most.
   const cap = 3 * maxSpan
   // The view moves only when the region no longer fits it. The picture stays still while the region
@@ -56,6 +74,7 @@ export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegio
   const [moved, setMoved] = useState<[number, number] | null>(null)
   const latest = useRef<[number, number] | null>(null)
   if (!preview.data) return <div className={cn('loop-preview')} aria-busy="true" />
+  const height = H + (variants ? BAND : 0)
   const [start, end] = moved ?? [region.start, region.end]
   const width = view[1] - view[0]
   const x = (p: number) => ((p - view[0]) / width) * W
@@ -136,8 +155,8 @@ export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegio
   const longest = `${maxSpan / 1e6} Mb`
   return (
     <div className={cn(tooLong ? 'loop-preview too-long' : 'loop-preview')}>
-      <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Loops in ${region.label || text(region.start, region.end)}`}>
-        <rect className={cn(onRegion ? 'region-box movable' : 'region-box')} x={x(start)} y={0} width={Math.max(x(end) - x(start), 2)} height={H} onPointerDown={onRegion ? grab('move') : undefined} {...(onRegion ? handlers : {})} />
+      <svg ref={svg} viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`Loops in ${region.label || text(region.start, region.end)}`}>
+        <rect className={cn(onRegion ? 'region-box movable' : 'region-box')} x={x(start)} y={0} width={Math.max(x(end) - x(start), 2)} height={height} onPointerDown={onRegion ? grab('move') : undefined} {...(onRegion ? handlers : {})} />
         <text className={cn('side-label')} x={6} y={14}>
           CTCF loops
         </text>
@@ -155,12 +174,24 @@ export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegio
             {gene.name}
           </text>
         )}
+        {variants?.map((v, i) => {
+          const x1 = x(v.pos)
+          const w = Math.max(x(v.end) - x1, 4)
+          return (
+            <g key={i} className={cn(`sv-mark sv-${v.type.toLowerCase()}`)}>
+              <rect x={x1} y={H + 2} width={w} height={10} rx={1} />
+              <text x={x1 + w / 2} y={H + 26} textAnchor="middle">
+                {v.type}
+              </text>
+            </g>
+          )
+        })}
         {onRegion &&
           (['start', 'end'] as const).map((kind) => {
             const p = kind === 'start' ? start : end
             return (
               <g key={kind}>
-                <line className={cn('region-edge')} x1={x(p)} x2={x(p)} y1={0} y2={H} />
+                <line className={cn('region-edge')} x1={x(p)} x2={x(p)} y1={0} y2={height} />
                 <rect
                   className={cn('region-handle')}
                   x={x(p) - 7}

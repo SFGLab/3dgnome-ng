@@ -158,6 +158,8 @@ def jobs(site: SimpleNamespace, uploads: dict[str, str]) -> SimpleNamespace:
     ask = site.ask
     post = lambda **more: ask("post", "/api/jobs", "/api/jobs", 201, data={**FORM, **more})["url"]  # noqa: E731
     ask("post", "/api/jobs", "/api/jobs", 400, data={**FORM, "region": "chr1:0-99000000"})
+    states = ask("post", "/api/jobs/states", "/api/jobs/states", 200, json={"jobs": ["/jobs/with_variants", "/jobs/absent"]})["states"]
+    assert states["/jobs/with_variants"]["state"] == "done" and states["/jobs/absent"] is None, "the states of a list name each job asked: " + str(states)
     own = {"loops": [{"factor": "CTCF", "upload": uploads["loops"]}], "contacts": uploads["contacts"], "enhancers": uploads["enhancers"], "anchors": uploads["anchors"]}
     return SimpleNamespace(
         plain=post(),

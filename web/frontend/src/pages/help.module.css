@@ -87,19 +87,21 @@
   font-size: 14px;
 }
 
+/* The description stays beside its link and wraps in its own column. */
 .sample-list li {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 12px;
+  gap: 12px;
 }
 
 .sample-list span {
+  min-width: 0;
   color: var(--muted);
   font-size: 13px;
 }
 
 .sample-link {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 5px;

@@ -20,7 +20,7 @@ export const asked = {
   sampleTable: (set: string) => queryOptions({ queryKey: ['sample-table', set], queryFn: () => api.sampleTable(set) }),
   expression: (cell: string, svSet: string, sample: string) => queryOptions({ queryKey: ['expression', cell, svSet, sample], queryFn: () => api.expression(cell, svSet, sample) }),
   variants: (fields: Record<string, string>) => queryOptions({ queryKey: ['sv-check', fields], queryFn: () => api.variants(fields) }),
-  status: (url: string) => queryOptions({ queryKey: ['status', url], queryFn: () => api.status(url) }),
+  states: (urls: string[]) => queryOptions({ queryKey: ['states', urls], queryFn: () => api.states(urls) }),
   uploadPreview: (id: string, cell: string, span: string) => queryOptions({ queryKey: ['upload-preview', id, span], queryFn: () => uploadPreview(id, cell, span) }),
   compare: (a: string, b: string, shared: boolean) => queryOptions({ queryKey: ['compare', a, b, shared], queryFn: () => compareJobs(a, b, shared) }),
   compareGene: (a: string, b: string, gene: string, shared: boolean) => queryOptions({ queryKey: ['compare-gene', a, b, gene, shared], queryFn: () => compareGene(a, b, gene, shared) }),

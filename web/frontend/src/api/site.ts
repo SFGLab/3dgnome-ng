@@ -1,6 +1,6 @@
 /** The routes of the form and of the lists of jobs. */
 import { call, posted, query as q } from './http'
-import type { Catalog, ExpressionOption, GeneHit, JobStatus, Preview, Region, SampleRow, SettingGroup, VariantCheck } from './types'
+import type { Catalog, ExpressionOption, GeneHit, JobState, Preview, Region, SampleRow, SettingGroup, VariantCheck } from './types'
 
 export const api = {
   catalog: () => call<Catalog>('/api/catalog'),
@@ -17,5 +17,6 @@ export const api = {
   parseIni: (file: File) => call<{ overrides: Record<string, string>; refused: string[] }>('/api/settings/ini', posted({ file })),
   submit: (form: FormData) => call<{ url: string }>('/api/jobs', { method: 'POST', body: form }),
   variants: (fields: Record<string, string>) => call<VariantCheck>('/api/variants/check', posted(fields)),
-  status: (url: string) => call<JobStatus>(`/api${url}`),
+  states: (urls: string[]) =>
+    call<{ states: Record<string, JobState | null> }>('/api/jobs/states', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobs: urls }) }).then((r) => r.states),
 }

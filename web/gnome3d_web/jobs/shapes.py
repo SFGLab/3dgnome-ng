@@ -14,6 +14,20 @@ class Stage(TypedDict):
     at: float
 
 
+class JobState(TypedDict):
+    """The state of a job as a list of jobs shows it, with the stage of a running job."""
+
+    state: State
+    stage: NotRequired[str]
+
+
+class JobStates(TypedDict):
+    """The states of the jobs of a list by the page path of each, `/jobs/<key>` or `/p/<token>`.
+    A job the site does not have is null."""
+
+    states: dict[str, JobState | None]
+
+
 class Status(TypedDict):
     """status.json. A job has `state` from the moment it waits and gains the rest as it runs."""
 

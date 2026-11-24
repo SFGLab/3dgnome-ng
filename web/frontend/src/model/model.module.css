@@ -279,6 +279,15 @@
   border-radius: 8px;
 }
 
+/* The variants under the loops are not caught by the pointer, the region box under them is. */
+.loop-preview .sv-mark {
+  pointer-events: none;
+}
+
+.loop-preview .sv-mark text {
+  font: 600 9px var(--font);
+}
+
 .loop-preview[aria-busy='true'] {
   height: 150px;
   background: var(--panel);

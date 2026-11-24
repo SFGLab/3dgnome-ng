@@ -132,6 +132,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Api States
+         * @description Answers the states of the jobs of a list in one request. The body is `{"jobs": [...]}` with
+         *     the page path of each job. A path that is no job of the site has null.
+         */
+        post: operations["api_states_api_jobs_states_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{key}": {
         parameters: {
             query?: never;
@@ -1115,6 +1136,30 @@ export interface components {
             /** Refused */
             refused: string[];
         };
+        /**
+         * JobState
+         * @description The state of a job as a list of jobs shows it, with the stage of a running job.
+         */
+        JobState: {
+            /** Stage */
+            stage?: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "queued" | "running" | "done" | "failed";
+        };
+        /**
+         * JobStates
+         * @description The states of the jobs of a list by the page path of each, `/jobs/<key>` or `/p/<token>`.
+         *     A job the site does not have is null.
+         */
+        JobStates: {
+            /** States */
+            states: {
+                [key: string]: components["schemas"]["JobState"] | null;
+            };
+        };
         /** JobUrl */
         JobUrl: {
             /** Url */
@@ -1878,6 +1923,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobUrl"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refusal"] | components["schemas"]["Missing"];
+                };
+            };
+        };
+    };
+    api_states_api_jobs_states_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStates"];
                 };
             };
             /** @description Bad Request */

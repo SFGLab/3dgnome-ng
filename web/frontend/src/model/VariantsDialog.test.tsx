@@ -59,6 +59,30 @@ describe('Structural variants dialog', () => {
     expect(checks[0].get('haplotype')).toBe('0')
   })
 
+  it('keeps the page behind it from scrolling while it is open', () => {
+    const { unmount } = renderDialog()
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    unmount()
+    expect(document.documentElement.style.overflow).toBe('')
+  })
+
+  it('draws the region as the box of step 1, with edges that move, and the variants under the loops', async () => {
+    mockApi([
+      [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'HG00733.sv.vcf.gz', size: 48_000_000, ok: true, summary: 'VCF with 2 samples.', error: null, samples: ['HG00733', 'HG00512'], counts: false }]],
+      [/^\/api\/variants\/check$/, () => [200, CHECK]],
+      [/\/preview$/, () => [200, { loops: { CTCF: [[11_600_000, 11_900_000, 7]], RNAPII: [] }, genes: [] }]],
+    ])
+    const onRegion = vi.fn()
+    const { container } = renderDialog({ onRegion, maxSpan: 20_000_000 })
+    expect(await screen.findByRole('slider', { name: 'Start of the region' })).toBeInTheDocument()
+    expect(screen.getByRole('slider', { name: 'End of the region' })).toBeInTheDocument()
+    await screen.findByText(/6 variants of HG00733 on the first haplotype/)
+    expect(container.querySelectorAll('.loop-preview .sv-mark')).toHaveLength(6)
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'End of the region' }), { key: 'ArrowRight' })
+    expect(onRegion).toHaveBeenCalledTimes(1)
+    expect(onRegion.mock.calls[0][0]).toMatch(/^chr1:11,500,000-12,6\d\d,000$/)
+  })
+
   it('lists each variant with its change to the loops', async () => {
     renderDialog()
     const table = await screen.findByRole('table')

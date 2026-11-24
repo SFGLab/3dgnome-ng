@@ -3,9 +3,13 @@ import { type ReactNode, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import '../styles/dialog.css'
 
+/** The number of dialogs on the page. The page scrolls again when the last one closes. */
+let open = 0
+
 /**
  * The frame of a dialog. It has the backdrop, the head with the title and the line under it and the
- * Escape key, which closes it. The caller gives the body and the foot.
+ * Escape key, which closes it. The page behind an open dialog does not scroll. The caller gives the
+ * body and the foot.
  * @param id the id of the title, which labels the dialog
  * @param name the class of this dialog beside `dialog`
  * @param closeButton a close button in the head
@@ -35,6 +39,20 @@ export function Dialog({
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
   }, [onClose])
+  useEffect(() => {
+    const page = document.documentElement
+    // The width of the scroll bar is kept as padding, and the page does not shift under the dialog.
+    if (open++ === 0) {
+      page.style.paddingRight = `${window.innerWidth - page.clientWidth}px`
+      page.style.overflow = 'hidden'
+    }
+    return () => {
+      if (--open === 0) {
+        page.style.overflow = ''
+        page.style.paddingRight = ''
+      }
+    }
+  }, [])
   const frame = (
     <div className="dialog-backdrop">
       <div className={`dialog ${name}`} role="dialog" aria-modal="true" aria-labelledby={id}>

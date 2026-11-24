@@ -1010,6 +1010,54 @@
     "title": "IniOverrides",
     "type": "object"
    },
+   "JobState": {
+    "description": "The state of a job as a list of jobs shows it, with the stage of a running job.",
+    "properties": {
+     "stage": {
+      "title": "Stage",
+      "type": "string"
+     },
+     "state": {
+      "enum": [
+       "queued",
+       "running",
+       "done",
+       "failed"
+      ],
+      "title": "State",
+      "type": "string"
+     }
+    },
+    "required": [
+     "state"
+    ],
+    "title": "JobState",
+    "type": "object"
+   },
+   "JobStates": {
+    "description": "The states of the jobs of a list by the page path of each, `/jobs/<key>` or `/p/<token>`.\nA job the site does not have is null.",
+    "properties": {
+     "states": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/JobState"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "title": "States",
+      "type": "object"
+     }
+    },
+    "required": [
+     "states"
+    ],
+    "title": "JobStates",
+    "type": "object"
+   },
    "JobUrl": {
     "properties": {
      "url": {
@@ -2820,6 +2868,53 @@
      }
     },
     "summary": "Api Submit"
+   }
+  },
+  "/api/jobs/states": {
+   "post": {
+    "description": "Answers the states of the jobs of a list in one request. The body is `{\"jobs\": [...]}` with\nthe page path of each job. A path that is no job of the site has null.",
+    "operationId": "api_states_api_jobs_states_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobStates"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api States Api Jobs States Post"
+        }
+       }
+      },
+      "description": "Not Found"
+     }
+    },
+    "summary": "Api States"
    }
   },
   "/api/jobs/{key}": {

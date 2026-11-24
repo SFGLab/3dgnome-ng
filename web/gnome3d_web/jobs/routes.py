@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -10,8 +11,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from ..answers import REFUSALS, job_of
 from ..context import Here
 from . import store
-from .shapes import JobUrl, Status
+from .shapes import JobState, JobStates, JobUrl, Status
 from .submit import create_job
+
+# The most jobs one request for states names. A list of a visitor is far shorter.
+MAX_STATES = 500
 
 router = APIRouter(responses=REFUSALS)
 
@@ -19,6 +23,33 @@ router = APIRouter(responses=REFUSALS)
 async def api_submit(site: Here, request: Request) -> JSONResponse:
     fields = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
     return JSONResponse({"url": create_job(site, fields)}, 201)
+
+
+@router.post("/api/jobs/states", response_model=JobStates)
+async def api_states(site: Here, request: Request) -> JSONResponse:
+    """Answers the states of the jobs of a list in one request. The body is `{"jobs": [...]}` with
+    the page path of each job. A path that is no job of the site has null."""
+    try:
+        body = json.loads(await request.body() or b"{}")
+    except ValueError:
+        raise HTTPException(400) from None
+    asked = body.get("jobs") if isinstance(body, dict) else None
+    states: dict[str, JobState | None] = {}
+    for url in (asked if isinstance(asked, list) else [])[:MAX_STATES]:
+        if not isinstance(url, str):
+            continue
+        _, kind, key = (url.split("/", 2) + ["", ""])[:3]
+        job = site.job(kind, key) if url.startswith("/") and kind in ("jobs", "p") else None
+        if job is None:
+            states[url] = None
+            continue
+        status = store.status(job)
+        state: JobState = {"state": status["state"]}
+        stage = status.get("stage")
+        if stage:
+            state["stage"] = stage
+        states[url] = state
+    return JSONResponse({"states": states})
 
 
 def send(d: Path, name: str) -> Response:

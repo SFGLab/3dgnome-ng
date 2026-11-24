@@ -59,7 +59,8 @@ export function mockApi(extra: Route[] = []) {
     [/^\/api\/preview$/, () => [200, PREVIEW]],
     [/^\/api\/settings$/, () => [200, SCHEMA]],
     [/^\/api\/expression$/, () => [200, { options: [] }]],
-    [/^\/api\/jobs\/[\w-]+$/, () => [200, { state: 'done', stage: 'done' }]],
+    // The states of a list of jobs, every job done.
+    [/^\/api\/jobs\/states$/, (_u, init) => [200, { states: Object.fromEntries((JSON.parse(String(init?.body ?? '{}')).jobs ?? []).map((url: string) => [url, { state: 'done', stage: 'done' }])) }]],
   ]
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://site')

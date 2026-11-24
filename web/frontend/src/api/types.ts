@@ -20,6 +20,7 @@ export type ExpressionOption = Shapes['ExpressionOption']
 export type VariantRow = Shapes['VariantRow']
 export type VariantCheck = Shapes['VariantCheck']
 export type JobStatus = Shapes['Status']
+export type JobState = Shapes['JobState']
 /** A sample of a call set. An unknown field is an empty string and so is a parent the set does not hold. */
 export type SampleRow = { sample: string; sex: string; population: string; superpopulation: string; father: string; mother: string }
 

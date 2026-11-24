@@ -22,7 +22,12 @@ function renderPage(path = '/jobs') {
 
 describe('My jobs', () => {
   beforeEach(() => {
-    mockApi([[/^\/api\/(jobs|p)\/[\w-]+$/, (u) => [200, u.pathname.endsWith('aaaa1111bbbb2222') ? { state: 'done', stage: 'done' } : { state: 'running', stage: 'modelling' }]]])
+    mockApi([
+      [/^\/api\/jobs\/states$/, (_u, init) => {
+        const asked: string[] = JSON.parse(String(init?.body)).jobs
+        return [200, { states: Object.fromEntries(asked.map((url) => [url, url.endsWith('aaaa1111bbbb2222') ? { state: 'done', stage: 'done' } : { state: 'running', stage: 'modelling' }])) }]
+      }],
+    ])
   })
   afterEach(() => {
     resetSync()
@@ -49,6 +54,17 @@ describe('My jobs', () => {
     expect(await within(rows[1]).findByText('done')).toBeInTheDocument()
     expect(within(rows[1]).getByText('GM12878 chr1:11.5-12.6 Mb')).toBeInTheDocument()
     expect(checkCopy(container)).toEqual([])
+  })
+
+  it('asks the states of every job of the list in one request', async () => {
+    rememberJob({ url: '/jobs/aaaa1111bbbb2222', label: 'GM12878 chr1:11.5-12.6 Mb', name: '', at: 1 })
+    rememberJob({ url: '/p/privatetoken123', label: 'H1ESC chr7:27.0-27.4 Mb', name: 'HOXA run', at: 2 })
+    renderPage()
+    await screen.findByText('running, modelling stage')
+    const fetched = vi.mocked(fetch).mock.calls.filter(([u]) => String(u).includes('/api/jobs/'))
+    expect(fetched).toHaveLength(1)
+    expect(String(fetched[0][0])).toContain('/api/jobs/states')
+    expect(JSON.parse(String(fetched[0][1]?.body)).jobs.sort()).toEqual(['/jobs/aaaa1111bbbb2222', '/p/privatetoken123'])
   })
 
   it('shows the empty state when storage throws', () => {

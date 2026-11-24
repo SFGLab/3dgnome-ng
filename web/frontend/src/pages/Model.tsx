@@ -245,8 +245,10 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
         <VariantsDialog
           catalog={catalog.data}
           cell={lookup}
-          region={region.data ?? null}
+          region={shownRegion ?? null}
           factors={form.factors}
+          maxSpan={maxSpan}
+          onRegion={(region) => set({ region })}
           mode={svDialog.mode}
           file={svDialog.file}
           upload={form.vcfUpload}

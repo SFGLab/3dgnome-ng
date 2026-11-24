@@ -94,6 +94,22 @@ def test_the_status_the_log_and_the_zip_of_a_job_from_disk(site: SimpleNamespace
     assert names == said["zip"], "the zip has the files it had: " + str(names)
 
 
+def test_the_states_of_a_list_of_jobs_come_in_one_answer(site: SimpleNamespace) -> None:
+    c, said = site.c, site.said
+    urls = [f"/jobs/{name}" for name in JOBS] + ["/jobs/absent0000000000", "/p/notoken", "elsewhere"]
+    states = c.post("/api/jobs/states", json={"jobs": urls}).json()["states"]
+    assert sorted(states) == sorted(urls), "every path asked has an answer: " + str(sorted(states))
+    for name in JOBS:
+        status = said[name]["status"]
+        want = {"state": status["state"], **({"stage": status["stage"]} if status.get("stage") else {})}
+        assert states[f"/jobs/{name}"] == want, f"the state of {name} is that of its status: {states[f'/jobs/{name}']}"
+    assert states["/jobs/absent0000000000"] is None, "a job the site does not have is null"
+    assert states["/p/notoken"] is None, "so is a private job it does not have"
+    assert states["elsewhere"] is None, "and a path that is no job"
+    assert c.post("/api/jobs/states", json={}).json() == {"states": {}}, "a body without jobs has no states"
+    assert c.post("/api/jobs/states", content=b"{").status_code == 400, "a body that is no JSON is refused"
+
+
 def test_a_file_of_a_job_from_disk_is_served(site: SimpleNamespace) -> None:
     c = site.c
     r = c.get("/jobs/with_variants/files/chr1_800000_2740000_s1.cif")
