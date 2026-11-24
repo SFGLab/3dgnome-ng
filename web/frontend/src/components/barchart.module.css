@@ -93,6 +93,12 @@
   color: var(--faint);
 }
 
+.bar-p {
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
 .chart-key {
   display: flex;
   flex-wrap: wrap;

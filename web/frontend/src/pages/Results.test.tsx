@@ -23,6 +23,11 @@ describe('Results page', () => {
     expect(values(screen.getByRole('figure', { name: 'Hi-C agreement at 10 kb' }))).toEqual(['0.24', '0.41', '0.47', '0.32', '0.16', '0.35', '0.37', '0.28', '0.18', '0.42', '0.46', '0.34'])
     expect(values(screen.getByRole('figure', { name: 'Hi-C agreement at 25 kb' }))).toEqual(['0.30', '0.49', '0.51', '0.41', '0.20', '0.43', '0.43', '0.38', '0.21', '0.51', '0.50', '0.44'])
     expect(screen.getByText(/is divided by the number of bead pairs of its two bins/)).toBeInTheDocument()
+    // A bar has the p value of its test against the bar of the chain of one bead per kilobase with CTCF loops, which has none.
+    const ps = (name: string) => within(screen.getByRole('figure', { name })).getAllByTestId('bar-p').map((el) => el.textContent)
+    expect(ps('Hi-C agreement at 25 kb')).toEqual(['p < 0.001', 'p = 0.036', 'p < 0.001', 'p < 0.001', 'p = 0.50', 'p < 0.001', 'p < 0.001', 'p = 0.52', 'p < 0.001'])
+    expect(ps('Hi-C agreement at 10 kb')[4]).toBe('p = 0.004')
+    expect(ps('Enhancer to promoter distance')).toEqual(['p < 0.001', 'p < 0.001', 'p < 0.001'])
   })
 
   it('shows the enhancer to promoter distances and the link to expression', () => {
@@ -100,8 +105,8 @@ describe('Results page', () => {
     const key = screen.getByRole('list', { name: 'Key' })
     expect(within(key).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'original models, cudaMMC',
-      '3D-GNOMEᴺᴳ, CTCF loops',
-      '3D-GNOMEᴺᴳ, CTCF and RNAPII loops',
+      '3D-GNOMEᴺᴳ, chain of one bead per kilobase, CTCF loops',
+      '3D-GNOMEᴺᴳ, chain of one bead per kilobase, CTCF and RNAPII loops',
       '3D-GNOMEᴺᴳ, chain of loop anchors, CTCF loops',
     ])
   })

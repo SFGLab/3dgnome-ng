@@ -5,39 +5,50 @@ import { ToolRuns, type ToolRun } from '../components/ToolRuns'
 import { hidden } from '../flags'
 import { ROUTES } from '../routes'
 import { scoped } from '../lib/css'
+import { pValue } from '../lib/pValue'
 import sheet from './results.module.css'
 
 const cn = scoped(sheet)
 
-const bar = (series: Bar['series'], value: number | null, digits = 2): Bar => ({
+/** Returns a bar. `p` is the p value of its test against the bar of 3D-GNOMEᴺᴳ with CTCF loops of the same group. */
+const bar = (series: Bar['series'], value: number | null, digits = 2, p?: number): Bar => ({
   series,
   value,
   label: value === null ? 'placeholder' : value.toFixed(digits),
+  p: p === undefined ? undefined : pValue(p),
 })
 
-/** Returns the bars of one cell line: the original models, the chain of one bead per kilobase with CTCF loops and with RNAPII loops added, the chain of loop anchors. */
-const agreement = (name: string, [original, ctcf, rnapii, anchors]: number[]): Group => ({
+/** A p value under 0.001, for a bar whose test gives one. */
+const LOW = 1e-4
+
+/**
+ * Returns the bars of one cell line: the original models, the chain of one bead per kilobase with CTCF loops and with RNAPII loops added, the chain of loop anchors.
+ * @param name the cell line
+ * @param values the four values
+ * @param rnapiiP the p value of the models with RNAPII loops against those with CTCF loops. The other two are under 0.001 at every resolution.
+ */
+const agreement = (name: string, [original, ctcf, rnapii, anchors]: number[], rnapiiP: number): Group => ({
   name,
-  bars: [bar('original', original), bar('ctcf', ctcf), bar('rnapii', rnapii), bar('anchors', anchors)],
+  bars: [bar('original', original, 2, LOW), bar('ctcf', ctcf), bar('rnapii', rnapii, 2, rnapiiP), bar('anchors', anchors, 2, LOW)],
 })
 
 /** The agreement with Hi-C per bead pair at each resolution in kilobases, for pairs up to 2 Mb apart. */
 const SCC: [number, Group[]][] = [
-  [5, [agreement('GM12878', [0.18, 0.32, 0.39, 0.25]), agreement('H1ESC', [0.11, 0.26, 0.29, 0.19]), agreement('HFFc6', [0.13, 0.34, 0.38, 0.26])]],
-  [10, [agreement('GM12878', [0.24, 0.41, 0.47, 0.32]), agreement('H1ESC', [0.16, 0.35, 0.37, 0.28]), agreement('HFFc6', [0.18, 0.42, 0.46, 0.34])]],
-  [25, [agreement('GM12878', [0.3, 0.49, 0.51, 0.41]), agreement('H1ESC', [0.2, 0.43, 0.43, 0.38]), agreement('HFFc6', [0.21, 0.51, 0.5, 0.44])]],
+  [5, [agreement('GM12878', [0.18, 0.32, 0.39, 0.25], LOW), agreement('H1ESC', [0.11, 0.26, 0.29, 0.19], LOW), agreement('HFFc6', [0.13, 0.34, 0.38, 0.26], LOW)]],
+  [10, [agreement('GM12878', [0.24, 0.41, 0.47, 0.32], LOW), agreement('H1ESC', [0.16, 0.35, 0.37, 0.28], 0.0042), agreement('HFFc6', [0.18, 0.42, 0.46, 0.34], LOW)]],
+  [25, [agreement('GM12878', [0.3, 0.49, 0.51, 0.41], 0.036), agreement('H1ESC', [0.2, 0.43, 0.43, 0.38], 0.5), agreement('HFFc6', [0.21, 0.51, 0.5, 0.44], 0.52)]],
 ]
 
 const DISTANCE: Group[] = [
-  { name: 'GM12878, 17% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.3, 1)] },
-  { name: 'H1ESC, 12% closer', bars: [bar('ctcf', 3.9, 1), bar('rnapii', 3.4, 1)] },
-  { name: 'HFFc6, 14% closer', bars: [bar('ctcf', 4.3, 1), bar('rnapii', 3.7, 1)] },
+  { name: 'GM12878, 17% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.3, 1, LOW)] },
+  { name: 'H1ESC, 12% closer', bars: [bar('ctcf', 3.9, 1), bar('rnapii', 3.4, 1, LOW)] },
+  { name: 'HFFc6, 14% closer', bars: [bar('ctcf', 4.3, 1), bar('rnapii', 3.7, 1, LOW)] },
 ]
 
 const EXPRESSION: Group[] = [
-  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.14), bar('ctcf', 0.23), bar('rnapii', 0.31)] },
-  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.13), bar('ctcf', 0.2), bar('rnapii', 0.24)] },
-  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14), bar('ctcf', 0.24), bar('rnapii', 0.28)] },
+  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.14, 2, LOW), bar('ctcf', 0.23), bar('rnapii', 0.31, 2, LOW)] },
+  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.13, 2, 0.0006), bar('ctcf', 0.2), bar('rnapii', 0.24, 2, LOW)] },
+  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14, 2, LOW), bar('ctcf', 0.24), bar('rnapii', 0.28, 2, 0.001)] },
 ]
 
 /** Returns the runs of the three tools on one task, each as beads and seconds. A null time is a run that did not finish. */
@@ -48,15 +59,15 @@ const runs = (cudammc: [number, number], multimm: [number, number | null], ours:
 ]
 
 const MICROC: Group[] = [
-  { name: 'GM12878, 25,783 loops', bars: [bar('original', 0.12), bar('ctcf', 0.26), bar('rnapii', 0.33)] },
-  { name: 'H1ESC, 10,046 loops', bars: [bar('original', 0.12), bar('ctcf', 0.39), bar('rnapii', 0.45)] },
-  { name: 'HFFc6, 19,192 loops', bars: [bar('original', 0.1), bar('ctcf', 0.44), bar('rnapii', 0.52)] },
+  { name: 'GM12878, 25,783 loops', bars: [bar('original', 0.12, 2, LOW), bar('ctcf', 0.26), bar('rnapii', 0.33, 2, LOW)] },
+  { name: 'H1ESC, 10,046 loops', bars: [bar('original', 0.12, 2, LOW), bar('ctcf', 0.39), bar('rnapii', 0.45, 2, LOW)] },
+  { name: 'HFFc6, 19,192 loops', bars: [bar('original', 0.1, 2, LOW), bar('ctcf', 0.44), bar('rnapii', 0.52, 2, LOW)] },
 ]
 
 const MICROC_RNAPII: Group[] = [
-  { name: 'GM12878, 2,130 loops', bars: [bar('ctcf', 0.14), bar('rnapii', 0.65)] },
-  { name: 'H1ESC, 586 loops', bars: [bar('ctcf', 0.19), bar('rnapii', 0.67)] },
-  { name: 'HFFc6, 1,318 loops', bars: [bar('ctcf', 0.24), bar('rnapii', 0.7)] },
+  { name: 'GM12878, 2,130 loops', bars: [bar('ctcf', 0.14), bar('rnapii', 0.65, 2, LOW)] },
+  { name: 'H1ESC, 586 loops', bars: [bar('ctcf', 0.19), bar('rnapii', 0.67, 2, LOW)] },
+  { name: 'HFFc6, 1,318 loops', bars: [bar('ctcf', 0.24), bar('rnapii', 0.7, 2, LOW)] },
 ]
 
 const TOOLS_MICROC: Group[] = [
@@ -171,7 +182,7 @@ export function Results() {
         With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with Hi-C is higher at 5 kb and at 10 kb in every cell line, 0.39 against 0.32 for GM12878 at 5 kb. At 25 kb it is higher for GM12878 and does not change for the other two cell lines. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart and lower for pairs 100 to 500 kb apart on all three cell lines.
       </p>
       <p className={cn('reading-note')}>
-        Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line and at every resolution, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. The chain of one bead per kilobase is higher than the chain of loop anchors on each of the 22 chromosomes of every cell line at every resolution, p &lt; 0.001 in the same test. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p of 0.001 or lower in a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
+        The p value beside a bar is that of the difference between the bar and the bar of 3D-GNOMEᴺᴳ with CTCF loops in the same group. Every test is two sided. Agreement with Hi-C is tested with a Wilcoxon signed rank test over the 22 chromosomes. The new models agree better with Hi-C than the original models on every cell line and at every resolution. The chain of one bead per kilobase agrees better than the chain of loop anchors on each of the 22 chromosomes of every cell line at every resolution. The enhancer to promoter distance is tested with a signed rank test over the pairs. The link to expression is tested with a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
       </p>
       <section id="microc">
         <h2>Micro-C loops</h2>
