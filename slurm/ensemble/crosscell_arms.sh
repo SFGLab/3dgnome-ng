@@ -14,12 +14,20 @@
 #     --mem=96G --cpus-per-task=16 slurm/ensemble/crosscell_arms.sh
 #
 # ARMS is the list of arms, C R M by default. With n arms, task i runs line i / n of GM12878 H1ESC
-# HFFC6 and arm i % n. With SPLIT=1 it runs line and arm i % 3n on chromosome i / 3n of CHROMS. A
+# HFFC6 and arm i % n. With SPLIT=1 and m lines it runs line and arm i % mn on chromosome i / mn of
+# CHROMS. A
 # member whose .cif exists is skipped. After chr1 the arm is sliced to chr1:1-60000000. The inputs
 # come from playground/rnapii/crosscell_prep.py and the configs from
 # slurm/ensemble/crosscell_configs.py. UC and UR are C and R on the uniform chain. They read half a
 # of the deep map of the line, data/_hic_half/a/<LINE>.mcool of playground/thin_cooler.py. UCN and
 # URN are UC and UR without the loop dropout.
+#
+# CELLS is the list of cell lines, GM12878 H1ESC HFFC6 by default. The nine people of the trios
+# run the arms UC and UR of crosscell_configs.py --trios, 9 people by 2 arms by 22 chromosomes:
+#
+#   CELLS="HG00512 HG00513 HG00514 HG00731 HG00732 HG00733 GM19238 GM19239 GM19240" ARMS="UC UR" \
+#     OUT=out/xt SPLIT=1 CHROMS="chr1 ... chr22" sbatch -A <account> --array=0-395%24 --mem=96G \
+#     --cpus-per-task=16 slurm/ensemble/crosscell_arms.sh
 
 #SBATCH --job-name=xc_rnapii
 #SBATCH --nodes=1
@@ -44,10 +52,10 @@ N="${N:-10}"
 DRY="${DRY:-0}"
 SPLIT="${SPLIT:-0}"
 
-LINES=(GM12878 H1ESC HFFC6)
+read -r -a LINES <<< "${CELLS:-GM12878 H1ESC HFFC6}"
 read -r -a ARMS <<< "${ARMS:-C R M}"
 NARMS=${#ARMS[@]}
-NCOMBO=$((3 * NARMS))
+NCOMBO=$((${#LINES[@]} * NARMS))
 TASK="${SLURM_ARRAY_TASK_ID:-0}"
 COMBO="$TASK"
 if [ "$SPLIT" = "1" ]; then
