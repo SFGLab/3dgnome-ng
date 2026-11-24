@@ -101,6 +101,9 @@ the genes, the loops and the two tables of the comparison, are saved whole as CS
 The tab opens with the Hi-C of the cell type above and the contacts of the structures within the median bond
 below, on a linear colour scale. Each half has its own range from zero to the 99th percentile of its nonzero
 values. The log scale and the map of 1/(d+1)³ are choices of the card. The picture of the contacts example of
-the title page, `src/assets/contacts.png`, is the tab as it opens on the job of the example:
-`web/design/render_contacts.py` draws it from the answer of `/api/jobs/<key>/contacts`.
+the title page, `src/assets/contacts.png`, is the tab on the job of the example with Log scale ticked, the one
+place that keeps the log scale: on the linear scale a tile shows the diagonal alone.
+`web/design/render_contacts.py --log` draws it from the answer of `/api/jobs/<key>/contacts`, without the bins
+at the two ends that hold no contacts. The tile shows the map whole, `object-fit: contain`, with the diagonal
+from corner to corner.
 

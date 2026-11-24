@@ -254,6 +254,11 @@
   object-fit: cover;
 }
 
+/* A contact map is shown whole, its diagonal from corner to corner. */
+.example img.map {
+  object-fit: contain;
+}
+
 /* The first example, two drawings of one locus side by side on one scale. */
 .example.story {
   grid-column: span 2;

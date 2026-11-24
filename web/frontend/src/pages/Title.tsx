@@ -194,7 +194,7 @@ export function Title() {
             </span>
           </button>
           <button type="button" className={cn('example')} disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'contacts')!)}>
-            <img src={contacts} alt="" />
+            <img className={cn('map')} src={contacts} alt="" />
             <span className={cn('example-title')}>Contacts against Hi-C</span>
             <span className={cn('example-detail')}>{busy === 'contacts' ? 'Opening the job' : 'GM12878, chr1:20-25 Mb'}</span>
           </button>
