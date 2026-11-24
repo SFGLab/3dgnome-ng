@@ -254,9 +254,9 @@
   object-fit: cover;
 }
 
-/* A contact map fills its tile, its diagonal from corner to corner at any width of the tile. */
+/* A contact map is square, as wide as its tile and placed at the top. The tile cuts its bottom. */
 .example img.map {
-  object-fit: fill;
+  object-position: top;
 }
 
 /* The first example, two drawings of one locus side by side on one scale. */
