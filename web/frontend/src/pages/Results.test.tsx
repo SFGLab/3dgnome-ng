@@ -25,9 +25,9 @@ describe('Results page', () => {
     expect(screen.getByText(/is divided by the number of bead pairs of its two bins/)).toBeInTheDocument()
     // A bar has the p value of its test against the bar of the chain of one bead per kilobase with CTCF loops, which has none.
     const ps = (name: string) => within(screen.getByRole('figure', { name })).getAllByTestId('bar-p').map((el) => el.textContent)
-    expect(ps('Hi-C agreement at 25 kb')).toEqual(['p < 0.001', 'p = 0.036', 'p < 0.001', 'p < 0.001', 'p = 0.50', 'p < 0.001', 'p < 0.001', 'p = 0.52', 'p < 0.001'])
-    expect(ps('Hi-C agreement at 10 kb')[4]).toBe('p = 0.004')
-    expect(ps('Enhancer to promoter distance')).toEqual(['p < 0.001', 'p < 0.001', 'p < 0.001'])
+    expect(ps('Hi-C agreement at 25 kb')).toEqual(['p < 0.001', 'reference', 'p = 0.036', 'p < 0.001', 'p < 0.001', 'reference', 'p = 0.50', 'p < 0.001', 'p < 0.001', 'reference', 'p = 0.52', 'p < 0.001'])
+    expect(ps('Hi-C agreement at 10 kb')[6]).toBe('p = 0.004')
+    expect(ps('Enhancer to promoter distance')).toEqual(['reference', 'p < 0.001', 'reference', 'p < 0.001', 'reference', 'p < 0.001'])
   })
 
   it('shows the enhancer to promoter distances and the link to expression', () => {
@@ -80,8 +80,8 @@ describe('Results page', () => {
     const runs = screen.getByRole('figure', { name: 'Comparison over 21 runs' })
     expect(within(runs).getByText('21 of 21')).toBeInTheDocument()
     expect(within(runs).getByText('6 of 21')).toBeInTheDocument()
-    expect(within(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' })).getAllByTestId('bar-p').map((el) => el.textContent)).toEqual(['p < 0.001', 'p = 0.21', 'p < 0.001', 'p < 0.001', 'p < 0.001', 'p < 0.001'])
-    expect(within(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' })).getAllByTestId('bar-p').map((el) => el.textContent)).toEqual(Array(6).fill('p < 0.002'))
+    expect(within(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' })).getAllByTestId('bar-p').map((el) => el.textContent)).toEqual(['p < 0.001', 'p = 0.21', 'reference', 'p < 0.001', 'p < 0.001', 'reference', 'p < 0.001', 'p < 0.001', 'reference'])
+    expect(within(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' })).getAllByTestId('bar-p').map((el) => el.textContent)).toEqual(['p < 0.002', 'p < 0.002', 'reference', 'p < 0.002', 'p < 0.002', 'reference', 'p < 0.002', 'p < 0.002', 'reference'])
   })
 
   it('shows the share of Micro-C loops placed, for the model sets and for the three tools', () => {

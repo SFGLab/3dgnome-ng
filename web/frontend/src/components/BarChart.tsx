@@ -6,7 +6,7 @@ const cn = scoped(sheet)
 
 
 export type Series = 'original' | 'ctcf' | 'rnapii' | 'anchors' | 'cudammc' | 'multimm'
-/** A bar. `p` is the p value of the test of the bar against the reference bar of its group, as text. */
+/** A bar. `p` is the p value of the test of the bar against the reference bar of its group, as text, and the word reference on that bar. */
 export type Bar = { series: Series; value: number | null; label: string; p?: string }
 export type Group = { name: string; bars: Bar[] }
 

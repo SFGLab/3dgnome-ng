@@ -18,6 +18,10 @@ step `resolutions` of `playground/rnapii/readouts_crossline_genome.sh`. SCC agai
 pairs up to 2 Mb apart, mean over the chromosomes by length. The tables per chromosome are in
 `data/figures/redo-2026-11-23/genome_pair/`, outside git.
 
+The figures state the same score since 2026-11-24. `playground/rnapii/redo_merge.py` with the folder of the
+step `resolutions` gives them the rows per bead pair, figure 1c and panels a and e of the supplement, and the
+line under each figure says so.
+
 | line | resolution | cudaMMC | uniform, CTCF | uniform, CTCF and RNAPII | loop anchors, CTCF |
 |---|---|---|---|---|---|
 | GM12878 | 5 kb | 0.183 | 0.322 | 0.392 | 0.246 |

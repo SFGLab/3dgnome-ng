@@ -21,6 +21,9 @@ const bar = (series: Bar['series'], value: number | null, digits = 2, p?: number
 /** A p value under 0.001, for a bar whose test gives one. */
 const LOW = 1e-4
 
+/** Returns the bar that the other bars of its group are tested against. */
+const ref = (series: Bar['series'], value: number, digits = 2): Bar => ({ ...bar(series, value, digits), p: 'reference' })
+
 /**
  * Returns the bars of one cell line: the original models, the chain of one bead per kilobase with CTCF loops and with RNAPII loops added, the chain of loop anchors.
  * @param name the cell line
@@ -29,7 +32,7 @@ const LOW = 1e-4
  */
 const agreement = (name: string, [original, ctcf, rnapii, anchors]: number[], rnapiiP: number): Group => ({
   name,
-  bars: [bar('original', original, 2, LOW), bar('ctcf', ctcf), bar('rnapii', rnapii, 2, rnapiiP), bar('anchors', anchors, 2, LOW)],
+  bars: [bar('original', original, 2, LOW), ref('ctcf', ctcf), bar('rnapii', rnapii, 2, rnapiiP), bar('anchors', anchors, 2, LOW)],
 })
 
 /** The agreement with Hi-C per bead pair at each resolution in kilobases, for pairs up to 2 Mb apart. */
@@ -40,15 +43,15 @@ const SCC: [number, Group[]][] = [
 ]
 
 const DISTANCE: Group[] = [
-  { name: 'GM12878, 17% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.3, 1, LOW)] },
-  { name: 'H1ESC, 12% closer', bars: [bar('ctcf', 3.9, 1), bar('rnapii', 3.4, 1, LOW)] },
-  { name: 'HFFc6, 14% closer', bars: [bar('ctcf', 4.3, 1), bar('rnapii', 3.7, 1, LOW)] },
+  { name: 'GM12878, 17% closer', bars: [ref('ctcf', 4.0, 1), bar('rnapii', 3.3, 1, LOW)] },
+  { name: 'H1ESC, 12% closer', bars: [ref('ctcf', 3.9, 1), bar('rnapii', 3.4, 1, LOW)] },
+  { name: 'HFFc6, 14% closer', bars: [ref('ctcf', 4.3, 1), bar('rnapii', 3.7, 1, LOW)] },
 ]
 
 const EXPRESSION: Group[] = [
-  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.14, 2, LOW), bar('ctcf', 0.23), bar('rnapii', 0.31, 2, LOW)] },
-  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.13, 2, 0.0006), bar('ctcf', 0.2), bar('rnapii', 0.24, 2, LOW)] },
-  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14, 2, LOW), bar('ctcf', 0.24), bar('rnapii', 0.28, 2, 0.001)] },
+  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.14, 2, LOW), ref('ctcf', 0.23), bar('rnapii', 0.31, 2, LOW)] },
+  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.13, 2, 0.0006), ref('ctcf', 0.2), bar('rnapii', 0.24, 2, LOW)] },
+  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14, 2, LOW), ref('ctcf', 0.24), bar('rnapii', 0.28, 2, 0.001)] },
 ]
 
 /** Returns the runs of the three tools on one task, each as beads and seconds. A null time is a run that did not finish. */
@@ -59,36 +62,36 @@ const runs = (cudammc: [number, number], multimm: [number, number | null], ours:
 ]
 
 const MICROC: Group[] = [
-  { name: 'GM12878, 25,783 loops', bars: [bar('original', 0.12, 2, LOW), bar('ctcf', 0.26), bar('rnapii', 0.33, 2, LOW)] },
-  { name: 'H1ESC, 10,046 loops', bars: [bar('original', 0.12, 2, LOW), bar('ctcf', 0.39), bar('rnapii', 0.45, 2, LOW)] },
-  { name: 'HFFc6, 19,192 loops', bars: [bar('original', 0.1, 2, LOW), bar('ctcf', 0.44), bar('rnapii', 0.52, 2, LOW)] },
+  { name: 'GM12878, 25,783 loops', bars: [bar('original', 0.12, 2, LOW), ref('ctcf', 0.26), bar('rnapii', 0.33, 2, LOW)] },
+  { name: 'H1ESC, 10,046 loops', bars: [bar('original', 0.12, 2, LOW), ref('ctcf', 0.39), bar('rnapii', 0.45, 2, LOW)] },
+  { name: 'HFFc6, 19,192 loops', bars: [bar('original', 0.1, 2, LOW), ref('ctcf', 0.44), bar('rnapii', 0.52, 2, LOW)] },
 ]
 
 const MICROC_RNAPII: Group[] = [
-  { name: 'GM12878, 2,130 loops', bars: [bar('ctcf', 0.14), bar('rnapii', 0.65, 2, LOW)] },
-  { name: 'H1ESC, 586 loops', bars: [bar('ctcf', 0.19), bar('rnapii', 0.67, 2, LOW)] },
-  { name: 'HFFc6, 1,318 loops', bars: [bar('ctcf', 0.24), bar('rnapii', 0.7, 2, LOW)] },
+  { name: 'GM12878, 2,130 loops', bars: [ref('ctcf', 0.14), bar('rnapii', 0.65, 2, LOW)] },
+  { name: 'H1ESC, 586 loops', bars: [ref('ctcf', 0.19), bar('rnapii', 0.67, 2, LOW)] },
+  { name: 'HFFc6, 1,318 loops', bars: [ref('ctcf', 0.24), bar('rnapii', 0.7, 2, LOW)] },
 ]
 
 const TOOLS_MICROC: Group[] = [
-  { name: 'GM12878, 902 loops', bars: [bar('cudammc', 0.14, 2, LOW), bar('multimm', 0.25, 2, 0.21), bar('ctcf', 0.29)] },
-  { name: 'H1ESC, 385 loops', bars: [bar('cudammc', 0.21, 2, LOW), bar('multimm', 0.16, 2, LOW), bar('ctcf', 0.53)] },
-  { name: 'HFFc6, 639 loops', bars: [bar('cudammc', 0.16, 2, LOW), bar('multimm', 0.15, 2, LOW), bar('ctcf', 0.51)] },
+  { name: 'GM12878, 902 loops', bars: [bar('cudammc', 0.14, 2, LOW), bar('multimm', 0.25, 2, 0.21), ref('ctcf', 0.29)] },
+  { name: 'H1ESC, 385 loops', bars: [bar('cudammc', 0.21, 2, LOW), bar('multimm', 0.16, 2, LOW), ref('ctcf', 0.53)] },
+  { name: 'HFFc6, 639 loops', bars: [bar('cudammc', 0.16, 2, LOW), bar('multimm', 0.15, 2, LOW), ref('ctcf', 0.51)] },
 ]
 
 const TOOLS_MICROC_BEADS: Group[] = [
-  { name: 'GM12878', bars: [bar('cudammc', 0.25, 2, LOW), bar('multimm', 1.0, 2, LOW), bar('ctcf', 0.98)] },
-  { name: 'H1ESC', bars: [bar('cudammc', 0.26, 2, LOW), bar('multimm', 1.0, 2, LOW), bar('ctcf', 0.95)] },
-  { name: 'HFFc6', bars: [bar('cudammc', 0.22, 2, LOW), bar('multimm', 1.0, 2, LOW), bar('ctcf', 0.97)] },
+  { name: 'GM12878', bars: [bar('cudammc', 0.25, 2, LOW), bar('multimm', 1.0, 2, LOW), ref('ctcf', 0.98)] },
+  { name: 'H1ESC', bars: [bar('cudammc', 0.26, 2, LOW), bar('multimm', 1.0, 2, LOW), ref('ctcf', 0.95)] },
+  { name: 'HFFc6', bars: [bar('cudammc', 0.22, 2, LOW), bar('multimm', 1.0, 2, LOW), ref('ctcf', 0.97)] },
 ]
 
 /** Returns the bar of another tool. Its bootstrap of 1,000 resamples has no resample with the tool ahead, a p value under 0.002. */
 const tool = (series: Bar['series'], value: number): Bar => ({ ...bar(series, value), p: pValue(0.001, 0.002) })
 
 const TOOLS_SCC: Group[] = [
-  { name: 'GM12878', bars: [tool('cudammc', 0.27), tool('multimm', 0.3), bar('ctcf', 0.47)] },
-  { name: 'H1ESC', bars: [tool('cudammc', 0.17), tool('multimm', 0.16), bar('ctcf', 0.35)] },
-  { name: 'HFFc6', bars: [tool('cudammc', 0.2), tool('multimm', 0.18), bar('ctcf', 0.45)] },
+  { name: 'GM12878', bars: [tool('cudammc', 0.27), tool('multimm', 0.3), ref('ctcf', 0.47)] },
+  { name: 'H1ESC', bars: [tool('cudammc', 0.17), tool('multimm', 0.16), ref('ctcf', 0.35)] },
+  { name: 'HFFc6', bars: [tool('cudammc', 0.2), tool('multimm', 0.18), ref('ctcf', 0.45)] },
 ]
 
 const RUN_TIME: [string, string, 'seconds' | 'minutes', ToolRun[]][] = [
@@ -185,7 +188,7 @@ export function Results() {
         With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with Hi-C is higher at 5 kb and at 10 kb in every cell line, 0.39 against 0.32 for GM12878 at 5 kb. At 25 kb it is higher for GM12878 and does not change for the other two cell lines. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart and lower for pairs 100 to 500 kb apart on all three cell lines.
       </p>
       <p className={cn('reading-note')}>
-        The p value beside a bar is that of the difference between the bar and the bar of 3D-GNOMEᴺᴳ with CTCF loops in the same group. Every test is two sided. Agreement with Hi-C is tested with a Wilcoxon signed rank test over the 22 chromosomes. The new models agree better with Hi-C than the original models on every cell line and at every resolution. The chain of one bead per kilobase agrees better than the chain of loop anchors on each of the 22 chromosomes of every cell line at every resolution. The enhancer to promoter distance is tested with a signed rank test over the pairs. The link to expression is tested with a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
+        The p value beside a bar is that of the difference between the bar and the bar marked reference in the same group, the chain of one bead per kilobase with CTCF loops. Every test is two sided. Agreement with Hi-C is tested with a Wilcoxon signed rank test over the 22 chromosomes. The new models agree better with Hi-C than the original models on every cell line and at every resolution. The chain of one bead per kilobase agrees better than the chain of loop anchors on each of the 22 chromosomes of every cell line at every resolution. The enhancer to promoter distance is tested with a signed rank test over the pairs. The link to expression is tested with a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
       </p>
       <section id="microc">
         <h2>Micro-C loops</h2>
@@ -258,7 +261,7 @@ export function Results() {
           cudaMMC has beads at both ends of about a quarter of the Micro-C loops and this limits the share it places. MultiMM has beads at every loop. It places nearly as many loops as 3D-GNOMEᴺᴳ on GM12878 and a third as many on the other two cell lines. The share of loops placed is tested by 10,000 resamples of the loops and of the moved loops. The share of loops with beads is tested with an exact sign test over the loops.
         </p>
         <p className={cn('reading-note')}>
-          The p value beside the bar of a tool is that of its difference from 3D-GNOMEᴺᴳ in a paired block bootstrap, which resamples the bins of the region 1,000 times. A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ has the higher value against cudaMMC in eight and against MultiMM in seven. By the interval it is better than cudaMMC in four and better than MultiMM in one. On chr1:1-60 Mb it is better than both tools in every cell line.
+          The p value beside the bar of a tool is that of its difference from 3D-GNOMEᴺᴳ, the bar marked reference. For the agreement with Hi-C it is from a paired block bootstrap, which resamples the bins of the region 1,000 times. A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ has the higher value against cudaMMC in eight and against MultiMM in seven. By the interval it is better than cudaMMC in four and better than MultiMM in one. On chr1:1-60 Mb it is better than both tools in every cell line.
         </p>
       </section>
       <section id="runtime">

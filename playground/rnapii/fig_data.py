@@ -46,13 +46,18 @@ def agreement(readouts: Path) -> pd.DataFrame:
 
     Returns columns line, arm, measure and value. `hic` is the stratum adjusted correlation of
     the summed map in `<LINE>_pooled.txt`, or of `<LINE>_battery.json` for a line without that
-    file. `microc` is the 5 kb correlation of `<LINE>_microc.json`. `microc_loops` is the share
+    file. With `hic_per_bead_pair.tsv` of `redo_merge.py` it is the correlation of the contacts per
+    bead pair of that file. `microc` is the 5 kb correlation of `<LINE>_microc.json`. `microc_loops` is the share
     of Micro-C loops placed above the moved loops, from `<LINE>_microc_loops.json`. A line
     without a Micro-C file has no rows of that measure.
     """
     rows = []
     pooled = {p.name.removesuffix("_pooled.txt") for p in readouts.glob("*_pooled.txt")}
-    for path in sorted(readouts.glob("*_pooled.txt")):
+    per_pair = readouts / "hic_per_bead_pair.tsv"
+    if per_pair.is_file():
+        for r in pd.read_csv(per_pair, sep="\t").itertuples():
+            rows.append({"line": r.line, "arm": r.arm, "measure": "hic", "value": float(r.value)})
+    for path in [] if per_pair.is_file() else sorted(readouts.glob("*_pooled.txt")):
         for ln in path.read_text().splitlines():
             f = ln.split()
             m = _ARM.match(f[0]) if f else None
