@@ -254,9 +254,9 @@
   object-fit: cover;
 }
 
-/* A contact map is shown whole, its diagonal from corner to corner. */
+/* A contact map fills its tile, its diagonal from corner to corner at any width of the tile. */
 .example img.map {
-  object-fit: contain;
+  object-fit: fill;
 }
 
 /* The first example, two drawings of one locus side by side on one scale. */

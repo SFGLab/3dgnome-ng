@@ -104,6 +104,6 @@ values. The log scale and the map of 1/(d+1)³ are choices of the card. The pict
 the title page, `src/assets/contacts.png`, is the tab on the job of the example with Log scale ticked, the one
 place that keeps the log scale: on the linear scale a tile shows the diagonal alone.
 `web/design/render_contacts.py --log` draws it from the answer of `/api/jobs/<key>/contacts`, without the bins
-at the two ends that hold no contacts. The tile shows the map whole, `object-fit: contain`, with the diagonal
-from corner to corner.
+at the two ends that hold no contacts. The tile is filled by the map, `object-fit: fill`, with the diagonal
+from corner to corner at any width of the tile. A bin is then wider than tall.
 
