@@ -269,6 +269,24 @@ The paired block bootstrap over the 21 runs, leads by the 95 percent interval:
 | balanced SCC, mapped bins | MultiMM | 5 | 7 | 3 and 5 |
 | balanced SCC, mapped bins | cudaMMC | 9 | 9 | 5 and 9 |
 
+The same bootstrap with the contacts per bead pair, `bootstrap_pair.txt` of 2026-11-24, the score of the
+Results page since that day. `playground/ensemble_bootstrap.py` divides the count of a cell by the product of
+the bead counts of its two bins and prints a two sided p value.
+
+| Runs | against | higher value | better by the interval |
+|---|---|---|---|
+| 5 Mb, 9 runs | MultiMM | 9 | 2 |
+| 5 Mb, 9 runs | cudaMMC | 9 | 6 |
+| 20 Mb, 9 runs | MultiMM | 7 | 1 |
+| 20 Mb, 9 runs | cudaMMC | 8 | 4 |
+| chr1 1 to 60 Mb, three structures, 3 runs | MultiMM | 3 | 3 |
+| chr1 1 to 60 Mb, three structures, 3 runs | cudaMMC | 3 | 3 |
+
+Over the 21 runs the uniform chain is better than MultiMM in 6 and better than cudaMMC in 13 by the interval.
+No run is lost to another tool. On chr1 1 to 60 Mb at ten structures the SCC per bead pair is 0.472, 0.349 and
+0.454 for GM12878, H1ESC and HFFC6. cudaMMC has 0.269, 0.171 and 0.204 and MultiMM 0.297, 0.163 and 0.180. No
+resample of 1,000 has another tool ahead, p under 0.002.
+
 The last column is the first measurement, scored against the whole map. No run is lost to another
 tool on any score. On the 20 Mb runs the raw SCC of the uniform chain is
 0.32 to 0.48, where the chain of loop anchors had 0.39 to 0.61, and its point value is above both

@@ -76,10 +76,11 @@ describe('Results page', () => {
 
   it('compares the three tools on Hi-C and counts the runs with intervals', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' }))).toEqual(['0.22', '0.30', '0.48', '0.14', '0.16', '0.35', '0.15', '0.18', '0.47'])
+    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' }))).toEqual(['0.27', '0.30', '0.47', '0.17', '0.16', '0.35', '0.20', '0.18', '0.45'])
     const runs = screen.getByRole('figure', { name: 'Comparison over 21 runs' })
     expect(within(runs).getByText('21 of 21')).toBeInTheDocument()
-    expect(within(runs).getByText('7 of 21')).toBeInTheDocument()
+    expect(within(runs).getByText('6 of 21')).toBeInTheDocument()
+    expect(within(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' })).getAllByTestId('bar-p').map((el) => el.textContent)).toEqual(Array(6).fill('p < 0.002'))
   })
 
   it('shows the share of Micro-C loops placed, for the model sets and for the three tools', () => {

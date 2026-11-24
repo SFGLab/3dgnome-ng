@@ -82,10 +82,13 @@ const TOOLS_MICROC_BEADS: Group[] = [
   { name: 'HFFc6', bars: [bar('cudammc', 0.22), bar('multimm', 1.0), bar('ctcf', 0.97)] },
 ]
 
+/** Returns the bar of another tool. Its bootstrap of 1,000 resamples has no resample with the tool ahead, a p value under 0.002. */
+const tool = (series: Bar['series'], value: number): Bar => ({ ...bar(series, value), p: pValue(0.001, 0.002) })
+
 const TOOLS_SCC: Group[] = [
-  { name: 'GM12878', bars: [bar('cudammc', 0.22), bar('multimm', 0.3), bar('ctcf', 0.48)] },
-  { name: 'H1ESC', bars: [bar('cudammc', 0.14), bar('multimm', 0.16), bar('ctcf', 0.35)] },
-  { name: 'HFFc6', bars: [bar('cudammc', 0.15), bar('multimm', 0.18), bar('ctcf', 0.47)] },
+  { name: 'GM12878', bars: [tool('cudammc', 0.27), tool('multimm', 0.3), bar('ctcf', 0.47)] },
+  { name: 'H1ESC', bars: [tool('cudammc', 0.17), tool('multimm', 0.16), bar('ctcf', 0.35)] },
+  { name: 'HFFc6', bars: [tool('cudammc', 0.2), tool('multimm', 0.18), bar('ctcf', 0.45)] },
 ]
 
 const RUN_TIME: [string, string, 'seconds' | 'minutes', ToolRun[]][] = [
@@ -217,7 +220,7 @@ export function Results() {
           <div>
             <BarChart
               title="Agreement with Hi-C, three tools"
-              subtitle="The stratum adjusted correlation with the Hi-C map at 25 kb, on chr1:1-60 Mb. The contact map of a model is the sum of the contacts of its ten structures."
+              subtitle="The stratum adjusted correlation with the Hi-C map at 25 kb, on chr1:1-60 Mb. The contact map of a model is the sum of the contacts of its ten structures. Contacts are counted per pair of beads."
               better="higher"
               groups={TOOLS_SCC}
             />
@@ -225,15 +228,15 @@ export function Results() {
           <figure className="bar-chart" aria-label="Comparison over 21 runs">
             <figcaption>
               <span className="chart-title">Comparison over 21 runs</span>
-              <span className="chart-sub">Each of the three cell lines was modelled on three regions of 5 Mb, three regions of 20 Mb and chr1:1-60 Mb. A tool counts as better in a run when the 95% bootstrap interval of the difference does not include zero.</span>
+              <span className="chart-sub">Each of the three cell lines was modelled on three regions of 5 Mb, three regions of 20 Mb and chr1:1-60 Mb. A tool counts as better in a run when the 95% bootstrap interval of the difference does not include zero. The stratum adjusted correlation counts contacts per pair of beads.</span>
             </figcaption>
             <div className={cn('stat')}>
               <span className={cn('stat-value')}>21 of 21</span>
               <span className={cn('stat-label')}>runs with a higher Pearson correlation and a higher rank correlation with Hi-C for 3D-GNOMEᴺᴳ than for both other tools</span>
             </div>
             <div className={cn('stat')}>
-              <span className={cn('stat-value')}>7 of 21</span>
-              <span className={cn('stat-label')}>runs with a higher stratum adjusted correlation for 3D-GNOMEᴺᴳ than for MultiMM. The count against cudaMMC is 12 of 21. Neither tool is better than 3D-GNOMEᴺᴳ in any run.</span>
+              <span className={cn('stat-value')}>6 of 21</span>
+              <span className={cn('stat-label')}>runs with a higher stratum adjusted correlation for 3D-GNOMEᴺᴳ than for MultiMM. The count against cudaMMC is 13 of 21. Neither tool is better than 3D-GNOMEᴺᴳ in any run.</span>
             </div>
           </figure>
         </div>
@@ -255,7 +258,7 @@ export function Results() {
           cudaMMC has beads at both ends of about a quarter of the Micro-C loops and this limits the share it places. MultiMM has beads at every loop. It places nearly as many loops as 3D-GNOMEᴺᴳ on GM12878 and a third as many on the other two cell lines.
         </p>
         <p className={cn('reading-note')}>
-          A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ has the higher value against both tools in all nine. By the interval it is better than cudaMMC in five and better than MultiMM in two. On chr1:1-60 Mb it is better than both tools in every cell line.
+          The p value beside the bar of a tool is that of its difference from 3D-GNOMEᴺᴳ in a paired block bootstrap, which resamples the bins of the region 1,000 times. A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ has the higher value against cudaMMC in eight and against MultiMM in seven. By the interval it is better than cudaMMC in four and better than MultiMM in one. On chr1:1-60 Mb it is better than both tools in every cell line.
         </p>
       </section>
       <section id="runtime">
