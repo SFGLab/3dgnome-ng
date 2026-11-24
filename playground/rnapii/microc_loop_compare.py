@@ -31,7 +31,9 @@ over its controls, the excess over the square root of the control mean. The call
 pass thousands of pixels of about ten reads on a deep map, and those do not show in the Hi-C
 map of the same cells. `loops_in_map.py` is the check, numbers in `design/microc-loops.md`.
 
-Prints one row per arm and class and writes the rows and the per loop table to the JSON.
+Prints one row per arm and class and writes the rows and the per loop table to the JSON. The key
+`moved` of the JSON has the distance ratios of the moved loops per arm, which
+`microc_tools_test.py` resamples.
 """
 
 from __future__ import annotations
@@ -199,6 +201,7 @@ def main() -> None:
         ok = m & np.isfinite(ctl) & (ctl > 0)
         rows.append({"arm": "map", "class": c, "loops": int(m.sum()), "scored": int(ok.sum()), "contact_enrichment": float(cnt[ok].sum() / ctl[ok].sum())})
     per_loop: dict[str, list[float]] = {"start1": [e[0] for e in ends], "start2": [e[1] for e in ends], "map": map_enr[:real].tolist()}
+    per_moved: dict[str, list[float]] = {}
 
     ci, cj, inside = controls(i, j, n)
     for d in arms:
@@ -227,6 +230,7 @@ def main() -> None:
         ratio = np.where(seen > 0, dist / np.maximum(dctl, 1e-12), np.nan)
         name = Path(d).name
         per_loop[name] = ratio[:real].tolist()
+        per_moved[name] = ratio[~is_real].tolist()
         null = ratio[~is_real]
         null_placed = float((null <= CLOSER).sum() / max(len(null), 1))
         null = null[np.isfinite(null)]
@@ -259,7 +263,7 @@ def main() -> None:
             )
     for r in rows[: len(classes)]:
         print(f"  map {r['class']:<15} loops {r['loops']:>5} scored {r['scored']:>5}  contact {r['contact_enrichment']:6.2f}")
-    out.write_text(json.dumps({"binsize": b, "rows": rows, "loops": per_loop}, indent=1) + "\n")
+    out.write_text(json.dumps({"binsize": b, "rows": rows, "loops": per_loop, "moved": per_moved}, indent=1) + "\n")
 
 
 if __name__ == "__main__":
