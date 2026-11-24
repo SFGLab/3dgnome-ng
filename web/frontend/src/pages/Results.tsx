@@ -15,10 +15,17 @@ const bar = (series: Bar['series'], value: number | null, digits = 2): Bar => ({
   label: value === null ? 'placeholder' : value.toFixed(digits),
 })
 
-const SCC: Group[] = [
-  { name: 'GM12878', bars: [bar('original', 0.19), bar('ctcf', 0.49), bar('anchors', 0.52)] },
-  { name: 'H1ESC', bars: [bar('original', 0.13), bar('ctcf', 0.44), bar('anchors', 0.45)] },
-  { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.51), bar('anchors', 0.47)] },
+/** Returns the bars of one cell line: the original models, the chain of one bead per kilobase with CTCF loops and with RNAPII loops added, the chain of loop anchors. */
+const agreement = (name: string, [original, ctcf, rnapii, anchors]: number[]): Group => ({
+  name,
+  bars: [bar('original', original), bar('ctcf', ctcf), bar('rnapii', rnapii), bar('anchors', anchors)],
+})
+
+/** The agreement with Hi-C per bead pair at each resolution in kilobases, for pairs up to 2 Mb apart. */
+const SCC: [number, Group[]][] = [
+  [5, [agreement('GM12878', [0.18, 0.32, 0.39, 0.25]), agreement('H1ESC', [0.11, 0.26, 0.29, 0.19]), agreement('HFFc6', [0.13, 0.34, 0.38, 0.26])]],
+  [10, [agreement('GM12878', [0.24, 0.41, 0.47, 0.32]), agreement('H1ESC', [0.16, 0.35, 0.37, 0.28]), agreement('HFFc6', [0.18, 0.42, 0.46, 0.34])]],
+  [25, [agreement('GM12878', [0.3, 0.49, 0.51, 0.41]), agreement('H1ESC', [0.2, 0.43, 0.43, 0.38]), agreement('HFFc6', [0.21, 0.51, 0.5, 0.44])]],
 ]
 
 const DISTANCE: Group[] = [
@@ -121,15 +128,24 @@ export function Results() {
       }
     >
       <ChartKey series={['original', 'ctcf', 'rnapii', 'anchors']} />
+      <div id="agreement" className={cn('chart-row three')}>
+        {SCC.map(([kb, groups]) => (
+          <BarChart
+            key={kb}
+            title={`Hi-C agreement at ${kb} kb`}
+            subtitle={`The stratum adjusted correlation between the contact map of a model and the Hi-C map in bins of ${kb} kb, for pairs up to 2 Mb apart. Contacts are counted per pair of beads.`}
+            better="higher"
+            groups={groups}
+          />
+        ))}
+      </div>
+      <p className={cn('reading-note')}>
+        The contact map of a model is the sum of the contacts of its ten structures. The count of a cell of this map is divided by the number of bead pairs of its two bins. Without the division a bin with more beads has more contacts, wherever the beads are. Both chains have beads only on the stretches that loops cover. On these stretches the chain of one bead per kilobase has 25 beads in a bin of 25 kb. The chain of loop anchors has between 1 and 68 beads there, 14 in the median. It has more of them where Hi-C has more reads. The rank correlation between the number of beads of a bin and its Hi-C reads is 0.27 to 0.53 in the three cell lines for this chain and under 0.05 for the other. The undivided count of the chain of loop anchors therefore agrees with Hi-C through the number of beads alone. On GM12878 at 25 kb it scores 0.53 undivided and 0.41 per pair of beads. The chain of one bead per kilobase scores 0.50 and 0.49.
+      </p>
       <div className={cn('chart-row')}>
-        <div id="agreement">
-          <BarChart title="Agreement with Hi-C" subtitle="The stratum adjusted correlation between the contact map of a model and the Hi-C map, at 25 kb. The contact map of a model is the sum of the contacts of its ten structures. The chain of loop anchors is shown beside the chain of one bead per kilobase." better="higher" groups={SCC} />
-        </div>
         <div id="distance">
           <BarChart title="Enhancer to promoter distance" subtitle="The median 3D distance between an enhancer and its promoter, in bead units. Only the pairs joined by an RNAPII loop are counted." groups={DISTANCE} />
         </div>
-      </div>
-      <div className={cn('chart-row')}>
         <div id="expression">
           <BarChart
             title="Link to expression"
@@ -138,7 +154,9 @@ export function Results() {
             groups={EXPRESSION}
           />
         </div>
-        {trios && <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
+      </div>
+      {trios && <div className={cn('chart-row')}>
+        <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
           <figcaption>
             <span className="chart-title">Nine people, three trios</span>
             <span className="chart-sub">The change in the model of each person when RNAPII loops are added, measured against the Hi-C map of that person on chromosomes 1 to 22.</span>
@@ -147,13 +165,13 @@ export function Results() {
             <span className={cn('stat-value')}>9 of 9</span>
             <span className={cn('stat-label')}>people with more contact enrichment at RNAPII loops. The rise is 44 to 67% and the median is 53%.</span>
           </div>
-        </figure>}
-      </div>
+        </figure>
+      </div>}
       <p className={cn('reading-note')}>
-        With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is higher for GM12878, 0.51 against 0.49. It does not change for the other two cell lines. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart and lower for pairs 100 to 500 kb apart on all three cell lines.
+        With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with Hi-C is higher at 5 kb and at 10 kb in every cell line, 0.39 against 0.32 for GM12878 at 5 kb. At 25 kb it is higher for GM12878 and does not change for the other two cell lines. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart and lower for pairs 100 to 500 kb apart on all three cell lines.
       </p>
       <p className={cn('reading-note')}>
-        Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. Between the two chains the same test finds the chain of loop anchors higher for GM12878 with p = 0.01, the chain of one bead per kilobase higher for HFFc6 with p &lt; 0.001 and no difference for H1ESC. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p of 0.001 or lower in a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
+        Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line and at every resolution, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. The chain of one bead per kilobase is higher than the chain of loop anchors on each of the 22 chromosomes of every cell line at every resolution, p &lt; 0.001 in the same test. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p of 0.001 or lower in a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
       </p>
       <section id="microc">
         <h2>Micro-C loops</h2>

@@ -18,7 +18,11 @@ describe('Results page', () => {
   // The cell line charts hold the whole genome readouts of the redo of 2026-11-23, design/figures/redo-2026-11-23.
   it('shows the agreement with Hi-C of the original and the new models', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.19', '0.49', '0.52', '0.13', '0.44', '0.45', '0.15', '0.51', '0.47'])
+    // Agreement per pair of beads at three resolutions: original, CTCF, CTCF and RNAPII, loop anchors.
+    expect(values(screen.getByRole('figure', { name: 'Hi-C agreement at 5 kb' }))).toEqual(['0.18', '0.32', '0.39', '0.25', '0.11', '0.26', '0.29', '0.19', '0.13', '0.34', '0.38', '0.26'])
+    expect(values(screen.getByRole('figure', { name: 'Hi-C agreement at 10 kb' }))).toEqual(['0.24', '0.41', '0.47', '0.32', '0.16', '0.35', '0.37', '0.28', '0.18', '0.42', '0.46', '0.34'])
+    expect(values(screen.getByRole('figure', { name: 'Hi-C agreement at 25 kb' }))).toEqual(['0.30', '0.49', '0.51', '0.41', '0.20', '0.43', '0.43', '0.38', '0.21', '0.51', '0.50', '0.44'])
+    expect(screen.getByText(/is divided by the number of bead pairs of its two bins/)).toBeInTheDocument()
   })
 
   it('shows the enhancer to promoter distances and the link to expression', () => {
@@ -49,7 +53,7 @@ describe('Results page', () => {
     expect(cells(genome, 'rate-value')).toEqual(['4.1', '', '2.1'])
     expect(within(genome).getByTestId('bar-best').closest('tr')).toHaveTextContent('cudaMMC')
     expect(within(genome).getByTestId('rate-best').closest('tr')).toHaveTextContent('3D-GNOME')
-    expect(within(screen.getByRole('figure', { name: 'Agreement with Hi-C' })).getByTestId('better')).toHaveTextContent('↑ higher is better')
+    expect(within(screen.getByRole('figure', { name: 'Hi-C agreement at 25 kb' })).getByTestId('better')).toHaveTextContent('↑ higher is better')
     expect(within(screen.getByRole('figure', { name: 'One structure by bead count' })).getByTestId('better')).toHaveTextContent('↓ lower is better')
   })
 

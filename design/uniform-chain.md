@@ -2058,7 +2058,10 @@ chain without the loop dropout of the next section.
 | mean | | 0.505 | 0.424 | 0.415 | 0.228 | 0.416 | 0.406 | 0.225 | 0.348 | 0.338 |
 
 The plain raw SCC of a pooled map compares two chains with different beads per bin by their bead counts. The
-score of two such chains is the SCC per bead pair. The published panels still state the plain raw SCC.
+score of two such chains is the SCC per bead pair. Since 2026-11-24 the Results page states it at 5, 10 and
+25 kb on the pairs up to 2 Mb apart, where the uniform chain is higher than the chain of loop anchors on 22 of
+22 chromosomes of every cell line. `design/figures/redo-2026-11-23/summary.md` has the table and the bead
+counts of the two chains over the genome.
 
 ### The uniform chain without the loop dropout
 

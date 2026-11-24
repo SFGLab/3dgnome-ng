@@ -10,7 +10,43 @@ and the tables of the tools are in `data/figures/redo-2026-11-23/`, outside git.
 Arms: the cudaMMC models of 3D-GNOME 3.0, the uniform chain with CTCF loops, the uniform chain with CTCF and
 RNAPII loops, the chain of loop anchors with CTCF loops.
 
+## Agreement with Hi-C per bead pair at 5, 10 and 25 kb, the measure of the Results page
+
+Decided on 2026-11-24: the page states the agreement at three resolutions with the contacts counted per bead
+pair. The count of a cell of the pooled map is divided by the product of the bead counts of its two bins, the
+step `resolutions` of `playground/rnapii/readouts_crossline_genome.sh`. SCC against the raw map of half b on the
+pairs up to 2 Mb apart, mean over the chromosomes by length. The tables per chromosome are in
+`data/figures/redo-2026-11-23/genome_pair/`, outside git.
+
+| line | resolution | cudaMMC | uniform, CTCF | uniform, CTCF and RNAPII | loop anchors, CTCF |
+|---|---|---|---|---|---|
+| GM12878 | 5 kb | 0.183 | 0.322 | 0.392 | 0.246 |
+| GM12878 | 10 kb | 0.241 | 0.408 | 0.471 | 0.325 |
+| GM12878 | 25 kb | 0.297 | 0.491 | 0.510 | 0.410 |
+| H1ESC | 5 kb | 0.109 | 0.259 | 0.287 | 0.195 |
+| H1ESC | 10 kb | 0.157 | 0.351 | 0.373 | 0.281 |
+| H1ESC | 25 kb | 0.197 | 0.432 | 0.433 | 0.376 |
+| HFFC6 | 5 kb | 0.130 | 0.337 | 0.383 | 0.264 |
+| HFFC6 | 10 kb | 0.177 | 0.424 | 0.464 | 0.341 |
+| HFFC6 | 25 kb | 0.214 | 0.507 | 0.500 | 0.437 |
+
+Wilcoxon signed rank over the 22 chromosomes, two sided. The uniform chain is higher than cudaMMC and higher
+than the chain of loop anchors on 22 of 22 chromosomes of every line at every resolution, p 5e-07. With RNAPII
+loops against without, on every line: higher at 5 kb with p 5e-06 or lower. Higher at 10 kb with p 0.004 or
+lower. At 25 kb higher on GM12878 with p 0.036. No difference at 25 kb on H1ESC with p 0.50 or on HFFC6 with
+p 0.52. Against the balanced map the
+order of the arms is the same at every resolution, 0.346, 0.267 and 0.405 for the uniform chain at 25 kb against
+0.299, 0.252 and 0.366 for the chain of loop anchors.
+
+The same pairs without the division, the uniform chain and the chain of loop anchors at 25 kb: 0.502 and 0.532
+on GM12878, 0.442 and 0.454 on H1ESC, 0.516 and 0.473 on HFFC6. Both chains have beads on the same 65 % of
+the bins of 25 kb of GM12878. Among the bins with beads the uniform chain has 25 beads in 96 % and a rank
+correlation of the bead count with the raw coverage of 0.00 to 0.03 on the three lines. The chain of loop anchors
+has 1 to 68 beads with a median of 13 or 14. Its correlation is 0.53, 0.37 and 0.27.
+
 ## Agreement with Hi-C, raw SCC of the pooled map at 25 kb, mean over the chromosomes by length
+
+The measure of the page before 2026-11-24, the whole chromosome without the division.
 
 | line | cudaMMC | uniform, CTCF | uniform, CTCF and RNAPII | loop anchors, CTCF |
 |---|---|---|---|---|
