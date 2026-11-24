@@ -292,6 +292,39 @@ tool on any score. On the 20 Mb runs the raw SCC of the uniform chain is
 0.32 to 0.48, where the chain of loop anchors had 0.39 to 0.61, and its point value is above both
 tools in all nine. On chr1 1 to 60 Mb at three structures it leads both tools on all three cells.
 
+### Bands of separation
+
+The same ten structures of chr1 1 to 60 Mb by band of separation, 2026-11-25. The score is the SCC per bead pair
+at 10 kb against the raw half b over the pairs with both bins inside the region,
+`playground/rnapii/short_range_scc.py --region 0-60000000`. All three tools read CTCF loops. The three values of
+a cell are GM12878, H1ESC and HFFC6. The table is `design/figures/redo-2026-11-23/tools_bands.tsv`.
+
+| Band | uniform chain | cudaMMC | MultiMM |
+|---|---|---|---|
+| under 100 kb | 0.40, 0.26, 0.37 | 0.25, 0.16, 0.18 | 0.18, 0.10, 0.09 |
+| 100 to 500 kb | 0.33, 0.29, 0.37 | 0.22, 0.15, 0.20 | 0.18, 0.10, 0.11 |
+| 0.5 to 2 Mb | 0.24, 0.17, 0.24 | 0.08, 0.06, 0.04 | 0.06, 0.02, 0.04 |
+
+The uniform chain is above both tools in every band on every line. Its lead is largest in the band of 0.5 to
+2 Mb, three to seven times the score of the other tools. The two variants of MultiMM, after the minimisation
+and after the dynamics, differ by 0.002 at most. The scores at 25 kb over the whole range, 0.475, 0.350 and
+0.455, repeat the scores of the bootstrap above within 0.003.
+
+The whole genome has cudaMMC and the uniform chain on the same halves, `design/uniform-chain.md`. The score is
+weighted by the length of the chromosome.
+
+| Band | cudaMMC | uniform chain, CTCF loops | uniform chain, CTCF and RNAPII loops |
+|---|---|---|---|
+| under 100 kb | 0.28, 0.20, 0.20 | 0.45, 0.39, 0.45 | 0.55, 0.42, 0.52 |
+| 100 to 500 kb | 0.25, 0.15, 0.19 | 0.35, 0.31, 0.39 | 0.28, 0.28, 0.28 |
+| 0.5 to 2 Mb | 0.10, 0.05, 0.07 | 0.15, 0.12, 0.20 | 0.14, 0.11, 0.15 |
+
+With CTCF loops the uniform chain is above cudaMMC on each of the 22 chromosomes of each line in each band.
+With RNAPII loops cudaMMC is higher in the band of 100 to 500 kb on 6, 1 and 2 of the 22 chromosomes. On chr19
+the scores of that band are 0.11, 0.14 and 0.16 with RNAPII loops, 0.29, 0.25 and 0.31 with CTCF loops and
+0.28, 0.14 and 0.20 for cudaMMC. The loss is of the model with RNAPII loops against the model without them on
+the chromosomes dense in RNAPII loops. `design/uniform-chain.md` has its trace.
+
 ### The two chains on the same runs
 
 The structures of the two chains of each run against half b, the same bootstrap,
