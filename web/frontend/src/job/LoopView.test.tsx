@@ -150,4 +150,22 @@ describe('the loop view', () => {
     expect(drawn.find((g) => g.title.startsWith('ENSG00000228793'))).toHaveClass('unnamed')
     expect(within(screen.getByRole('group', { name: 'Enhancers' })).getAllByTestId('enhancer')).toHaveLength(1)
   })
+
+  it('asks for a gene that is clicked and for none at a click on the gene in use', () => {
+    const genes = [
+      { name: 'ECI2', tss: 4_135_596, start: 4_115_692, end: 4_135_597, strand: '-' },
+      { name: 'PRPF4B', tss: 4_021_267, start: 4_021_267, end: 4_065_217, strand: '+' },
+      { name: 'CDYL', tss: 4_706_159, start: 4_706_159, end: 4_955_551, strand: '+' },
+    ]
+    const onGene = vi.fn()
+    render(<LoopView chrom="chr6" region={[3_600_000, 4_800_000]} loops={[]} genes={genes} gene="ECI2" onGene={onGene} pickableGenes={new Set(['ECI2', 'PRPF4B'])} />)
+    fireEvent.click(screen.getByRole('button', { name: 'PRPF4B' }))
+    expect(onGene).toHaveBeenLastCalledWith('PRPF4B')
+    expect(screen.getByRole('button', { name: 'ECI2' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'ECI2' }))
+    expect(onGene).toHaveBeenLastCalledWith(null)
+    // A gene outside the table of the job is drawn and is no button.
+    expect(screen.queryByRole('button', { name: 'CDYL' })).toBeNull()
+    expect(screen.getByText('CDYL')).toBeInTheDocument()
+  })
 })

@@ -37,6 +37,21 @@
   margin-top: 2px;
 }
 
+/* A gene that can be picked is a button with the look of the others. */
+button.gene {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.gene:hover .gene-name,
+button.gene:focus-visible .gene-name {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
 /* The body of a gene, with an arrowhead at the end it is read towards. */
 .gene-bar {
   position: absolute;

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { LoopPreview } from './LoopPreview'
@@ -98,6 +98,26 @@ describe('LoopPreview', () => {
     at(box, 'pointermove', 322)
     at(box, 'pointerup', 322)
     expect(onRegion).toHaveBeenLastCalledWith('chr1:11,170,000-12,270,000')
+  })
+
+  it('moves the view to a region that a drag brought to its edge', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const preview = (start: number, end: number) => (
+      <QueryClientProvider client={client}>
+        <LoopPreview cell="GM12878" region={{ chrom: 'chr1', start, end, label: '' }} factors="CTCF+RNAPII" onRegion={vi.fn()} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(preview(11_500_000, 12_600_000))
+    await screen.findByText('2 CTCF loops')
+    const edge = () => screen.getByRole('slider', { name: 'End of the region' })
+    // The view is the region with its length on either side, 10.4 to 13.7 Mb.
+    expect(edge()).toHaveAttribute('aria-valuemax', '13700000')
+    // A region inside the view leaves the view where it is.
+    rerender(preview(11_500_000, 13_000_000))
+    expect(edge()).toHaveAttribute('aria-valuemax', '13700000')
+    // The end of the region at the end of the view: the view moves and has room again.
+    rerender(preview(11_500_000, 13_700_000))
+    await waitFor(() => expect(Number(edge().getAttribute('aria-valuemax'))).toBeGreaterThan(14_000_000))
   })
 
   it('does not let a drag make the region longer than a job takes', async () => {

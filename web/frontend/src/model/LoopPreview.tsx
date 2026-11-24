@@ -23,10 +23,16 @@ const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word
 const mb = (n: number) => `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)} Mb`
 const round = (p: number) => Math.round(p / STEP) * STEP
 
-/** Returns true for a region that is drawn well in a view, inside it and between an eighth and seven tenths of it. */
+/**
+ * Returns true for a region that is drawn well in a view: between an eighth and seven tenths of it,
+ * with room on either side. A region that a drag brought to an edge of the view does not fit. The
+ * view then moves to it. A view from the start of the chromosome has no room to the left.
+ */
 const fits = (start: number, end: number, view: [number, number]) => {
-  const share = (end - start) / (view[1] - view[0])
-  return start >= view[0] && end <= view[1] && share >= 0.125 && share <= 0.7
+  const width = view[1] - view[0]
+  const share = (end - start) / width
+  const room = 0.03 * width
+  return start >= view[0] + (view[0] > 0 ? room : 0) && end <= view[1] - room && share >= 0.125 && share <= 0.7
 }
 
 type Drag = { kind: 'start' | 'end' | 'move'; at: number; from: [number, number] }

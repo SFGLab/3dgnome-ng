@@ -126,6 +126,12 @@ export function StructureTab({ api, summary, selected, gene: geneProp, enhancer 
               genes={annotations.data.genes}
               enhancers={annotations.data.enhancers}
               gene={gene ?? undefined}
+              pickableGenes={new Set((genes.data ?? []).map((r) => r.gene))}
+              onGene={(g) => {
+                setLoop(null)
+                setPicks([])
+                setGene(g)
+              }}
               onWindow={(a, b) => setPart(a <= region.start && b >= region.end ? null : [a, b])}
               onReset={part ? () => setPart(null) : undefined}
               selected={loopIndex < 0 ? null : loopIndex}
@@ -135,7 +141,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, enhancer 
                 setLoop(i === null ? null : loops[i])
               }}
               cursor={cursor}
-              hint={part ? 'This part of the region stays solid in the model. Click a loop to mark its two anchors and the chain between them. Scroll to zoom.' : 'Click a loop to mark its two anchors and the chain between them in the model. Scroll or drag along the loops to look at a part of the region.'}
+              hint={part ? 'This part of the region stays solid in the model. Click a loop to mark its two anchors and the chain between them, or a gene to mark it and its nearest enhancer. Scroll to zoom.' : 'Click a loop to mark its two anchors and the chain between them in the model, or a gene to mark it and its nearest enhancer. Scroll or drag along the loops to look at a part of the region.'}
             />
           )
         }

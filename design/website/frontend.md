@@ -119,6 +119,15 @@ bar is left out and counted in the name of the track. The gene a view is about i
 stronger. A gene the annotation lists by its Ensembl id is placed last and drawn lighter, without a name.
 
 The tracks are in the loop view of the job page, under the model and over the contact map, with the genes and
-the enhancers of the job. The picture of the loops of the form and of the variants dialog has the genes track.
+the enhancers of the job. Under the model a gene of the gene table of the job is a button: a click marks the
+gene and its nearest enhancer in the model, as a click on a loop marks the loop. A second click lets it go. The picture of the loops of the form and of the variants dialog has the genes track.
 The types of the variants of that picture are in two rows. A third type close to two others is left out.
+
+## The view of the picture of the loops of the form
+
+The picture shows the region with its own length on either side. The view stays where it is while the region
+is drawn well in it: between an eighth and seven tenths of the view, with 3 % of the view free on either side.
+A drag ends at an edge of the view at the most. A region that a drag brought there no longer fits. The view
+then moves to it. Before 2026-11-25 a region at the edge of the view and under seven tenths of it kept the view, and
+no drag could take the region further.
 

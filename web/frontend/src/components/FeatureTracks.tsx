@@ -21,8 +21,26 @@ const place = (p: number) => p.toLocaleString('en-US')
  * @param genes the genes with their spans
  * @param enhancers the enhancers as start and end. Without them there is no enhancer track.
  * @param first the name of the gene the view is about, which is placed first and drawn stronger
+ * @param onGene takes the name of a gene that is clicked, or null for a click on the first gene. With it a gene is a button.
+ * @param pickable the names of the genes that can be clicked, every gene without it
  */
-export function FeatureTracks({ chrom, view, genes, enhancers, first }: { chrom: string; view: [number, number]; genes: TrackGene[]; enhancers?: [number, number][]; first?: string }) {
+export function FeatureTracks({
+  chrom,
+  view,
+  genes,
+  enhancers,
+  first,
+  onGene,
+  pickable,
+}: {
+  chrom: string
+  view: [number, number]
+  genes: TrackGene[]
+  enhancers?: [number, number][]
+  first?: string
+  onGene?: (name: string | null) => void
+  pickable?: Set<string>
+}) {
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(NOMINAL)
   useEffect(() => {
@@ -46,16 +64,27 @@ export function FeatureTracks({ chrom, view, genes, enhancers, first }: { chrom:
         {placed.map((g) => {
           const from = (Math.max(g.start, view[0]) - view[0]) / span
           const to = (Math.min(g.end, view[1]) - view[0]) / span
-          return (
-            <span
-              key={`${g.name}${g.start}`}
-              className={cn(`gene ${g.strand === '-' ? 'minus' : 'plus'}${g.name === first ? ' first' : ''}${unnamed(g) ? ' unnamed' : ''}`)}
-              style={{ left: `${from * 100}%`, top: g.row * ROW, width: `max(${MIN_BAR}px, ${(to - from) * 100}%)` }}
-              title={`${g.name}, ${chrom}:${place(g.start)}-${place(g.end)}, ${g.strand === '-' ? 'minus' : 'plus'} strand`}
-              data-testid="gene"
-            >
+          const picked = onGene && (!pickable || pickable.has(g.name))
+          const shared = {
+            className: cn(`gene ${g.strand === '-' ? 'minus' : 'plus'}${g.name === first ? ' first' : ''}${unnamed(g) ? ' unnamed' : ''}${picked ? ' pick' : ''}`),
+            style: { left: `${from * 100}%`, top: g.row * ROW, width: `max(${MIN_BAR}px, ${(to - from) * 100}%)` },
+            title: `${g.name}, ${chrom}:${place(g.start)}-${place(g.end)}, ${g.strand === '-' ? 'minus' : 'plus'} strand`,
+            'data-testid': 'gene',
+          }
+          const drawn = (
+            <>
               <span className={cn('gene-bar')} />
               {g.named && <span className={cn('gene-name')}>{g.name}</span>}
+            </>
+          )
+          // A gene that can be picked is a button. A second click on the gene in use lets it go.
+          return picked ? (
+            <button key={`${g.name}${g.start}`} type="button" {...shared} aria-label={g.name} aria-pressed={g.name === first} onClick={() => onGene(g.name === first ? null : g.name)}>
+              {drawn}
+            </button>
+          ) : (
+            <span key={`${g.name}${g.start}`} {...shared}>
+              {drawn}
             </span>
           )
         })}

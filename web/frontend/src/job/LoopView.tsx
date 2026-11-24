@@ -43,6 +43,10 @@ type Props = {
   enhancers?: [number, number][]
   /** The name of the gene in use, which is drawn first and stronger. */
   gene?: string
+  /** A click on a gene asks for it. A click on the gene in use asks for none. */
+  onGene?: (name: string | null) => void
+  /** The names of the genes that can be asked for. */
+  pickableGenes?: Set<string>
 }
 
 /**
@@ -51,7 +55,7 @@ type Props = {
  * region. The view only reports both. The genes and the enhancers of the region are tracks under
  * the loops, on the same stretch.
  */
-export function LoopView({ chrom, region, loops, selected = null, onSelect, window, onWindow, bounds, cursor = null, onReset, hint = '', genes, enhancers, gene }: Props) {
+export function LoopView({ chrom, region, loops, selected = null, onSelect, window, onWindow, bounds, cursor = null, onReset, hint = '', genes, enhancers, gene, onGene, pickableGenes }: Props) {
   const [start, end] = region
   const width = Math.max(end - start, 1)
   const x = (p: number) => ((p - start) / width) * W
@@ -215,7 +219,7 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
           ))}
         <span className={cn('unit')}>{`${chrom}, Mb`}</span>
       </div>
-      {genes && <FeatureTracks chrom={chrom} view={[start, end]} genes={genes} enhancers={enhancers} first={gene} />}
+      {genes && <FeatureTracks chrom={chrom} view={[start, end]} genes={genes} enhancers={enhancers} first={gene} onGene={onGene} pickable={pickableGenes} />}
     </div>
   )
 }
