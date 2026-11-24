@@ -35,43 +35,60 @@ The same bands, the chain of loop anchors to the uniform chain with CTCF loops: 
 0.395 to 0.376 and 0.397 to 0.462, p 0.85, 0.11 and 1e-06; 100 to 500 kb 0.398 to 0.346, 0.332 to 0.295 and
 0.383 to 0.390, p 2e-06, 0.054 and 0.70.
 
+## The two sets of runs of the uniform chain
+
+Decided on 2026-11-23: every comparison with Hi-C is from the runs with the loop dropout, the config of
+production. The enhancer to promoter distance, the link to expression and the Micro-C loops are from runs
+without it, `[springs] loop_dropout = no`, the arms UCN and URN of `slurm/ensemble/crosscell_arms.sh`, 132 tasks
+at 1a7bb2e with the model code of 2ff5766. `playground/rnapii/redo_merge.py` joins the two sets into the inputs
+of the figures. The figures and the Results page state it. The tables of the runs without the dropout are
+in `data/figures/redo-2026-11-23/nodrop/genome/`, the joined inputs in `merged/`, outside git.
+
+Without the dropout the raw SCC against half b is 0.486, 0.431 and 0.507 with CTCF loops, against 0.495, 0.435
+and 0.513 with it. With CTCF and RNAPII loops it is 0.479, 0.412 and 0.462 against 0.514, 0.436 and 0.504.
+
 ## Enhancer to promoter distance, pairs joined by an RNAPII loop and by no CTCF loop, median in bead units
 
-| line | pairs | uniform, CTCF | uniform, CTCF and RNAPII | closer |
-|---|---|---|---|---|
-| GM12878 | 23,237 | 4.09 | 3.51 | 14 % |
-| H1ESC | 33,360 | 3.98 | 3.58 | 10 % |
-| HFFC6 | 16,431 | 4.43 | 3.96 | 11 % |
+Runs without the dropout.
+
+| line | pairs | uniform, CTCF | uniform, CTCF and RNAPII | closer | with the dropout |
+|---|---|---|---|---|---|
+| GM12878 | 23,237 | 4.01 | 3.32 | 17 % | 4.09 to 3.51, 14 % |
+| H1ESC | 33,360 | 3.90 | 3.42 | 12 % | 3.98 to 3.58, 10 % |
+| HFFC6 | 16,431 | 4.34 | 3.73 | 14 % | 4.43 to 3.96, 11 % |
 
 Signed rank over the pairs and Mann-Whitney against the reference pairs: p under 0.001 on every line. On the
-chain of loop anchors the pass of 2026-11-19 had 19, 24 and 17 % closer. A structure of the uniform chain keeps
-a loop with the probability q / (q + 1).
+chain of loop anchors the pass of 2026-11-19 had 19, 24 and 17 % closer.
 
 ## Link to expression, minus the Spearman correlation of the change of distance with the change of expression
 
-| pair | cudaMMC | uniform, CTCF | uniform, CTCF and RNAPII | loop anchors, CTCF |
-|---|---|---|---|---|
-| GM12878 and H1ESC | 0.139 | 0.244 | 0.314 | 0.227 |
-| GM12878 and HFFC6 | 0.144 | 0.251 | 0.296 | 0.243 |
-| H1ESC and HFFC6 | 0.134 | 0.193 | 0.242 | 0.192 |
+Runs without the dropout.
+
+| pair | cudaMMC | uniform, CTCF | uniform, CTCF and RNAPII | loop anchors, CTCF | with the dropout, CTCF and with RNAPII |
+|---|---|---|---|---|---|
+| GM12878 and H1ESC | 0.139 | 0.230 | 0.306 | 0.227 | 0.244 and 0.314 |
+| GM12878 and HFFC6 | 0.144 | 0.243 | 0.279 | 0.243 | 0.251 and 0.296 |
+| H1ESC and HFFC6 | 0.134 | 0.198 | 0.242 | 0.192 | 0.193 and 0.242 |
 
 Median of 2,000 block bootstrap draws over the genes. With RNAPII loops against without, 10,000 draws:
-+0.071, +0.045 and +0.050, p 1e-04 each. The uniform chain against the chain of loop anchors: +0.017, +0.008
-and +0.001, p 0.15, 0.44 and 0.93.
++0.077, +0.037 and +0.046, p 1e-04, 0.001 and 1e-04. The uniform chain against the chain of loop anchors:
++0.003, +0.000 and +0.006, p 0.77, 0.96 and 0.57.
 
 ## Micro-C loops placed above moved loops
 
-| line | loops | cudaMMC | uniform, CTCF | uniform, CTCF and RNAPII | loop anchors, CTCF |
-|---|---|---|---|---|---|
-| GM12878 | 25,783 | 0.121 | 0.248 | 0.302 | 0.253 |
-| H1ESC | 10,046 | 0.118 | 0.376 | 0.423 | 0.379 |
-| HFFC6 | 19,192 | 0.102 | 0.418 | 0.488 | 0.434 |
+Runs without the dropout.
 
-Loops that an RNAPII loop supports and no CTCF loop does: 0.127 to 0.538 of 2,130, 0.160 to 0.529 of 586 and
-0.210 to 0.587 of 1,318, CTCF loops to CTCF and RNAPII loops. Loops that a CTCF loop supports: 0.719 to 0.759,
-0.748 to 0.792 and 0.720 to 0.803. Every rise has p under 0.001 over the 22 chromosomes. The uniform chain
-against the chain of loop anchors over all loops: p 0.19, 0.97 and 0.001, the chain of loop anchors higher on
-HFFC6.
+| line | loops | cudaMMC | uniform, CTCF | uniform, CTCF and RNAPII | loop anchors, CTCF | with the dropout, CTCF and with RNAPII |
+|---|---|---|---|---|---|---|
+| GM12878 | 25,783 | 0.121 | 0.257 | 0.334 | 0.253 | 0.248 and 0.302 |
+| H1ESC | 10,046 | 0.118 | 0.395 | 0.448 | 0.379 | 0.376 and 0.423 |
+| HFFC6 | 19,192 | 0.102 | 0.442 | 0.525 | 0.434 | 0.418 and 0.488 |
+
+Loops that an RNAPII loop supports and no CTCF loop does: 0.136 to 0.652 of 2,130, 0.189 to 0.666 of 586 and
+0.238 to 0.702 of 1,318, CTCF loops to CTCF and RNAPII loops. With the dropout the same loops were at 0.538,
+0.529 and 0.587 with RNAPII loops. Loops that a CTCF loop supports: 0.741 to 0.791, 0.762 to 0.812 and 0.747 to
+0.819. Every rise has p under 0.001 over the 22 chromosomes. The uniform chain against the chain of loop
+anchors over all loops: p 0.09, 0.03 and 0.25, the uniform chain higher on H1ESC.
 
 ## Not redone
 

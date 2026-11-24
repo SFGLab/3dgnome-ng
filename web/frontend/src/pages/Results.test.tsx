@@ -23,8 +23,9 @@ describe('Results page', () => {
 
   it('shows the enhancer to promoter distances and the link to expression', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.1', '3.5', '4.0', '3.6', '4.4', '4.0'])
-    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.14', '0.24', '0.31', '0.13', '0.19', '0.24', '0.14', '0.25', '0.30'])
+    expect(screen.getByText(/are from models built with every loop in every structure/)).toBeInTheDocument()
+    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.0', '3.3', '3.9', '3.4', '4.3', '3.7'])
+    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.14', '0.23', '0.31', '0.13', '0.20', '0.24', '0.14', '0.24', '0.28'])
   })
 
   it('shows the beads, the runtime and the runtime per 1,000 beads of each tool', () => {
@@ -74,8 +75,8 @@ describe('Results page', () => {
 
   it('shows the share of Micro-C loops placed, for the model sets and for the three tools', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.12', '0.25', '0.30', '0.12', '0.38', '0.42', '0.10', '0.42', '0.49'])
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.13', '0.54', '0.16', '0.53', '0.21', '0.59'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.12', '0.26', '0.33', '0.12', '0.39', '0.45', '0.10', '0.44', '0.52'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.14', '0.65', '0.19', '0.67', '0.24', '0.70'])
     expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' }))).toEqual(['0.14', '0.25', '0.29', '0.21', '0.16', '0.53', '0.16', '0.15', '0.51'])
     expect(values(screen.getByRole('figure', { name: 'Micro-C loops with beads at both ends' }))).toEqual(['0.25', '1.00', '0.98', '0.26', '1.00', '0.95', '0.22', '1.00', '0.97'])
   })

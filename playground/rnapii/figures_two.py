@@ -245,8 +245,8 @@ def panel_inputs(ax: plt.Axes, chains: list[tuple[np.ndarray, np.ndarray]]) -> N
         cols = plt.get_cmap("viridis")((mid - mid.min()) / max(np.ptp(mid), 1))
         _tube(inset, xyz[::3], cols[::3], 1.4)
     ax.text(8.15, 0.55, "ensemble of structures, coloured by genomic position", ha="center", fontsize=8, color=INK)
-    ax.text(0.3, 5.5, "cudaMMC: CTCF loops", fontsize=8, color=MUTED)
-    ax.text(0.3, 5.0, "3D-GNOMEᴺᴳ: CTCF loops, RNAPII loops, Hi-C contacts, structural variants", fontsize=8,
+    ax.text(0.3, 5.75, "cudaMMC: CTCF loops", fontsize=8, color=MUTED)
+    ax.text(0.3, 4.9, "3D-GNOMEᴺᴳ: CTCF loops, RNAPII loops, Hi-C contacts, structural variants", fontsize=8,
             color=INK)
 
 
@@ -303,6 +303,12 @@ def _render(ax: plt.Axes, xyz: np.ndarray, mid: np.ndarray, colour: str, title: 
             f"{textwrap.fill(title, 24)}\nenhancer to promoter\n{gap:.1f} bead units here,\n"
             f"{mean:.1f} on average over\n{len(ensemble)} structures",
             transform=ax.transAxes, ha="center", va="top", fontsize=7, color=INK)
+
+
+def _runs_note(inputs: Path) -> str:
+    """Returns the sentence of `redo_merge.py` on the runs behind the panels, empty without its file."""
+    note = inputs / "runs_note.txt"
+    return " " + note.read_text().strip() if note.is_file() else ""
 
 
 def _row_title(sub: SubFigure, letter: str, text: str, width: int = 88) -> None:
@@ -479,7 +485,7 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     fig.supxlabel(
         textwrap.fill(
             f"{LEGEND}. d: Wilcoxon signed rank test over the pairs of both model sets, "
-            f"Mann-Whitney U test against the reference pairs. The marks stand beside the models with RNAPII loops.{over}", 150),
+            f"Mann-Whitney U test against the reference pairs. The marks stand beside the models with RNAPII loops.{over}{_runs_note(inputs)}", 150),
         fontsize=6.5, color=MUTED,
     )
     _save(fig, out / "rnapii_figure1")
@@ -572,7 +578,8 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
         textwrap.fill(
             f"{LEGEND}. e: block bootstrap of the difference between the two model sets on the genes of both."
             + (" f: Wilcoxon signed rank test of the two model sets over the chromosomes. " if len(per_chrom) else " ")
-            + ("g: Wilcoxon signed rank test over the nine individuals, exact. " if len(w) else "") + "h: Mann-Whitney U test.", 150),
+            + ("g: Wilcoxon signed rank test over the nine individuals, exact. " if len(w) else "") + "h: Mann-Whitney U test."
+            + _runs_note(inputs), 150),
         fontsize=6.5, color=MUTED,
     )
     _save(fig, out / "rnapii_figure2")
@@ -714,7 +721,7 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
             textwrap.fill(
                 f"{LEGEND}, ns not significant. Every mark is a model set against 3D-GNOMEᴺᴳ with CTCF loops. a, b, d"
                 + (f", {letter}" if banded else "") + ": Wilcoxon signed rank "
-                "test over the chromosomes. c: block bootstrap of the difference on the genes of both model sets.", 150),
+                "test over the chromosomes. c: block bootstrap of the difference on the genes of both model sets." + _runs_note(inputs), 150),
             fontsize=6.5, color=MUTED,
         )
     _save(fig, out / "rnapii_supplement")

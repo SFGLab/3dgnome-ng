@@ -2084,6 +2084,12 @@ loops are made from runs without it and state so. Those runs are the arms UCN an
 loops, while the effect of an RNAPII loop on its enhancer and promoter is larger by a third. chr19 is one
 chromosome without a test over rows.
 
+The arms UCN and URN ran as eden array 1966039, 132 tasks. Over chromosomes 1 to 22 the pairs that an RNAPII
+loop holds are 17, 12 and 14 % closer on GM12878, H1ESC and HFFC6 without the dropout against 14, 10 and 11 %
+with it. The Micro-C loops that an RNAPII loop alone supports are placed at 0.65, 0.67 and 0.70 against 0.54,
+0.53 and 0.59. The raw SCC with CTCF and RNAPII loops is 0.479, 0.412 and 0.462 against 0.514, 0.436 and 0.504.
+`design/figures/redo-2026-11-23/summary.md` has the tables.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
