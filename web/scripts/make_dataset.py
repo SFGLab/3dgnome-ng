@@ -21,11 +21,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def genes_from_gtf(gtf: Path, out: Path) -> int:
-    """Returns gene_id, name, chrom, tss and strand of every gene line."""
+    """Writes gene_id, name, chrom, tss, strand, start and end of every gene line and returns
+    their number. The span is 0 based with the end left out, as a BED interval."""
     opener = gzip.open if str(gtf).endswith(".gz") else open
     n = 0
     with opener(gtf, "rt") as fh, out.open("w") as w:
-        w.write("gene_id\tname\tchrom\ttss\tstrand\n")
+        w.write("gene_id\tname\tchrom\ttss\tstrand\tstart\tend\n")
         for line in fh:
             if line.startswith("#"):
                 continue
@@ -36,7 +37,7 @@ def genes_from_gtf(gtf: Path, out: Path) -> int:
             gid = attrs.get("gene_id", "").strip('"')
             name = attrs.get("gene_name", gid).strip('"')
             tss = int(f[3]) - 1 if f[6] == "+" else int(f[4]) - 1
-            w.write(f"{gid}\t{name}\t{f[0]}\t{tss}\t{f[6]}\n")
+            w.write(f"{gid}\t{name}\t{f[0]}\t{tss}\t{f[6]}\t{int(f[3]) - 1}\t{f[4]}\n")
             n += 1
     return n
 

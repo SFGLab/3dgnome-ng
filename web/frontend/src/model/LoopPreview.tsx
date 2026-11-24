@@ -3,6 +3,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import type { Factors } from './form'
 import { around } from './loopWindow'
+import { FeatureTracks } from '../components/FeatureTracks'
+import { labelRows } from '../components/packGenes'
 import { scoped } from '../lib/css'
 import sheet from './model.module.css'
 
@@ -11,8 +13,8 @@ const cn = scoped(sheet)
 const W = 780
 const H = 150
 const AXIS = 75
-/** The height of the band of variants under the loops. */
-const BAND = 34
+/** The height of the band of variants under the loops, with two rows of labels. */
+const BAND = 42
 /** The shortest region a drag leaves and the step of a rounded position, in bp. */
 const MIN_SPAN = 20_000
 const STEP = 1_000
@@ -30,8 +32,8 @@ const fits = (start: number, end: number, view: [number, number]) => {
 type Drag = { kind: 'start' | 'end' | 'move'; at: number; from: [number, number] }
 
 /**
- * The loops around a region as arcs over an axis, CTCF above and RNAPII below, the genes as ticks
- * and the region as a box. With `onRegion` the edges of the box are sliders and the box can be
+ * The loops around a region as arcs over an axis, CTCF above and RNAPII below, the region as a box
+ * and the genes as a track under them. With `onRegion` the edges of the box are sliders and the box can be
  * moved. The new coordinates are reported when the drag ends.
  *
  * `maxSpan` is the longest region of a job in bp. A drag does not make the region longer than
@@ -78,6 +80,11 @@ export function LoopPreview({
   const [start, end] = moved ?? [region.start, region.end]
   const width = view[1] - view[0]
   const x = (p: number) => ((p - view[0]) / width) * W
+  const svRows = labelRows(
+    (variants ?? []).map((v) => (x(v.pos) + Math.max(x(v.end), x(v.pos) + 4)) / 2),
+    (variants ?? []).map((v) => v.type.length * 6.5),
+    2,
+  )
   const chosen = (f: string) => factors === 'CTCF+RNAPII' || factors === f
   // A loop counts for the region when both its anchors lie inside it, as the job reads it.
   const inside = (l: number[]) => (l[3] ?? l[0]) >= start && (l[4] ?? l[1]) <= end
@@ -98,7 +105,6 @@ export function LoopPreview({
       )
     })
   const count = (factor: string) => (preview.data.loops[factor] ?? []).filter(inside).length
-  const gene = region.gene ? preview.data.genes.find((g) => g.name === region.gene) : undefined
   const text = (a: number, b: number) => `${region.chrom}:${a.toLocaleString('en-US')}-${b.toLocaleString('en-US')}`
   const at = (clientX: number) => {
     const box = svg.current!.getBoundingClientRect()
@@ -166,23 +172,18 @@ export function LoopPreview({
         {arcs('CTCF', true)}
         {arcs('RNAPII', false)}
         <line className={cn('axis')} x1={0} x2={W} y1={AXIS} y2={AXIS} />
-        {preview.data.genes.map((g) => (
-          <line key={g.name + g.tss} className={cn(g === gene ? 'gene-tick named' : 'gene-tick')} x1={x(g.tss)} x2={x(g.tss)} y1={AXIS - 5} y2={AXIS + 5} />
-        ))}
-        {gene && (
-          <text className={cn('gene-label')} x={x(gene.tss)} y={AXIS - 9} textAnchor="middle">
-            {gene.name}
-          </text>
-        )}
         {variants?.map((v, i) => {
           const x1 = x(v.pos)
           const w = Math.max(x(v.end) - x1, 4)
           return (
             <g key={i} className={cn(`sv-mark sv-${v.type.toLowerCase()}`)}>
               <rect x={x1} y={H + 2} width={w} height={10} rx={1} />
-              <text x={x1 + w / 2} y={H + 26} textAnchor="middle">
-                {v.type}
-              </text>
+              {/* Two variants close to each other have their types on two rows. A third has none. */}
+              {svRows[i] !== null && (
+                <text x={x1 + w / 2} y={H + 24 + svRows[i]! * 11} textAnchor="middle">
+                  {v.type}
+                </text>
+              )}
             </g>
           )
         })}
@@ -214,6 +215,7 @@ export function LoopPreview({
             )
           })}
       </svg>
+      <FeatureTracks chrom={region.chrom} view={view} genes={preview.data.genes} first={region.gene} />
       <p className={cn('preview-key')}>
         <span className={cn('key-item')}>
           <span className={cn('key-line ctcf')} />

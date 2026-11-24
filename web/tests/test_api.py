@@ -62,6 +62,15 @@ def test_a_gene_name_in_lower_case_resolves_to_its_window(site: SimpleNamespace)
     assert r.status_code == 400 and "20,000,000" in r.json()["error"], "a region over the limit is a 400 naming it: " + r.text
 
 
+def test_the_preview_has_each_gene_that_reaches_into_the_region_with_its_span(site: SimpleNamespace) -> None:
+    c = site.c
+    whole = c.get("/api/preview", params={"cell": "GMX", "region": "chr1:0-3000000"}).json()["genes"]
+    assert {"name": "ALPHA", "tss": 1310000, "start": 1310000, "end": 1352000, "strand": "+"} in whole, "a gene has its TSS, its span and its strand: " + str(whole)
+    # BETA spans 2,571,000 to 2,600,001 and its TSS is outside this region.
+    part = c.get("/api/preview", params={"cell": "GMX", "region": "chr1:2000000-2590000"}).json()["genes"]
+    assert [g["name"] for g in part] == ["BETA"], "a gene whose body reaches into the region is listed: " + str(part)
+
+
 def test_the_preview_lists_the_ctcf_and_rnapii_loops(site: SimpleNamespace) -> None:
     c = site.c
     p = c.get("/api/preview", params={"cell": "GMX", "region": "chr1:0-3000000"}).json()

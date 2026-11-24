@@ -38,7 +38,8 @@ def job_routes(kind: str) -> APIRouter:
 
     @routes.get("/annotations", name=f"{kind}_annotations", response_model=Annotations)
     def annotations(site: Here, key: str) -> JSONResponse:
-        return JSONResponse(views.features(job_of(site, kind, key)))
+        job = job_of(site, kind, key)
+        return JSONResponse(views.features(job, site.base_cell(str(store.request(job).get("cell_type", ""))).genes()))
 
     @routes.get("/picks", name=f"{kind}_picks", response_model=Picks)
     def picks(site: Here, key: str) -> JSONResponse:

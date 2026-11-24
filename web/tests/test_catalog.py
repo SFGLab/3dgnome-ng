@@ -53,3 +53,13 @@ def test_a_cell_type_loads_with_absolute_paths(shared: SimpleNamespace) -> None:
         except RegionError:
             ok = True
         assert ok, f"{bad!r} is refused"
+
+
+def test_a_gene_table_without_spans_has_the_tss_as_the_span_of_a_gene(tmp_path: Path) -> None:
+    from gnome3d_web.catalog.model import gene_table
+
+    old = tmp_path / "genes.tsv"
+    old.write_text("gene_id\tname\tchrom\ttss\tstrand\nG1\tALPHA\tchr1\t1310000\t+\n")
+    table = gene_table(old)
+    assert (int(table["start"][0]), int(table["end"][0])) == (1310000, 1310001), "a table made before the spans were kept has the TSS as the span"
+

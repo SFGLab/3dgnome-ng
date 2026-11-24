@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { Loop } from '../api'
 import { LoopView } from './LoopView'
@@ -131,5 +131,23 @@ describe('the loop view', () => {
     expect(container.querySelector('.loop-cursor')?.getAttribute('x1')).toBe('500')
     rerender(<LoopView chrom="chr1" region={[1_000_000, 2_000_000]} loops={LOOPS} cursor={2_500_000} />)
     expect(container.querySelector('.loop-cursor')).not.toBeInTheDocument()
+  })
+
+  it('draws the genes and the enhancers of the region under the loops', () => {
+    const genes = [
+      { name: 'ECI2', tss: 4_135_596, start: 4_115_692, end: 4_135_597, strand: '-' },
+      { name: 'PRPF4B', tss: 4_021_267, start: 4_021_267, end: 4_065_217, strand: '+' },
+      { name: 'ENSG00000228793', tss: 3_720_080, start: 3_585_100, end: 3_720_081, strand: '-' },
+    ]
+    render(<LoopView chrom="chr6" region={[3_600_000, 4_600_000]} loops={[]} genes={genes} enhancers={[[4_022_561, 4_023_286]]} gene="ECI2" />)
+    const track = screen.getByRole('group', { name: 'Genes' })
+    const drawn = within(track).getAllByTestId('gene')
+    expect(drawn).toHaveLength(3)
+    expect(within(track).getByText('ECI2').closest('[data-testid="gene"]')).toHaveClass('first', 'minus')
+    expect(within(track).getByText('PRPF4B').closest('[data-testid="gene"]')).toHaveClass('plus')
+    // A gene the annotation lists by its Ensembl id is drawn without a name.
+    expect(within(track).queryByText('ENSG00000228793')).toBeNull()
+    expect(drawn.find((g) => g.title.startsWith('ENSG00000228793'))).toHaveClass('unnamed')
+    expect(within(screen.getByRole('group', { name: 'Enhancers' })).getAllByTestId('enhancer')).toHaveLength(1)
   })
 })

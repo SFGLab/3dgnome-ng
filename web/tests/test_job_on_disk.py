@@ -82,6 +82,11 @@ def test_a_job_from_disk_answers_as_it_did(site: SimpleNamespace, name: str, rou
         now.pop("now")
         # The summary states the skipped variants since 2026-11-21.
         assert now.pop("skipped_svs") == (1 if name == "with_variants" else 0), "the summary has the count of skipped variants of the status"
+    if route == "annotations":
+        # A gene has its span and its strand since 2026-11-24, from the gene table of the cell type.
+        for gene in now["genes"]:
+            span = (gene.pop("start"), gene.pop("end"), gene.pop("strand"))
+            assert span[0] <= gene["tss"] < span[1] and span[2] in "+-", f"the span of {gene['name']} holds its TSS: {span}"
     assert difference(site.said[name][route], now) == "", f"{route} of {name} is the answer the job gave when it was written"
 
 
@@ -108,6 +113,15 @@ def test_the_states_of_a_list_of_jobs_come_in_one_answer(site: SimpleNamespace) 
     assert states["elsewhere"] is None, "and a path that is no job"
     assert c.post("/api/jobs/states", json={}).json() == {"states": {}}, "a body without jobs has no states"
     assert c.post("/api/jobs/states", content=b"{").status_code == 400, "a body that is no JSON is refused"
+
+
+def test_a_gene_of_a_job_has_the_span_of_the_gene_table_laid_from_its_marked_tss(site: SimpleNamespace) -> None:
+    genes = {g["name"]: g for g in site.c.get("/api/jobs/with_variants/annotations").json()["genes"]}
+    marks = json.loads((site.jobs / "with_variants" / "marks.json").read_text())["elements"]
+    tss = {e["name"]: (e["start"] + e["end"]) // 2 for e in marks if e["kind"] == "promoter"}
+    # The table has ALPHA on the plus strand, 42 kb from its TSS on, and BETA on the minus strand, 29 kb up to its TSS.
+    assert (genes["ALPHA"]["start"], genes["ALPHA"]["end"], genes["ALPHA"]["strand"]) == (tss["ALPHA"], tss["ALPHA"] + 42_000, "+"), "a gene of the plus strand runs from its TSS on: " + str(genes["ALPHA"])
+    assert (genes["BETA"]["start"], genes["BETA"]["end"], genes["BETA"]["strand"]) == (tss["BETA"] - 29_000, tss["BETA"] + 1, "-"), "a gene of the minus strand ends at its TSS: " + str(genes["BETA"])
 
 
 def test_a_file_of_a_job_from_disk_is_served(site: SimpleNamespace) -> None:

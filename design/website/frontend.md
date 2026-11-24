@@ -109,3 +109,16 @@ at the two ends that hold no contacts. The map is square and as wide as its tile
 the bottom of the map, by the maintainer's word. Showing the map whole left white bands and stretching it to
 the tile distorted the bins. Both were tried on 2026-11-24 and taken back.
 
+## The gene and enhancer tracks under the loops
+
+`components/FeatureTracks.tsx` draws the genes of a view in rows under its loops, as a genome browser does, and
+the enhancers as boxes under them. A gene is a bar over its span with an arrowhead at the end it is read
+towards and its name beside it. `packGenes.ts` gives each gene the first row that is free up to the end of its
+name, four rows at most. A gene that finds no such row is drawn without its name. A gene without room for its
+bar is left out and counted in the name of the track. The gene a view is about is placed first and drawn
+stronger. A gene the annotation lists by its Ensembl id is placed last and drawn lighter, without a name.
+
+The tracks are in the loop view of the job page, under the model and over the contact map, with the genes and
+the enhancers of the job. The picture of the loops of the form and of the variants dialog has the genes track.
+The types of the variants of that picture are in two rows. A third type close to two others is left out.
+

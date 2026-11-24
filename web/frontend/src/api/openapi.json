@@ -1233,9 +1233,22 @@
     "type": "object"
    },
    "NamedGene": {
+    "description": "A gene of a drawing, its TSS, its span and its strand, + or -.",
     "properties": {
+     "end": {
+      "title": "End",
+      "type": "integer"
+     },
      "name": {
       "title": "Name",
+      "type": "string"
+     },
+     "start": {
+      "title": "Start",
+      "type": "integer"
+     },
+     "strand": {
+      "title": "Strand",
       "type": "string"
      },
      "tss": {
@@ -1245,7 +1258,10 @@
     },
     "required": [
      "name",
-     "tss"
+     "tss",
+     "start",
+     "end",
+     "strand"
     ],
     "title": "NamedGene",
     "type": "object"

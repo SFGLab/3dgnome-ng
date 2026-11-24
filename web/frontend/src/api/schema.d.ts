@@ -1226,10 +1226,19 @@ export interface components {
             /** Detail */
             detail: string;
         };
-        /** NamedGene */
+        /**
+         * NamedGene
+         * @description A gene of a drawing, its TSS, its span and its strand, + or -.
+         */
         NamedGene: {
+            /** End */
+            end: number;
             /** Name */
             name: string;
+            /** Start */
+            start: number;
+            /** Strand */
+            strand: string;
             /** Tss */
             tss: number;
         };

@@ -46,8 +46,13 @@ class RegionInfo(TypedDict):
 
 
 class NamedGene(TypedDict):
+    """A gene of a drawing, its TSS, its span and its strand, + or -."""
+
     name: str
     tss: int
+    start: int
+    end: int
+    strand: str
 
 
 class Preview(TypedDict):

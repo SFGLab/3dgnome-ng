@@ -387,20 +387,6 @@
   font-size: 12px;
 }
 
-.gene-tick {
-  stroke: var(--faint);
-}
-
-.gene-tick.named {
-  stroke: var(--promoter);
-  stroke-width: 2;
-}
-
-.gene-label {
-  fill: var(--ink);
-  font: 600 10px var(--font);
-}
-
 .side-label {
   fill: var(--muted);
   font: 10px var(--font);

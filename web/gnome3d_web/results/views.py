@@ -111,10 +111,26 @@ def loops(job: Path) -> list[Loop]:
     return out
 
 
-def features(job: Path) -> Annotations:
-    """Returns the genes, enhancers and loops of the region of the job."""
+def features(job: Path, genes: pd.DataFrame | None = None) -> Annotations:
+    """Returns the genes, enhancers and loops of the region of the job. `genes` is the gene table
+    of the cell type of the job. A gene has its span from the table, laid from the TSS the job
+    marks, which is in the coordinates of the job. A gene the table lacks has its TSS as its span."""
     elements = store.read_json(job / "marks.json").get("elements", [])
-    named: list[NamedGene] = [{"name": e["name"], "tss": (e["start"] + e["end"]) // 2} for e in elements if e["kind"] == "promoter"]
+    marked = [(str(e["name"]), (e["start"] + e["end"]) // 2) for e in elements if e["kind"] == "promoter"]
+    spans: dict[str, list[tuple[int, int, int, str]]] = {}
+    if genes is not None and marked:
+        rows = genes[genes["name"].isin(sorted({name for name, _ in marked}))]
+        for name, tss, start, end, strand in zip(rows["name"], rows["tss"], rows["start"], rows["end"], rows["strand"], strict=True):
+            spans.setdefault(str(name), []).append((int(tss), int(start), int(end), str(strand)))
+    named: list[NamedGene] = []
+    for name, tss in marked:
+        # A name on two chromosomes or twice on one: the gene whose TSS is nearest the marked one.
+        known = min(spans.get(name, []), key=lambda g: abs(g[0] - tss), default=None)
+        if known is None:
+            named.append({"name": name, "tss": tss, "start": tss, "end": tss + 1, "strand": "+"})
+        else:
+            ref, start, end, strand = known
+            named.append({"name": name, "tss": tss, "start": tss + start - ref, "end": tss + end - ref, "strand": strand})
     enh: list[tuple[int, int]] = [(e["start"], e["end"]) for e in elements if e["kind"] == "enhancer"]
     return {"genes": named, "enhancers": enh, "loops": loops(job)}
 

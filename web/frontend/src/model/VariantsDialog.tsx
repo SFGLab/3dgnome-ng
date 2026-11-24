@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Dialog } from '../components/Dialog'
 import { Pager } from '../components/Pager'
 import { LoopPreview } from './LoopPreview'
+import { labelRows } from '../components/packGenes'
 import { usePage } from '../components/usePage'
 import type { Factors, FormState } from './form'
 import { type OwnChoice, ownField } from './upload'
@@ -49,6 +50,12 @@ function Track({ cell, region, factors, own, rows }: { cell: string; region: Reg
   })
   const x = (p: number) => Math.min(W, Math.max(0, ((p - region.start) / (region.end - region.start)) * W))
   const shown = factors === 'CTCF+RNAPII' ? ['CTCF', 'RNAPII'] : [factors]
+  // Two variants close to each other have their types on two rows. A third has none.
+  const labelRow = labelRows(
+    rows.map((v) => (x(v.pos) + Math.max(x(v.end), x(v.pos) + 4)) / 2),
+    rows.map((v) => v.type.length * 6.5),
+    2,
+  )
   return (
     <svg className={cn('sv-track')} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Variants in ${span}`}>
       {ownArcs.flatMap((q, k) =>
@@ -70,9 +77,11 @@ function Track({ cell, region, factors, own, rows }: { cell: string; region: Reg
         return (
           <g key={i} className={cn(`sv-mark sv-${v.type.toLowerCase()}`)}>
             <rect x={x1} y={AXIS + 6} width={w} height={10} rx={1} />
-            <text x={x1 + w / 2} y={AXIS + 30} textAnchor="middle">
-              {v.type}
-            </text>
+            {labelRow[i] !== null && (
+              <text x={x1 + w / 2} y={AXIS + 28 + labelRow[i]! * 11} textAnchor="middle">
+                {v.type}
+              </text>
+            )}
           </g>
         )
       })}

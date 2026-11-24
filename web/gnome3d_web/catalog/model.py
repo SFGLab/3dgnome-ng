@@ -35,8 +35,12 @@ def _columns(path: Path) -> frozenset[str]:
 @lru_cache(maxsize=None)
 def gene_table(path: Path) -> pd.DataFrame:
     """Returns the gene table of a cell type, read once for the process. A caller takes rows of it
-    and leaves the table as it is."""
-    return pd.read_csv(path, sep="\t")
+    and leaves the table as it is. The columns are gene_id, name, chrom, tss and strand with start
+    and end, the span of the gene. A table made before the spans were kept has the TSS as the span."""
+    table = pd.read_csv(path, sep="\t")
+    if "start" not in table.columns or "end" not in table.columns:
+        table["start"], table["end"] = table["tss"], table["tss"] + 1
+    return table
 
 
 def _no_strings() -> dict[str, str]:
@@ -74,7 +78,7 @@ class CellType:
         return [(n, self.root / self.clusters[n]) for n in names]
 
     def genes(self) -> pd.DataFrame:
-        """Returns the gene table with the columns gene_id, name, chrom, tss and strand."""
+        """Returns the gene table with the columns gene_id, name, chrom, tss, strand, start and end."""
         return gene_table(self.path("genes"))
 
 

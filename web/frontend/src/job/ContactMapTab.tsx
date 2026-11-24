@@ -200,6 +200,8 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               chrom={job.chrom}
               region={[job.start, job.end]}
               loops={annotations.data!.loops}
+              genes={annotations.data!.genes}
+              enhancers={annotations.data!.enhancers}
               window={[locus.start, locus.end]}
               onWindow={(start, end) => {
                 moveTo({ chrom: job.chrom, start, end })

@@ -16,7 +16,7 @@ export const CATALOG = {
 export const PREVIEW = {
   loops: { CTCF: [[11600000, 11900000, 7], [12000000, 12400000, 5]], RNAPII: [[11700000, 12300000, 4]] },
   counts: { CTCF: 2, RNAPII: 1 },
-  genes: [{ name: 'TNFRSF8', tss: 12063303 }],
+  genes: [{ name: 'TNFRSF8', tss: 12063303, start: 12063303, end: 12144207, strand: '+' }],
 }
 
 export const GENES = [

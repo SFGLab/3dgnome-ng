@@ -123,6 +123,9 @@ export function StructureTab({ api, summary, selected, gene: geneProp, enhancer 
               region={part ?? [region.start, region.end]}
               bounds={[region.start, region.end]}
               loops={loops}
+              genes={annotations.data.genes}
+              enhancers={annotations.data.enhancers}
+              gene={gene ?? undefined}
               onWindow={(a, b) => setPart(a <= region.start && b >= region.end ? null : [a, b])}
               onReset={part ? () => setPart(null) : undefined}
               selected={loopIndex < 0 ? null : loopIndex}

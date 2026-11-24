@@ -30,7 +30,7 @@ export const STRUCTURE: Structure = {
   anchors: [],
 }
 
-export const ANNOTATIONS = { genes: [{ name: 'TNFRSF8', tss: 12_063_302 }], enhancers: [[12_448_194, 12_450_774]], loops: [] }
+export const ANNOTATIONS = { genes: [{ name: 'TNFRSF8', tss: 12_063_302, start: 12_063_302, end: 12_144_206, strand: '+' }], enhancers: [[12_448_194, 12_450_774]], loops: [] }
 
 export const DISTANCE = {
   a: { bead: 0, bp: 12_063_000, offset: -302 },

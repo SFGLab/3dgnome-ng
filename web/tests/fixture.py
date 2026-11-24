@@ -28,7 +28,7 @@ def make_data(root: Path) -> Path:
     (ct / "centromeres.bed").write_text("chr1\t121700000\t125100000\n")
     (ct / "compartments.bed").write_text("chr1\t0\t1000000\tA\nchr1\t1000000\t2500000\tB\nchr1\t2500000\t4000000\tA\nchr2\t0\t1000000\tB\n")
     (ct / "config.ini").write_text("[main]\nmax_pet_length = 1000000\n\n[data]\n")
-    (ct / "genes.tsv").write_text("gene_id\tname\tchrom\ttss\tstrand\nG1\tALPHA\tchr1\t1310000\t+\nG2\tBETA\tchr1\t2600000\t-\n")
+    (ct / "genes.tsv").write_text("gene_id\tname\tchrom\ttss\tstrand\tstart\tend\nG1\tALPHA\tchr1\t1310000\t+\t1310000\t1352000\nG2\tBETA\tchr1\t2600000\t-\t2571000\t2600001\n")
     (ct / "enhancers.bed").write_text("chr1\t1490000\t1492000\nchr1\t2700000\t2702000\n")
     svs = root / "svs"
     svs.mkdir()

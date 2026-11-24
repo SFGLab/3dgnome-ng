@@ -1,6 +1,8 @@
 import { RefreshCw, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Loop } from '../api'
+import { FeatureTracks } from '../components/FeatureTracks'
+import type { TrackGene } from '../components/packGenes'
 import { wheelFactor } from './wheel'
 import { zoomed, describeLoop, ticks } from './loops'
 import { scoped } from '../lib/css'
@@ -35,14 +37,21 @@ type Props = {
   onReset?: () => void
   /** The line under the view while no loop is under the pointer and none is selected. */
   hint?: string
+  /** The genes of the region, drawn in rows under the loops. */
+  genes?: TrackGene[]
+  /** The enhancers of the region as start and end, drawn under the genes. */
+  enhancers?: [number, number][]
+  /** The name of the gene in use, which is drawn first and stronger. */
+  gene?: string
 }
 
 /**
  * The loops of a region in two dimensions. The genome is a line and every loop an arc between its
  * anchors, taller for a longer loop. An arc can be selected and a drag selects a part of the
- * region. The view only reports both.
+ * region. The view only reports both. The genes and the enhancers of the region are tracks under
+ * the loops, on the same stretch.
  */
-export function LoopView({ chrom, region, loops, selected = null, onSelect, window, onWindow, bounds, cursor = null, onReset, hint = '' }: Props) {
+export function LoopView({ chrom, region, loops, selected = null, onSelect, window, onWindow, bounds, cursor = null, onReset, hint = '', genes, enhancers, gene }: Props) {
   const [start, end] = region
   const width = Math.max(end - start, 1)
   const x = (p: number) => ((p - start) / width) * W
@@ -206,6 +215,7 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
           ))}
         <span className={cn('unit')}>{`${chrom}, Mb`}</span>
       </div>
+      {genes && <FeatureTracks chrom={chrom} view={[start, end]} genes={genes} enhancers={enhancers} first={gene} />}
     </div>
   )
 }

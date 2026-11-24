@@ -22,6 +22,11 @@ python web/scripts/make_dataset.py data $DATA_DIR HFFC6 ... \
   --note "RNAPII loops from BJ, a different foreskin fibroblast line"
 ```
 
+`genes.tsv` has gene_id, name, chrom, tss, strand, start and end, the span 0 based with the end left out. A
+table made before 2026-11-24 lacks the span, which the tracks of the genes read:
+`python web/scripts/add_gene_spans.py $DATA_DIR gencode.v40.annotation.gtf.gz` adds it and keeps the table as
+it was beside it. The site draws a gene of a table without spans at its TSS.
+
 The script copies the files and adds the catalog entry. It refuses a cell type that already
 exists. `--lymphoblastoid` marks the lines HiCDiffusion was trained on. For the others the form
 and the result page show the out of domain notice.
