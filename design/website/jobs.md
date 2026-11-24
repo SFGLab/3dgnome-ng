@@ -116,3 +116,18 @@ per kilobase, the config `CANONICAL_UNIFORM` of the engine.
   under 5 kb from the TSS, a bead or two away. An example about one enhancer names it, `enhancer` of
   `model/examples.ts`. The job page and the comparison then open with `gene` and `enhancer` in the address,
   mark that enhancer as B and measure it from the TSS in each job. Another selected gene ends this.
+
+## The states of a list of jobs
+
+`POST /api/jobs/states` takes `{"jobs": [...]}` with the page path of each job, `/jobs/<key>` or `/p/<token>`,
+and answers the state of each with the stage of a running job. A path that is no job of the site has null. The
+list of jobs of a browser asks it once, and again every 15 seconds only while one of its jobs waits or runs.
+Before 2026-11-24 the list asked the status route of every job every 15 seconds.
+
+## The check of the variants
+
+`POST /api/variants/check` applies each variant of the sample to the loops of the chromosome on its own and
+words the change. One application builds the network of the chromosome, 0.2 s for chr1 of GM12878 since the
+change to the vendored rules of 2026-11-24, `web/vendor/VENDORED.md`, and 2.2 s before it on the host of the
+site. The network of the region alone is not used: it gave other words in 3 of 178 applications.
+

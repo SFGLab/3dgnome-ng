@@ -47,3 +47,36 @@ def test_a_sample_the_vcf_lacks_is_one_error_for_both(tmp_path: Path) -> None:
             read(vcf, "NOBODY", Region("chr1", 0, 3_000_000))
     with pytest.raises(UnknownSample, match="FORMAT"):
         read_svs(vcf, "FORMAT", Region("chr1", 0, 3_000_000))
+
+
+# A network with anchors that share a start, rewritten by an inversion and a deletion. The loops
+# of each result are printed in sorted order.
+REWRITE = """
+import random, sys
+sys.path[:0] = [{web!r}, {vendor!r}]
+from personal3d import motifs, rewrite
+from personal3d.variants import SV
+rng = random.Random(3)
+starts = sorted(rng.sample(range(10_000, 3_000_000, 5_000), 90))
+anchors = [(s, s + rng.choice([400, 900, 1500])) for s in starts] + [(s, s + 2200) for s in starts[::3]]
+clusters = []
+for _ in range(400):
+    a, b = sorted(rng.sample(anchors, 2))
+    if a[1] < b[0]:
+        clusters.append(["chr1", a[0], a[1], "chr1", b[0], b[1], rng.choice("RLN"), rng.choice("RLN"), float(rng.randint(3, 40))])
+for sv in ([SV("chr1", 800_000, 1_400_000, "INV")], [SV("chr1", 2_000_000, 2_300_000, "DEL")]):
+    loops = rewrite.apply(clusters, rewrite.domains(clusters), {{"chr1": 4_000_000}}, sv, None, None, motifs.THRESHOLD)
+    print(sorted((lp.a, lp.b, lp.orient, lp.weight, lp.ref_a, lp.ref_b) for lp in loops))
+"""
+
+
+def test_the_rewritten_loops_do_not_depend_on_the_hash_seed_of_the_process() -> None:
+    import os
+    import subprocess
+    import sys
+
+    web = Path(__file__).resolve().parents[1]
+    code = REWRITE.format(web=str(web), vendor=str(web / "vendor"))
+    said = [subprocess.run([sys.executable, "-c", code], env={**os.environ, "PYTHONHASHSEED": seed}, capture_output=True, text=True, check=True).stdout for seed in ("1", "2", "3")]
+    assert len(said[0]) > 1000, "the network is rewritten: " + said[0][:200]
+    assert said[0] == said[1] == said[2], "the loops after the variants are the same under three hash seeds"

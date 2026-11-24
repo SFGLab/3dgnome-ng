@@ -468,7 +468,9 @@ class Genome(object):
         clusters = (tuple(line) if line[1] <= line[4] else
                     tuple(line[3:6] + line[:3] + [line[7]] + [line[6], line[8]])
                     for line in clusters)
-        clusters = set(clusters)
+        # In sorted order. The order of a set follows the hash seed of the process, and two
+        # anchors of one start were resolved by the order their loops came in.
+        clusters = sorted(set(clusters))
         clusters = list(map(list, clusters))
         for line in clusters:
             elems = [tuple(line[:3] + [line[6]]), tuple(line[3:6] + [line[7]])]
@@ -490,7 +492,9 @@ class Genome(object):
                     segment = segment_list[ind]
                     if segment.end >= end:
                         segments.append(segment)
-                        anchor_list = segment.get_anchor_list()
+                        # Read in place. A copy for each end of each loop made the build
+                        # quadratic in the anchors of a segment.
+                        anchor_list = segment._anchors
                         ind = anchor_list.bisect_key_left(start)
                         if ind >= len(anchor_list):
                             anchor = Anchor(chr_id, start, end, motif_orient)
