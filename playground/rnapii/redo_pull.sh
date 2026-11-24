@@ -17,6 +17,10 @@
 # URN as R, with M linked from the root BESIDE:
 #
 #   MAP="UCN=C URN=R" BESIDE=~/xu ROOT=~/xun EDEN=... bash playground/rnapii/redo_pull.sh
+#
+# The arms of the nine people of the trios have no arm E, OLD=none:
+#
+#   MAP="UC=C UR=R" OLD=none ROOT=~/trio_xt EDEN=user@host:/path/out/xt bash playground/rnapii/redo_pull.sh
 set -euo pipefail
 EDEN="${EDEN:?set EDEN to user@host:/path/out/xu}"
 ROOT="${ROOT:-$HOME/xu}"
@@ -26,14 +30,14 @@ BESIDE="${BESIDE:-}"
 HOST="${EDEN%%:*}"; DIR="${EDEN#*:}"
 mkdir -p "$ROOT/out/lr"
 {
-  printf "E\tcudaMMC models of %s\n" "$OLD"
+  [ "$OLD" = none ] || printf "E\tcudaMMC models of %s\n" "$OLD"
   for m in $MAP; do printf "%s\t%s of crosscell_arms.sh\n" "${m#*=}" "${m%%=*}"; done
   [ -z "$BESIDE" ] || printf "M\tM of %s\n" "$BESIDE"
 } > "$ROOT/out/lr/ARMS.txt"
 GLOB=""
 for m in $MAP; do GLOB="$GLOB *_${m%%=*}/chr*"; done
 for L in GM12878 H1ESC HFFC6; do
-  [ -e "$ROOT/out/lr/${L}_E" ] || ln -s "$OLD/out/lr/${L}_E" "$ROOT/out/lr/${L}_E"
+  [ "$OLD" = none ] || [ -e "$ROOT/out/lr/${L}_E" ] || ln -s "$OLD/out/lr/${L}_E" "$ROOT/out/lr/${L}_E"
   [ -z "$BESIDE" ] || [ -e "$ROOT/out/lr/${L}_M" ] || ln -s "$BESIDE/out/lr/${L}_M" "$ROOT/out/lr/${L}_M"
 done
 READY=$(ssh "$HOST" "cd '$DIR' && for d in $GLOB; do [ -d \"\$d\" ] || continue; [ \$(ls \$d/*.cif 2>/dev/null | wc -l) -ge 10 ] && [ \$(ls \$d/*.beads.tsv 2>/dev/null | wc -l) -ge 10 ] && [ -z \"\$(find \$d -mmin -10 -print -quit)\" ] && echo \$d; done; true")
@@ -49,4 +53,4 @@ for d in $READY; do
   rsync -a "$HOST:$DIR/$d/" "$dest/"
   n=$((n + 1))
 done
-echo "pulled $n chromosomes of arms, $(ls -d "$ROOT"/out/lr/*_[CRM]/chr* 2>/dev/null | wc -l) of 198 in the root"
+echo "pulled $n chromosomes of arms, $(ls -d "$ROOT"/out/lr/*_[CRM]/chr* 2>/dev/null | wc -l) in the root"

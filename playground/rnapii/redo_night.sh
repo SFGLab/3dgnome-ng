@@ -15,6 +15,12 @@
 # environment of redo_pull.sh for other arms. The runs without the loop dropout:
 #
 #   R=xun PULL='MAP="UCN=C URN=R" BESIDE=$HOME/xu' WS=... EDEN=... JOB=... bash playground/rnapii/redo_night.sh
+#
+# READOUTS is the readout script of playground/rnapii, redo_readouts.sh unless given. ARMS_DIR is the
+# folder of the arms under the checkout of the cluster, out/xu unless given. The nine people:
+#
+#   R=trio_xt PULL='MAP="UC=C UR=R" OLD=none' READOUTS=trio_readouts.sh ARMS_DIR=out/xt WS=... EDEN=... JOB=... \
+#     bash playground/rnapii/redo_night.sh
 set -u
 WS="${WS:?the ssh options and the host of the workstation}"
 EDEN="${EDEN:?user@host:/path of the checkout on the cluster}"
@@ -23,6 +29,8 @@ ROUNDS="${ROUNDS:-60}"
 EVERY="${EVERY:-1800}"
 R="${R:-xu}"
 PULL="${PULL:-}"
+READOUTS="${READOUTS:-redo_readouts.sh}"
+ARMS_DIR="${ARMS_DIR:-out/xu}"
 ws() { ssh -A -o ConnectTimeout=30 -o ServerAliveInterval=30 $WS "$@" 2>/dev/null; }
 until ws 'grep -q "^redo tools DONE" ~/gapfill-data/redo_tools.log'; do sleep 300; done
 echo "$(date +%H:%M) tools queue done"
@@ -31,8 +39,8 @@ for round in $(seq 1 "$ROUNDS"); do
   echo "$(date +%H:%M) round $round: ${left:-?} tasks of the array waiting or running"
   # The pull leaves out a chromosome with a file of the last ten minutes. The last round waits them out.
   [ "${left:-1}" = "0" ] && sleep 720
-  ws "$PULL EDEN=$EDEN/out/xu ROOT=\$HOME/$R bash ~/$R/repo/playground/rnapii/redo_pull.sh" | tail -1
-  ws "screen -S 3dgnome -X screen -t readouts bash -c 'ROOT=\$HOME/$R bash ~/$R/repo/playground/rnapii/redo_readouts.sh > ~/$R/logs/readouts.$round.log 2>&1; echo round done >> ~/$R/logs/readouts.$round.log'"
+  ws "$PULL EDEN=$EDEN/$ARMS_DIR ROOT=\$HOME/$R bash ~/$R/repo/playground/rnapii/redo_pull.sh" | tail -1
+  ws "screen -S 3dgnome -X screen -t readouts bash -c 'ROOT=\$HOME/$R bash ~/$R/repo/playground/rnapii/$READOUTS > ~/$R/logs/readouts.$round.log 2>&1; echo round done >> ~/$R/logs/readouts.$round.log'"
   until ws "grep -q '^round done' ~/$R/logs/readouts.$round.log"; do sleep 300; done
   ws "tail -n 3 ~/$R/logs/readouts.$round.log | head -2"
   [ "${left:-1}" = "0" ] && break
