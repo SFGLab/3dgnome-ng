@@ -8,11 +8,14 @@ resample, so a difference between two arms comes with an interval. A resample gi
 count, a pair of bins the product of its two counts as weight, and a pair keeps its genomic
 separation, so the strata of the SCC stay what they are. Every arm sees the same resamples.
 
-Four scores. Pearson on log counts, Spearman and SCC against raw Hi-C over every bin, and SCC
-against balanced Hi-C over the bins Hi-C maps. Spearman ranks the pairs once on the whole
-region and correlates the ranks under the weights. For each other arm it prints the first
-arm's score, the other's, the difference with its 95 percent interval, and the share of
-resamples the first arm leads in.
+Five scores. Pearson on log counts, Spearman and SCC against raw Hi-C over every bin, SCC
+against balanced Hi-C over the bins Hi-C maps, and SCC against raw Hi-C of the contacts per bead
+pair, the count of a cell over the product of the bead counts of its two bins, as
+`ensemble_score.py` has it. Spearman ranks the pairs once on the whole region and correlates the
+ranks under the weights. For each other arm it prints the first arm's score, the other's, the
+difference with its 95 percent interval, the share of resamples the first arm leads in and the
+two sided p value of the difference, twice the smaller share of resamples on one side of zero and
+no less than one over the number of resamples.
 """
 
 from __future__ import annotations
@@ -33,17 +36,23 @@ from legacy.validation.metrics.hic import observed_hic, simulated_contacts  # no
 RES = 25_000
 BLOCK = 10
 DRAWS = 1000
-NAMES = ("raw Pearson", "raw Spearman", "raw SCC", "balanced SCC, mapped")
+NAMES = ("raw Pearson", "raw Spearman", "raw SCC", "balanced SCC, mapped", "raw SCC per bead pair")
 
 
-def pooled(d: Path, bins: np.ndarray) -> np.ndarray:
-    """The contacts of every structure of an arm summed, at the battery's contact radius."""
+def pooled(d: Path, bins: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The contacts of every structure of an arm summed, at the battery's contact radius, and
+    the same contacts per bead pair."""
     sim = np.zeros((len(bins), len(bins)))
+    beads = np.zeros(len(bins))
     for c in sorted(d.glob("*.cif")):
         p, m, _, _ = load(c)
         r = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
         sim += simulated_contacts(p, m, bins, RES, r)
-    return sim
+        idx = np.searchsorted(bins, m, side="right") - 1
+        ok = (idx >= 0) & (idx < len(bins)) & (m < int(bins[-1]) + RES)
+        beads += np.bincount(idx[ok], minlength=len(bins))
+    pair = np.outer(beads, beads)
+    return sim, np.divide(sim, pair, out=np.zeros_like(sim), where=pair > 0)
 
 
 def wcorr(w: np.ndarray, x: np.ndarray, y: np.ndarray) -> float:
@@ -86,7 +95,9 @@ def main() -> None:
     mapped = (bal.sum(axis=0) > 0).astype(float)
     iu = np.triu_indices(n, 1)
     sep = iu[1] - iu[0]
-    sims = [pooled(d, bins)[iu] for d in dirs]
+    both = [pooled(d, bins) for d in dirs]
+    sims = [s[iu] for s, _ in both]
+    pairs = [q[iu] for _, q in both]
     o_raw, o_bal = raw[iu], bal[iu]
     lo_raw, rk_raw = np.log1p(o_raw), rankdata(o_raw)
     ls = [np.log1p(s) for s in sims]
@@ -94,7 +105,7 @@ def main() -> None:
     rng = np.random.default_rng(0)
     nb = -(-n // BLOCK)
     block = np.arange(n) // BLOCK
-    out = np.empty((DRAWS + 1, len(dirs), 4))
+    out = np.empty((DRAWS + 1, len(dirs), len(NAMES)))
     for b in range(DRAWS + 1):
         # The first row is the region as it is, every bin once.
         cnt = np.ones(n) if b == 0 else np.bincount(rng.integers(0, nb, nb), minlength=nb)[block].astype(float)
@@ -106,17 +117,19 @@ def main() -> None:
                 wcorr(w, rs[a], rk_raw),
                 wscc(w, sep, n, sims[a], o_raw),
                 wscc(wm, sep, n, sims[a], o_bal),
+                wscc(w, sep, n, pairs[a], o_raw),
             )
     print(f"{region}, {n} bins, {DRAWS} resamples of {BLOCK} bin blocks, first arm {dirs[0].name}")
-    print(f"  {'score':>22s} {'against':>40s}   first   other    diff   95 percent interval   first leads")
+    print(f"  {'score':>22s} {'against':>40s}   first   other    diff   95 percent interval   first leads       p")
     for a in range(1, len(dirs)):
         for k, name in enumerate(NAMES):
             d = out[1:, 0, k] - out[1:, a, k]
             d = d[np.isfinite(d)]
             lo, hi = np.percentile(d, [2.5, 97.5])
+            p = max(2 * min(float((d <= 0).mean()), float((d >= 0).mean())), 1 / DRAWS)
             print(
                 f"  {name:>22s} {dirs[a].name:>40s}  {out[0, 0, k]:6.3f}  {out[0, a, k]:6.3f}  "
-                f"{out[0, 0, k] - out[0, a, k]:+6.3f}   {lo:+6.3f} to {hi:+6.3f}        {float((d > 0).mean()):5.3f}"
+                f"{out[0, 0, k] - out[0, a, k]:+6.3f}   {lo:+6.3f} to {hi:+6.3f}        {float((d > 0).mean()):5.3f}   {p:.3f}"
             )
 
 
