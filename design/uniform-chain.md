@@ -2092,7 +2092,8 @@ Traced on 2026-11-25, `design/2026-11-25-rnapii-band.md`:
 - With `[distance] contact_half_saturation = 0.001` a kept loop is at one bead. The band rises from 0.173 to
   0.263 with RNAPII loops and from 0.251 to 0.347 with CTCF loops on chr19 of GM12878. HFFc6 repeats it. On
   H1 it rises on raw counts and falls on balanced counts. The overlaps of chain beads rise from 3 to 6 per
-  thousand to 40 to 141. With the radius of the arcs stage held at 2.88 they are 86. No change is adopted.
+  thousand to 40 to 141. With the radius of the arcs stage held at 2.88 they are 86. The maintainer decided on 2026-11-25 to change nothing: a lower agreement with RNAPII loops at
+  this range is expected.
 
 ### The uniform chain without the loop dropout
 

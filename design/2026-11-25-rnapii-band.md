@@ -5,6 +5,9 @@ with CTCF loops for pairs under 100 kb apart and worse for pairs 100 to 500 kb a
 of the loss, the part of it that the measure makes, the cause in the model and the ways to remove it, each with
 its numbers. Nothing in the model or on the site is changed.
 
+Decided by the maintainer on 2026-11-25: no change. RNAPII loops are expected to lower the agreement with
+Hi-C at this range. The loop target and the published score stay as they are.
+
 ## Summary
 
 1. The loss is real on two cell lines of three. On the bins where both models have beads, against balanced Hi-C
