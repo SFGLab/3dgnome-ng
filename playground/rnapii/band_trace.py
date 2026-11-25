@@ -10,6 +10,11 @@ for each arm:
 - the number of bins with beads and the stratum adjusted correlation of three bands of separation
   against the raw and the balanced map, over every bin, over the bins with beads in every arm and
   over those of them that the balancing of the map kept,
+- the same correlation of minus the mean distance of the centroids of two bins, on the bins with
+  beads in every arm. A contact is two beads within 1.33 bonds, which is another share of the pairs
+  for a tool with another chain. The distance reads no radius,
+- the rank correlation of that distance with the counts over every pair up to 2 Mb apart, with the
+  separation kept, the score that a fit of distances to a Hi-C map is built for,
 - for the pairs 100 to 500 kb apart with beads in every arm, by the classes of `band_pairs.py`: the
   contacts per 1,000 pairs of beads of a structure, the mean contact over the mean of its
   separation, beside the same ratio of the raw and of the balanced map. The pooled count of a cell
@@ -42,6 +47,29 @@ def beads_per_bin(cifs: list[Path], n: int) -> np.ndarray:
         idx = start // RES
         beads += np.bincount(idx[(idx >= 0) & (idx < n)], minlength=n)[:n]
     return beads / max(len(cifs), 1)
+
+
+def distance_band(cifs: list[Path], n: int, depth: int) -> np.ndarray:
+    """Returns minus the mean distance of the centroids of the beads of two bins over the
+    structures, in bonds of each structure, on the diagonals 1 to `depth`. A cell that no
+    structure has beads at holds zero."""
+    total = np.zeros((n, depth + 1))
+    seen = np.zeros((n, depth + 1))
+    for cif in cifs:
+        pos, start, _, _ = load(cif)
+        bond = float(np.median(np.linalg.norm(np.diff(pos, axis=0), axis=1)))
+        idx = start // RES
+        ok = (idx >= 0) & (idx < n)
+        count = np.bincount(idx[ok], minlength=n)[:n]
+        centre = np.full((n, 3), np.nan)
+        for k in range(3):
+            centre[:, k] = np.divide(np.bincount(idx[ok], weights=pos[ok, k], minlength=n)[:n], count, out=np.full(n, np.nan), where=count > 0)
+        for d in range(1, depth + 1):
+            dist = np.linalg.norm(centre[: n - d] - centre[d:], axis=1) / bond
+            has = np.isfinite(dist)
+            total[: n - d, d][has] += dist[has]
+            seen[: n - d, d][has] += 1
+    return -np.divide(total, seen, out=np.zeros_like(total), where=seen > 0)
 
 
 def classes(n: int, d0: int, d1: int, ctcf: str, rnapii: str, chrom: str) -> np.ndarray:
@@ -86,10 +114,11 @@ def main() -> None:
     depth = BANDS[-1][1] // RES
     obs, mapped, balanced = observed_band(mcool, chrom, RES, depth)
     n = obs.shape[0]
-    per_pair, beads, count = {}, {}, {}
+    per_pair, beads, count, distance = {}, {}, {}, {}
     for name, folder in zip(names, folders, strict=True):
         cifs = sorted(folder.glob("*.cif"))
         _, per_pair[name] = simulated_band(cifs, RES, n, depth)
+        distance[name] = distance_band(cifs, n, depth)
         beads[name] = beads_per_bin(cifs, n)
         count[name] = len(cifs)
     every = np.ones(n, dtype=bool)
@@ -100,13 +129,37 @@ def main() -> None:
     for name in names:
         print(f"{name}: {count[name]} structures, {int((beads[name] > 0).sum())} bins with beads, {beads[name].sum():,.0f} beads")
         for label, keep in keeps.items():
-            parts = []
+            parts, far = [], []
             for lo, hi in BANDS:
                 raw = scc(per_pair[name], obs, lo // RES, hi // RES, keep)
                 bal = scc(per_pair[name], balanced, lo // RES, hi // RES, keep)
-                rows.append({"arm": name, "bins": label, "sep_lo": lo, "sep_hi": hi, "scc_pair": raw, "scc_pair_bal": bal})
+                row = {"arm": name, "bins": label, "sep_lo": lo, "sep_hi": hi, "scc_pair": raw, "scc_pair_bal": bal}
                 parts.append(f"{lo // 1000} to {hi // 1000} kb raw {raw:.3f} balanced {bal:.3f}")
+                if keep is not every:
+                    # The distance has no value at a bin without beads.
+                    row["scc_distance"] = scc(distance[name], obs, lo // RES, hi // RES, keep)
+                    row["scc_distance_bal"] = scc(distance[name], balanced, lo // RES, hi // RES, keep)
+                    far.append(f"{lo // 1000} to {hi // 1000} kb raw {row['scc_distance']:.3f} balanced {row['scc_distance_bal']:.3f}")
+                rows.append(row)
             print(f"  {label:>28s}  " + "  ".join(parts))
+            if far:
+                print(f"  {'the same by the distance':>28s}  " + "  ".join(far))
+    # The rank correlation of the distance with the counts over every pair up to 2 Mb apart, the
+    # separation not removed. A fit of distances to a map is built for this score.
+    from scipy.stats import spearmanr
+
+    keep = common & mapped
+    pair = np.zeros((n, depth + 1), dtype=bool)
+    for d in range(1, depth + 1):
+        pair[: n - d, d] = keep[: n - d] & keep[d:]
+    rank = {}
+    for name in names:
+        has = pair & (distance[name] < 0)
+        rank[name] = {
+            "raw": float(spearmanr(distance[name][has], obs[has])[0]),
+            "balanced": float(spearmanr(distance[name][has], balanced[has])[0]),
+        }
+        print(f"{name}: rank correlation of the distance with the counts, separation kept, raw {rank[name]['raw']:.3f} balanced {rank[name]['balanced']:.3f}")
     d0, d1 = LO // RES + 1, HI // RES
     cls = classes(n, d0, d1, ctcf, rnapii, chrom)
     pair_ok = np.zeros_like(cls, dtype=bool)
@@ -140,7 +193,7 @@ def main() -> None:
     m = (cls >= 0) & pair_ok
     cells = [f"{1000 * float(per_pair[name][:, : d1 + 1][m].mean()) * count[name]:11.2f} {1.0:10.2f}" for name in names]
     print(f"  {'the band':>20s} {int(m.sum()):9,d}  {1.0:7.2f}  {1.0:12.2f}  " + "  ".join(f"{c:>22s}" for c in cells))
-    Path(out).write_text(json.dumps({"chrom": chrom, "bins": n, "common": int(common.sum()), "scc": rows, "classes": table}, indent=1))
+    Path(out).write_text(json.dumps({"chrom": chrom, "bins": n, "common": int(common.sum()), "scc": rows, "rank_distance": rank, "classes": table}, indent=1))
 
 
 if __name__ == "__main__":
