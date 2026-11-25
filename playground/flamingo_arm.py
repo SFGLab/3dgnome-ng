@@ -5,8 +5,9 @@
 FLAMINGO builds a structure from a Hi-C map and reads no loops. The map here is the half that our
 runs read, and the score reads the other half. The fragments are the 5 kb bins of the region and
 the domains are 1 Mb, the settings of its example. The matrix of the fragments holds the balanced
-counts of the map at 5 kb. The half maps have no resolution of 1 Mb, and the matrix of the domains
-is the sum of the balanced counts at 5 kb over each pair of domains.
+counts of the map at 5 kb, scaled to the sum of the raw counts of the region. The half maps have
+no resolution of 1 Mb, and the matrix of the domains is the sum of those counts over each pair of
+domains.
 
 The run is FLAMINGOrLite, the version its authors maintain, through `playground/flamingo_run.R`.
 FLAMINGO gives one structure a run. The ensemble is `--n` runs, each with its own draw of the 75
@@ -52,24 +53,40 @@ def write_matrices(mcool: str, chrom: str, lo: int, hi: int, work: Path) -> tupl
     per = DOMAIN_RES // FRAG_RES
     n_domain = -(-n // per)
     offset = c.offset(chrom) + first
-    coarse = np.zeros((n_domain, n_domain))
-    kept = 0
-    with open(work / "frag.tsv", "w") as fh:
-        step = 2_000
+    step = 2_000
+
+    def slabs():  # noqa: ANN202
         for s in range(0, n, step):
             e = min(n, s + step)
             span = (f"{chrom}:{(first + s) * FRAG_RES}-{(first + e) * FRAG_RES}", f"{chrom}:{(first + s) * FRAG_RES}-{last * FRAG_RES}")
             px = c.matrix(balance=True, as_pixels=True, join=False).fetch(*span)
-            px = px[np.isfinite(px["balanced"]) & (px["balanced"] > 0) & (px["bin2_id"] >= px["bin1_id"])]
+            yield px[np.isfinite(px["balanced"]) & (px["balanced"] > 0) & (px["bin2_id"] >= px["bin1_id"])]
+
+    # FLAMINGO takes the distance of a pair as its count to the power -0.25 and reads counts
+    # normalised on the scale of counts, as KR in a .hic file. The weights of a cooler put a
+    # balanced count near 1e-3. The balanced counts are scaled to the sum of the raw counts.
+    raw = balanced = 0.0
+    for px in slabs():
+        raw += float(px["count"].sum())
+        balanced += float(px["balanced"].sum())
+    scale = raw / balanced
+    coarse = np.zeros((n_domain, n_domain))
+    kept = 0
+    with open(work / "frag.tsv", "w") as fh:
+        for px in slabs():
             i = px["bin1_id"].to_numpy() - offset
             j = px["bin2_id"].to_numpy() - offset
-            v = px["balanced"].to_numpy()
+            v = px["balanced"].to_numpy() * scale
             np.add.at(coarse, (i // per, j // per), v)
             np.savetxt(fh, np.c_[i + 1, j + 1, v], fmt="%d\t%d\t%.8g")
             kept += len(v)
     ii, jj = np.nonzero(np.triu(coarse))
     np.savetxt(work / "domain.tsv", np.c_[ii + 1, jj + 1, coarse[ii, jj]], fmt="%d\t%d\t%.8g")
-    print(f"{chrom}:{first * FRAG_RES}-{last * FRAG_RES}: {n} fragments, {n_domain} domains, {kept:,} cells with a balanced count", flush=True)
+    print(
+        f"{chrom}:{first * FRAG_RES}-{last * FRAG_RES}: {n} fragments, {n_domain} domains, {kept:,} cells with a balanced count,"
+        f" scaled by {scale:.0f} to a mean of {raw / kept:.2f}",
+        flush=True,
+    )
     return n, n_domain, first * FRAG_RES
 
 
