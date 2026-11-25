@@ -2076,8 +2076,23 @@ HFFC6, p 0.50 and 0.52 over the 22 chromosomes, while they are higher at 5 and 1
 - By separation at 10 kb the rise is under 100 kb, +0.087, +0.034 and +0.065 on average. The fall is between 100
   and 500 kb, -0.070, -0.027 and -0.112 on average and -0.065 to -0.178 on chr17 and chr19.
 
-The two effects cancel at 25 kb on two lines. Open: the pairs between 100 and 500 kb that lose agreement on a
-chromosome dense in RNAPII loops are not identified yet.
+The two effects cancel at 25 kb on two lines.
+
+Traced on 2026-11-25, `design/2026-11-25-rnapii-band.md`:
+
+- On the bins where both models have beads, against balanced counts, the band of 100 to 500 kb moves by -0.041
+  on GM12878, +0.015 on H1 and -0.057 on HFFc6. The score over every bin against raw counts doubles the loss: a
+  bin without beads counts as a bin without contacts and the raw counts grow with the coverage of a bin.
+- The cause is the loop target. A spring holds a kept loop at 3 to 5 beads in this band and the contact radius
+  is 1.33 bonds. On chr19 of GM12878 the ends of RNAPII loops are in contact in 1.03 % of pairs without the
+  RNAPII loops, 0.25 % with them and 0.09 % with every loop kept.
+- The excluded volume of the arcs stage is not the cause: off, or at a radius of 1.33, the band is 0.163 against
+  0.173. The beads that RNAPII loops add are not the cause: with every RNAPII loop dropped the band is 0.249
+  against 0.251 for the CTCF loops.
+- With `[distance] contact_half_saturation = 0.001` a kept loop is at one bead. The band rises from 0.173 to
+  0.263 with RNAPII loops and from 0.251 to 0.347 with CTCF loops on chr19 of GM12878. HFFc6 repeats it. On
+  H1 it rises on raw counts and falls on balanced counts. The overlaps of chain beads rise from 3 to 6 per
+  thousand to 40 to 141. With the radius of the arcs stage held at 2.88 they are 86. No change is adopted.
 
 ### The uniform chain without the loop dropout
 

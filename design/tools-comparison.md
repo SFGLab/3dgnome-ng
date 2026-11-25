@@ -325,6 +325,13 @@ the scores of that band are 0.11, 0.14 and 0.16 with RNAPII loops, 0.29, 0.25 an
 0.28, 0.14 and 0.20 for cudaMMC. The loss is of the model with RNAPII loops against the model without them on
 the chromosomes dense in RNAPII loops. `design/uniform-chain.md` has its trace.
 
+On the bins where all three tools have beads, against balanced counts, `playground/rnapii/band_trace.py`,
+2026-11-25: 0.24, 0.18 and 0.24 under 100 kb against 0.09, 0.02 and 0.05 for cudaMMC and 0.10, 0.03 and 0.02
+for MultiMM. Between 100 and 500 kb 0.43, 0.43 and 0.50 against 0.20, 0.16 and 0.23 and against 0.18, 0.12 and
+0.13. Between 0.5 and 2 Mb 0.29, 0.22 and 0.29 against 0.10, 0.08 and 0.09 and against 0.07, 0.02 and 0.06. The
+tables are in `data/figures/trace-2026-11-25/tools_trace/`. `design/2026-11-25-rnapii-band.md` has the reason
+for the bins.
+
 ### The two chains on the same runs
 
 The structures of the two chains of each run against half b, the same bootstrap,
