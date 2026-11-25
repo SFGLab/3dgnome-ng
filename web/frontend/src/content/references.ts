@@ -172,6 +172,11 @@ export const REFERENCES: Reference[] = [
     authors: 'Mallick S, Li H, Lipson M, et al.', venue: 'Nature 538, 201-206',
   },
   {
+    key: 'hgdpsv2020', group: 'data', year: 2020, doi: '10.1016/j.cell.2020.05.024',
+    title: 'Population structure, stratification, and introgression of human structural variation',
+    authors: 'Almarri MA, Bergström A, Prado-Martinez J, et al.', venue: 'Cell 182, 189-199',
+  },
+  {
     key: 'beagle2018', group: 'algorithms', year: 2018, doi: '10.1016/j.ajhg.2018.07.015',
     title: 'A one-penny imputed genome from next-generation reference panels',
     authors: 'Browning BL, Zhou Y, Browning SR', venue: 'American Journal of Human Genetics 103, 338-348',
@@ -300,6 +305,12 @@ export const DATA_SOURCES: DataSource[] = [
     accessions: [{ id: 'PRJEB9586', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB9586' }],
     note: 'The project calls single base variants alone. Its samples were lifted to GRCh38 and phased against the 1000 Genomes 30x panel with Beagle 5.5 (Browning et al., AJHG 2018). The structural variants of the panel were then imputed onto them. The set keeps the 35,434 variants with an imputation quality, DR2, of 0.8 or more.',
     label: 'Mallick et al., Nature 2016', ref: 'sgdp2016',
+  },
+  {
+    data: 'Structural variants, HGDP, 911 samples', usedFor: 'variant structures',
+    accessions: [{ id: 'HGDP structural variation', url: 'https://ngs.sanger.ac.uk/production/hgdp/hgdp_structural_variation/' }],
+    note: 'The calls of Manta genotyped with Graphtyper on GRCh38 that passed the filters of the project: 74,965 deletions, insertions, duplications and inversions. The genotypes are unphased. Insertions of unknown length are left out.',
+    label: 'Almarri et al., Cell 2020', ref: 'hgdpsv2020',
   },
   {
     data: 'Reference genome, hg38', usedFor: 'sequence for HiCDiffusion',

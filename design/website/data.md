@@ -53,6 +53,24 @@ Records need SVTYPE of DEL, INS, INV or DUP, with END or SVLEN. The ALT sequence
 is used when it has one. Other types are skipped and counted on the result page. Many large call
 sets are fine, as a job reads only its region through tabix.
 
+The call set of the Human Genome Diversity Project is written from the files of the project, Almarri et al.,
+Cell 2020, `https://ngs.sanger.ac.uk/production/hgdp/hgdp_structural_variation/`:
+
+```bash
+python web/scripts/make_hgdp_sv_set.py HGDP.metadata RAW/ HGDP.vcf HGDP.samples.tsv \
+  del.manta.vcf.gz ins.manta.vcf.gz dup.manta.vcf.gz inv.manta.vcf.gz
+bgzip HGDP.vcf
+python web/scripts/add_sv_set.py $DATA_DIR HGDP HGDP.vcf.gz --label "HGDP, 911 samples"
+python web/scripts/add_sample_table.py $DATA_DIR HGDP HGDP.samples.tsv
+```
+
+The files of the project have the type and the size of a call in its ALT field and the samples under their
+accessions. The script writes the fields the site reads and the names of the project. It keeps a record that
+passed the filters with a carrier whose own genotype passed: 74,965 of 102,367, for 911 samples, 57,081
+deletions, 10,047 insertions, 6,259 duplications and 1,578 inversions, 3,599 to 6,342 a sample. An insertion
+has its sequence from the raw calls of the project. The 8,893 insertions of unknown length are left out. The
+genotypes are unphased. The site puts an unphased variant on the first haplotype.
+
 ## Gene expression
 
 A table has the genes in its first column, by Ensembl id or by name, an optional column `length`

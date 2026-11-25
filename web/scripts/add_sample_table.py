@@ -4,8 +4,10 @@
 
 The pedigree file is that of the 1000 Genomes 30x panel,
 `20130606_g1k_3202_samples_ped_population.txt`. The table goes to `svs/<NAME>.samples.tsv`
-with the columns sample, sex, population, superpopulation, father and mother. The catalog is
-first copied to `catalog.json.before-sample-table-<NAME>`. An existing table is refused.
+with the columns sample, sex, population, superpopulation, father and mother. A file that
+already has those six columns as its header is taken as the table, as
+`make_hgdp_sv_set.py` writes it. The catalog is first copied to
+`catalog.json.before-sample-table-<NAME>`. An existing table is refused.
 """
 
 from __future__ import annotations
@@ -16,13 +18,19 @@ import shutil
 from pathlib import Path
 
 SEX = {"1": "male", "2": "female"}
+COLUMNS = ["sample", "sex", "population", "superpopulation", "father", "mother"]
 
 
 def read_pedigree(path: Path) -> dict[str, dict[str, str]]:
-    """Returns the rows of the pedigree by sample."""
+    """Returns the rows of the pedigree, or of a table of the six columns, by sample."""
     rows: dict[str, dict[str, str]] = {}
     with path.open() as fh:
         header = fh.readline().split()
+        if header == COLUMNS:
+            for line in fh:
+                f = line.rstrip("\n").split("\t")
+                rows[f[0]] = dict(zip(COLUMNS[1:], [*f[1:], "", "", "", "", ""][:5], strict=True))
+            return rows
         col = {name.lower(): i for i, name in enumerate(header)}
         for line in fh:
             f = line.split()
