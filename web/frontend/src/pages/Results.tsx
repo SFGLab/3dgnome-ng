@@ -1,14 +1,19 @@
 import { DocPage } from '../components/DocPage'
 import { BarChart, ChartKey, type Bar, type Group } from '../components/BarChart'
+import { Equation } from '../components/Equation'
 import { LineChart, type Line, type Point } from '../components/LineChart'
 import { ToolRuns, type ToolRun } from '../components/ToolRuns'
 import { hidden } from '../flags'
 import { ROUTES } from '../routes'
 import { scoped } from '../lib/css'
 import { pValue } from '../lib/pValue'
+import { REFERENCES, referenceLink } from '../content/references'
 import sheet from './results.module.css'
 
 const cn = scoped(sheet)
+
+/** The paper that defines the stratum adjusted correlation. */
+const HICREP = referenceLink(REFERENCES.find((r) => r.key === 'hicrep2017')!)
 
 /** Returns a bar. `p` is the p value of its test against the bar of 3D-GNOMEᴺᴳ with CTCF loops of the same group. */
 const bar = (series: Bar['series'], value: number | null, digits = 2, p?: number): Bar => ({
@@ -127,6 +132,7 @@ const SECTIONS: [to: string, label: string][] = [
   ['#tools', 'Other tools'],
   [`${ROUTES.method}#limitations`, 'Limitations'],
   ['#runtime', 'Runtime'],
+  ['#measures', 'Measures'],
 ]
 
 /** The models against measured data and against cudaMMC and MultiMM and the runtime of the three. */
@@ -156,6 +162,9 @@ export function Results() {
           />
         ))}
       </div>
+      <p className={cn('reading-note')}>
+        The stratum adjusted correlation is the measure of HiCRep (<a href={HICREP}>Yang et al., Genome Research 2017</a>). It compares pairs of bins the same distance apart. The fall of contacts with distance adds nothing to it. The <a href="#measures">Measures</a> section has its formula and those of the other numbers of this page.
+      </p>
       <p className={cn('reading-note')}>
         The contact map of a model is the sum of the contacts of its ten structures. The count of a cell of this map is divided by the number of bead pairs of its two bins. Without the division a bin with more beads has more contacts, wherever the beads are. Both chains have beads only on the stretches that loops cover. On these stretches the chain of one bead per kilobase has 25 beads in a bin of 25 kb. The chain of loop anchors has between 1 and 68 beads there, 14 in the median. It has more of them where Hi-C has more reads. The rank correlation between the number of beads of a bin and its Hi-C reads is 0.27 to 0.53 in the three cell lines for this chain and under 0.05 for the other. The undivided count of the chain of loop anchors therefore agrees with Hi-C through the number of beads alone. On GM12878 at 25 kb it scores 0.53 undivided and 0.41 per pair of beads. The chain of one bead per kilobase scores 0.50 and 0.49.
       </p>
@@ -304,6 +313,48 @@ export function Results() {
         </div>
         <p className={cn('reading-note')}>
           By region size, cudaMMC is the fastest tool from 10 Mb. Below 10 Mb cudaMMC and MultiMM take about the same time. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. By bead count, MultiMM is the fastest tool up to about 30,000 beads and 3D-GNOMEᴺᴳ is the fastest above that. cudaMMC takes about the same time as 3D-GNOMEᴺᴳ up to about 7,000 beads and more time above that. Each further structure of the same region costs 3D-GNOMEᴺᴳ less time than the first. One structure of chr1 takes 6.4 minutes and three structures take 11.2 minutes.
+        </p>
+      </section>
+      <section id="measures">
+        <h2>Measures</h2>
+        <p className="intro">
+          This section has the formula of each number of the page. A model is the set of structures built for one region, ten unless a chart states another number. In the formulas <var>s</var> runs over the <var>S</var> structures of a model.
+        </p>
+        <h3 className={cn('sub-head')}>Contacts per pair of beads</h3>
+        <div className="equations">
+          <Equation name="m_contact" />
+        </div>
+        <p className={cn('reading-note')}>
+          Two beads of a structure are in contact when they are within 1.33 times the median distance of two neighbouring beads of that structure. <var>n</var> is the number of such pairs of structure <var>s</var> with one bead in bin <var>i</var> and the other in bin <var>j</var>. <var>b</var> is the number of beads of structure <var>s</var> in bin <var>i</var>. The contacts of a cell are divided by the number of bead pairs of its two bins. The note under the first charts gives the reason.
+        </p>
+        <h3 className={cn('sub-head')}>Stratum adjusted correlation</h3>
+        <div className="equations">
+          <Equation name="m_scc" />
+        </div>
+        <p className={cn('reading-note')}>
+          This is the measure of HiCRep (<a href={HICREP}>Yang et al., Genome Research 2017</a>). The pairs of bins that are <var>d</var> bins apart form one stratum. <var>r</var> is the Pearson correlation between the contacts per pair of beads <var>c</var> and the Hi-C counts <var>h</var> over the <var>N</var> pairs of the stratum. A stratum is weighted by its number of pairs and by the standard deviations of the two maps in it. The strata run from one bin to 2 Mb on the charts of chromosomes 1 to 22 and over the whole region on the charts of the other tools. The Hi-C counts are the raw counts of the half of the map that no model read. The maps are not smoothed.
+        </p>
+        <h3 className={cn('sub-head')}>Enhancer to promoter distance</h3>
+        <div className="equations">
+          <Equation name="m_distance" />
+        </div>
+        <p className={cn('reading-note')}>
+          The two positions are those of the bead nearest the centre of the enhancer and of the bead nearest the transcription start site of the gene, in structure <var>s</var>. The distance is in bead units, the mean distance of two neighbouring beads. The chart gives the median over the pairs that an RNAPII loop joins and no CTCF loop.
+        </p>
+        <h3 className={cn('sub-head')}>Link to expression</h3>
+        <div className="equations">
+          <Equation name="m_expression" />
+        </div>
+        <p className={cn('reading-note')}>
+          The distance of a gene in a cell line is the smallest enhancer to promoter distance over the enhancers of that cell line. <var>R</var> is the rank of this distance among the genes of the cell line, as a share between 0 and 1. <var>e</var> is the expression of the gene. The log ratio of expression between the cell lines <var>A</var> and <var>B</var> is that of DESeq2. A gene whose enhancer is closer in <var>B</var> has a negative change of rank. With the flipped sign a higher value means that the genes whose enhancers come closer are expressed more.
+        </p>
+        <h3 className={cn('sub-head')}>Micro-C loops placed</h3>
+        <div className="equations">
+          <Equation name="m_loop" />
+          <Equation name="m_placed" />
+        </div>
+        <p className={cn('reading-note')}>
+          The numerator of the first formula is the mean 3D distance between the two bins of loop <var>l</var> over the structures. The denominator is the median of the same distance over the control pairs of the loop. A control pair is the two bins of the loop shifted together by 3 to 10 bins along the diagonal, which keeps the genomic separation. A loop is placed when its two ends are at least a fifth closer than the median control. A moved loop is a loop shifted by 30 bins, to a place where no loop was called. The share of moved loops that a model places is the rate at which a pair without a loop passes the threshold.
         </p>
       </section>
     </DocPage>

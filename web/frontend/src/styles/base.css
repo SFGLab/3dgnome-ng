@@ -1,11 +1,8 @@
-@import '@fontsource/figtree/400.css';
-@import '@fontsource/figtree/500.css';
-@import '@fontsource/figtree/600.css';
-@import '@fontsource/figtree/700.css';
-@import '@fontsource/figtree/800.css';
-/* Figtree has no Greek letters. Those of the Method page are drawn in Inter. */
-@import '@fontsource/inter/greek-400.css';
-@import '@fontsource/inter/greek-600.css';
+/* IBM Plex Sans has no weight above 700. A rule that asks for 800 is drawn at 700. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans/700.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import './tokens.css';
 
@@ -185,11 +182,11 @@ a:not(.button, .button-link, .cite-button, .chip-button, .action, .brand, .recen
 
 /* The raised NG of the site's name. Its capitals end level with the capitals
    of the name. It stays on the baseline of the name and is lifted by the
-   height of the capitals of the name less its own. The capitals of Figtree are
-   0.7 em tall, `--cap`. `--ng` is its size against the size of the name. */
+   height of the capitals of the name less its own. The capitals of IBM Plex Sans
+   are 0.698 em tall, `--cap`. `--ng` is its size against the size of the name. */
 sup.ng {
   --ng: 0.42;
-  --cap: 0.7;
+  --cap: 0.698;
   position: relative;
   top: calc(-1em * var(--cap) * (1 / var(--ng) - 1));
   font-size: calc(var(--ng) * 1em);
@@ -197,3 +194,10 @@ sup.ng {
   vertical-align: baseline;
   color: var(--accent);
 }
+
+/* A symbol of a formula named in a sentence. The slant of its last letter reaches into the space
+   after it. */
+var {
+  padding-right: 0.12em;
+}
+

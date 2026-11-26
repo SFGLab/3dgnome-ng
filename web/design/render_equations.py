@@ -52,6 +52,16 @@ EQUATIONS: dict[str, tuple[str, int]] = {
     "stretch_pairs": (r"$t_{ab} = b(s_{ab})\quad \mathrm{for}\ s_{ab} \leq 5\ \mathrm{Mb}\ \mathrm{or}\ |a - b| \in \{2^m,\ 3 \cdot 2^m\}$", DISPLAY),
     "bond_two": (r"$E_{\mathrm{bond}} = w_d\, k \left(\frac{d - t}{t}\right)^2,\quad k = k_s\ \mathrm{for}\ d > t,\quad k = k_q\ \mathrm{for}\ d < t$", DISPLAY),
     "node_move": (r"$\mathbf{x}_i \rightarrow \mathbf{x}_i + \Delta,\quad \mathbf{x}_{i-1} \rightarrow \mathbf{x}_{i-1} - \frac{\Delta}{2},\quad \mathbf{x}_{i+1} \rightarrow \mathbf{x}_{i+1} - \frac{\Delta}{2}$", DISPLAY),
+    # The measures of the Results page.
+    "m_contact": (r"$c_{ij} = \frac{\sum_s n^s_{ij}}{B_i\, B_j},\quad B_i = \sum_s b^s_i$", DISPLAY),
+    "m_scc": (r"$\mathrm{SCC} = \frac{\sum_d w_d\, r_d}{\sum_d w_d},\quad w_d = N_d\, \sigma_d(c)\, \sigma_d(h)$", DISPLAY),
+    "m_distance": (r"$d_{EP} = \frac{1}{S} \sum_{s=1}^{S} \left\Vert \mathbf{x}^s_E - \mathbf{x}^s_P \right\Vert$", DISPLAY),
+    "m_expression": (
+        r"$\rho_{AB} = -\,\mathrm{Spearman}_g\left(R^B_g - R^A_g,\ \log_2 \frac{e^B_g}{e^A_g}\right)$",
+        DISPLAY,
+    ),
+    "m_loop": (r"$\lambda_l = \frac{d_l}{\mathrm{median}_k\ d_{l,k}},\quad \mathrm{placed\ when}\ \lambda_l \leq 0.8$", DISPLAY),
+    "m_placed": (r"$\mathrm{score} = \frac{\mathrm{placed\ loops}}{\mathrm{loops}} - \frac{\mathrm{placed\ moved\ loops}}{\mathrm{moved\ loops}}$", DISPLAY),
     "t_loop_simple": (r"$k \left(\frac{d_{ij} - t_{ij}}{t_{ij}}\right)^2$", CELL),
     "t_background": (r"$w_b \left(\frac{d_{ij} - b_{ij}}{\min(d_{ij}, b_{ij})}\right)^2$", CELL),
     "t_repulsion": (r"$\max\left(0,\ \frac{1}{d_{ij}} - \frac{1}{r_c}\right)$", CELL),

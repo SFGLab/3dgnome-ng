@@ -78,6 +78,15 @@ section on the two chains, no table and no rule of the uniform chain, and its se
 numbered without them. The equations are drawn by `web/design/render_equations.py`; their TeX for a screen
 reader is `src/assets/eq/tex.json`.
 
+The Results page ends with the section Measures: the formula of each number of the page, the contacts per
+pair of beads, the stratum adjusted correlation, the enhancer to promoter distance, the link to expression and
+the Micro-C loops placed, drawn by the same script under the names `m_*`. The stratum adjusted correlation is
+cited to HiCRep there, under the first charts, on the Help page and at the SCC of the contact map card of a
+job.
+
+The text is set in IBM Plex Sans, served by the site from `@fontsource/ibm-plex-sans`. Code is in JetBrains
+Mono. IBM Plex Sans has no weight above 700.
+
 The title page has two rows of examples. The first is the TNFRSF8 comparison over two columns
 with the contact map. The second is the GSTM1 deletion with the comparison of VPS13D in GM12878
 and H1ESC over two columns. `web/scripts/make_previews.py` draws each from its finished job, the

@@ -299,7 +299,11 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               <span className={cn('big-value')}>{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className={cn('unit')}>Spearman correlation</span>
             </p>
             <p className={cn('card-text')}>{`Pairs of bins the same distance apart are compared${reach(maps.data.rank_reach)}. The fall of contacts with distance adds nothing to this number.`}</p>
-            <p className={cn('card-text')} title={maps.data.scc_about}>{`SCC ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, the same comparison on the values and not their ranks.`}</p>
+            {/* SCC is the stratum adjusted correlation of HiCRep. Its name links to the paper. */}
+            <p className={cn('card-text')} title={maps.data.scc_about}>
+              <a href="https://doi.org/10.1101/gr.220640.117" title="The stratum adjusted correlation of HiCRep, Yang et al., Genome Research 2017">SCC</a>
+              {` ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, the same comparison on the values and not their ranks.`}
+            </p>
             {typeof maps.data.loop_enrichment === 'number' && (
               <p className={cn('card-text')}>{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
             )}
