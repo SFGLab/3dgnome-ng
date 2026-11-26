@@ -22,7 +22,7 @@
   --original: #A9A8A3;
   --multimm: #C2571A;
   --good: #17794A;
-  --font: "Inter", system-ui, sans-serif;
+  --font: "Figtree", "Inter", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   color-scheme: light;
 }
@@ -47,7 +47,7 @@
     --original: #8E8D88;
     --multimm: #E0622E;
     --good: #4CC38A;
-    --font: "Inter", system-ui, sans-serif;
+    --font: "Figtree", "Inter", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, monospace;
     color-scheme: dark;
   }
@@ -72,7 +72,7 @@
   --original: #8E8D88;
   --multimm: #E0622E;
   --good: #4CC38A;
-  --font: "Inter", system-ui, sans-serif;
+  --font: "Figtree", "Inter", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   color-scheme: dark;
 }

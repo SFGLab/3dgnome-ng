@@ -12,6 +12,7 @@
     "api": "openapi-typescript src/api/openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@fontsource/figtree": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@radix-ui/react-slider": "^1.6.1",
