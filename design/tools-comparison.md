@@ -365,3 +365,48 @@ placed above the moved loops, 10,000 resamples of the loops and of the moved loo
 +0.319 and +0.354 on GM12878, H1ESC and HFFC6, p under 0.001 each. Against MultiMM +0.032 with p 0.21, +0.372
 and +0.361 with p under 0.001. The share of loops with beads at both ends, exact sign test over the loops: over
 cudaMMC on every line, under MultiMM by 22, 19 and 19 loops, p under 0.001 each.
+
+## pyLoopSage and FLAMINGO, measured and left out, 2026-11-26
+
+The maintainer asked for a comparison with pyLoopSage 2.0.1 and with FLAMINGO, Wang et al., Nature
+Communications 2022. The decision of 2026-11-26 is to leave both out of the comparison: the two tools answer
+other questions and their scores add nothing to the page. The measurement is kept here.
+
+pyLoopSage simulates loop extrusion from the CTCF loops and folds each snapshot with molecular dynamics. It ran
+at its defaults, one bead per 2 kb, with its own search of the CTCF motifs. Its ensemble was ten frames
+after the burn in. FLAMINGO fits one structure to a Hi-C map by low rank matrix completion and reads no loops.
+It ran as FLAMINGOrLite at its defaults, 5 kb fragments in domains of 1 Mb, on half a of the map, ten runs for
+ten structures. Its counts are the balanced counts scaled to the sum of the raw counts: it takes a distance as
+the count to the power -0.25. With the balanced counts of a cooler, near 1e-3, a pair with contacts is
+further apart than a pair without. The runs before that scale are not kept as results.
+
+chr1 1 to 60 Mb, ten structures a tool, against half b. The three values are GM12878, H1 and HFFc6.
+
+| Score | 3D-GNOMEᴺᴳ | FLAMINGO | pyLoopSage | MultiMM | cudaMMC |
+|---|---|---|---|---|---|
+| raw SCC per bead pair at 25 kb | 0.47, 0.35, 0.45 | 0.17, 0.33, 0.21 | 0.24, 0.08, 0.10 | 0.30, 0.16, 0.18 | 0.27, 0.17, 0.20 |
+| by the distance, under 100 kb | 0.35, 0.28, 0.37 | 0.37, 0.46, 0.42 | 0.11, -0.01, 0.06 | 0.09, 0.03, 0.06 | 0.12, 0.08, 0.11 |
+| by the distance, 100 to 500 kb | 0.52, 0.50, 0.58 | 0.52, 0.57, 0.48 | 0.00, -0.08, -0.04 | 0.16, 0.09, 0.16 | 0.18, 0.20, 0.23 |
+| by the distance, 0.5 to 2 Mb | 0.27, 0.29, 0.37 | 0.25, 0.21, 0.19 | -0.08, -0.08, -0.05 | 0.05, 0.02, 0.03 | 0.23, 0.16, 0.25 |
+| rank of the distance, separation kept | 0.83, 0.77, 0.81 | 0.57, 0.56, 0.54 | 0.60, 0.53, 0.54 | 0.27, 0.22, 0.31 | 0.62, 0.55, 0.69 |
+
+The scores by the distance are the stratum adjusted correlation of minus the mean distance of two bins with
+the balanced counts at 10 kb, on the bins where every tool has beads, `playground/rnapii/band_trace.py`. A
+contact is two beads within 1.33 bonds, which is 8.5 percent of the pairs 100 to 500 kb apart for FLAMINGO and
+0.6 percent for the uniform chain. The distance reads no radius.
+
+- FLAMINGO is level with the uniform chain or above it under 500 kb and below it beyond. On nine runs of 5 Mb
+  with five structures it is higher under 100 kb, 0.42 against 0.29. It is higher between 100 and 500 kb too,
+  0.63 against 0.52, p 0.03 for both. On nine runs of 20 Mb the two are level under 100 kb, 0.33 and 0.34. The
+  uniform chain is higher beyond, 0.48 against 0.31 and 0.31 against 0.15, on nine of nine. FLAMINGO fits each domain
+  of 1 Mb to the map and turns the domains onto a coarse backbone.
+- By the block bootstrap of the SCC per bead pair at 25 kb the uniform chain is above every tool on every line,
+  p 0.001. It is level with FLAMINGO on H1, +0.02, p 0.96.
+- pyLoopSage has no agreement beyond 100 kb. Its 95 frames score as its ten.
+- Ten structures of 60 Mb took pyLoopSage 3.2 to 4.9 h on an RTX 3090 and FLAMINGO 1.4 to 1.8 h on 20 cores,
+  with other jobs on the machine.
+
+pyLoopSage was not run on the regions of 20 Mb and of 5 Mb: its queue was stopped at the decision. The tables
+are in `data/figures/tools-more-2026-11-25/` and the wrappers of the two tools in
+`data/figures/retired/`, under `playground/` and `slurm/ensemble/`.
+
