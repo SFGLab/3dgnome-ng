@@ -26,6 +26,8 @@ services:
       # GPUS and WORKERS_PER_GPU in its place.
       GPU_SLOTS: "${GPU_SLOTS:-}"
       BASE_PATH: "${BASE_PATH:-}"
+      # The address of the host as a reader types it, for the canonical links and the sitemap.
+      PUBLIC_URL: "${PUBLIC_URL:-}"
       RETENTION_DAYS: "${RETENTION_DAYS:-14}"
       MAX_REGION_MB: "${MAX_REGION_MB:-20}"
       # The image's source directory belongs to root. The caches go next to the results.

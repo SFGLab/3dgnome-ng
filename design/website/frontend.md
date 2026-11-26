@@ -84,6 +84,26 @@ the Micro-C loops placed, drawn by the same script under the names `m_*`. The st
 cited to HiCRep there, under the first charts, on the Help page and at the SCC of the contact map card of a
 job.
 
+## The head of a page, the icon and search engines
+
+`src/content/pages.json` has the title and the description of every page of the app. The build copies it to
+`dist/pages.json`. The server reads it and gives each page its own title, description, canonical link and the
+tags of a shared link in the head of the app, `gnome3d_web/frontend.py`. A search engine gets them without
+running the app. The app sets the title of the tab from the same file on every change of the page.
+
+- The title page also carries a description of the tool as JSON-LD, with the plain name 3D-GNOME NG beside the
+  name with the raised letters.
+- The page of a job, the job list of a browser, a page that the configuration hides and a missing address
+  carry `noindex`. The answers of the API and the files of a job carry it as a header.
+- `/sitemap.xml` lists the pages a search engine may index. It needs `PUBLIC_URL`, the address of the host as
+  a reader types it. Without the variable the pages have no canonical link and the site has no sitemap.
+- `/robots.txt` keeps the API and the jobs out. A search engine reads that file at the root of a host alone.
+  A site under a base path relies on the `noindex` marks.
+
+`public/` holds the icon, `favicon.svg`, its PNG and ICO copies, the manifest and `og.png`, the picture of a
+shared link. `og.png` is the top 1200 by 630 pixels of the title page. Make it again after a change of that
+page.
+
 The text is set in IBM Plex Sans, served by the site from `@fontsource/ibm-plex-sans`. Code is in JetBrains
 Mono. IBM Plex Sans has no weight above 700.
 

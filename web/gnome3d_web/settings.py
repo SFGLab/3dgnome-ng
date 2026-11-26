@@ -19,6 +19,9 @@ MAX_REGION_MB   the longest region the form accepts, in Mb, default 20. limits.r
 FRONTEND_DIST   the frontend build, default web/frontend/dist
 BASE_PATH     the path the site is served under, /new for a site at /new/, default the root.
               The frontend is built with the same value
+PUBLIC_URL    the address of the host as a reader types it, https://3dgnome.mini.pw.edu.pl. The
+              pages get their canonical link and the site its sitemap from it. Without it the
+              pages have no canonical link and the site has no sitemap
 MAX_STRUCTURES  the most structures a job may ask for, default 100
 UPLOAD_MAX_MB   the largest upload, in MB, default 200
 LINK_READS    how many contact map links the server reads at once, default 4
@@ -102,6 +105,7 @@ class Settings:
     link_allow_private: bool = False
     link_reads: int = 4
     base_path: str = ""
+    public_url: str = ""
     site_config: Path | None = None
     workers_per_gpu: int = 1
     # None divides the cores of the server by the jobs at once.
@@ -197,6 +201,7 @@ class Settings:
             link_allow_private=os.environ.get("LINK_ALLOW_PRIVATE", "") == "1",
             link_reads=int(os.environ.get("LINK_READS", "4")),
             base_path=base_path(os.environ.get("BASE_PATH", "")),
+            public_url=os.environ.get("PUBLIC_URL", "").strip().rstrip("/"),
             site_config=Path(os.environ["SITE_CONFIG"]) if os.environ.get("SITE_CONFIG") else None,
             frontend_dist=Path(os.environ.get("FRONTEND_DIST", Path(__file__).resolve().parents[1] / "frontend" / "dist")),
         )

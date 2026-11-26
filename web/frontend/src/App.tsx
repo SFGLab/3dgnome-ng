@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { PageTitle } from './components/PageTitle'
 import { Cite } from './pages/Cite'
 import { Help } from './pages/Help'
 import { Method } from './pages/Method'
@@ -25,6 +26,7 @@ export function App() {
   useEffect(() => startSync(), [])
   return (
     <BrowserRouter basename={BASE || '/'}>
+      <PageTitle />
       <Layout>
         <Suspense fallback={null}>
         <Routes>

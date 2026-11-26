@@ -1,0 +1,12 @@
+{
+  "name": "3D-GNOME NG",
+  "short_name": "3D-GNOME NG",
+  "description": "3D structures of chromatin from ChIA-PET loops, Hi-C contacts and structural variants.",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "theme_color": "#2A78D6",
+  "background_color": "#FCFCFB",
+  "display": "browser"
+}

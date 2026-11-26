@@ -29,6 +29,9 @@ SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPUS=0,1 WORKERS_PER_GPU=2 \
   SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
 ```
 
+`PUBLIC_URL=https://host` gives the pages their canonical links and the site its sitemap,
+`https://host/new/sitemap.xml` for this site. Submit that address to a search engine once.
+
 `SITE_ROOT` holds two directories. The container reads `data/` and does not write it. It writes
 `results/` as `SITE_USER` and the JAX and Numba caches go there too. The port is bound to the
 loopback of the host, for a proxy on the host. A job that waits in the queue is lost when the

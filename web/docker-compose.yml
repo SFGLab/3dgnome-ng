@@ -15,6 +15,7 @@ services:
     environment:
       QUEUE: rq
       BASE_PATH: "${BASE_PATH:-}"
+      PUBLIC_URL: "${PUBLIC_URL:-}"
       REDIS_URL: redis://redis:6379/0
       RETENTION_DAYS: "${RETENTION_DAYS:-14}"
     volumes:

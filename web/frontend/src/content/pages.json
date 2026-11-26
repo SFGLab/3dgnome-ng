@@ -1,0 +1,45 @@
+{
+  "site": "3D-GNOMEᴺᴳ",
+  "plain": "3D-GNOME NG",
+  "pages": {
+    "": {
+      "title": "3D-GNOMEᴺᴳ, 3D chromatin structure from ChIA-PET loops and Hi-C",
+      "description": "3D-GNOME NG is a free web server that computes ensembles of 3D structures of genomic regions up to 20 Mb from CTCF and RNAPII loops, Hi-C contacts and structural variants."
+    },
+    "model": {
+      "title": "Model a region",
+      "description": "Choose a cell type, a region, the loops and a person's structural variants, then build an ensemble of 3D chromatin structures with 3D-GNOME NG."
+    },
+    "examples": {
+      "title": "Examples",
+      "description": "Finished 3D-GNOME NG jobs to open, among them the TNFRSF8 locus with CTCF and RNAPII loops, the GSTM1 deletion and VPS13D in two cell lines."
+    },
+    "method": {
+      "title": "Method",
+      "description": "The method of 3D-GNOME NG, from chromatin loops and a contact map to an ensemble of 3D structures, with its target distances, anchor phase, chain phase and validation."
+    },
+    "results": {
+      "title": "Results",
+      "description": "Agreement of 3D-GNOME NG models with Hi-C and Micro-C in GM12878, H1ESC and HFFc6, the effect of RNAPII loops, a comparison with cudaMMC and MultiMM and the runtime."
+    },
+    "help": {
+      "title": "Help",
+      "description": "A tutorial with sample output, the input formats with sample files, the hosted structural variant sets, a guide to the results and the way to run 3D-GNOME NG on your own computer."
+    },
+    "cite": {
+      "title": "Cite",
+      "description": "The papers and the data sources to cite for structures, figures and data made with 3D-GNOME NG."
+    },
+    "privacy": {
+      "title": "Privacy notice",
+      "description": "The data that the 3D-GNOME NG server stores and for how long, with your rights under the GDPR. The site sets no cookies and does no tracking."
+    },
+    "jobs": {
+      "title": "My jobs",
+      "description": "The jobs started from this browser.",
+      "private": true
+    }
+  },
+  "job": { "title": "Job", "private": true },
+  "missing": { "title": "Page not found", "private": true }
+}
