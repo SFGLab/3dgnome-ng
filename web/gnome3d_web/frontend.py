@@ -132,7 +132,8 @@ def serve(app: FastAPI, site: Site) -> None:
     async def keep_out_of_the_index(request: Request, call_next: Any) -> Response:
         """Asks a search engine not to index the answers of the API and the files of a job."""
         response = await call_next(request)
-        path = request.url.path.lstrip("/")
+        # This step is outside the one that takes the base path off an address.
+        path = request.url.path.removeprefix(s.base_path).lstrip("/")
         if path.startswith("api/") or re.match(r"(jobs|p)/[^/]+", path):
             response.headers["X-Robots-Tag"] = "noindex"
         return response

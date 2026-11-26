@@ -100,6 +100,8 @@ def test_a_site_under_a_base_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     text = c.get("/new/help").text
     assert '<link rel="canonical" href="https://example.org/new/help">' in text, "the canonical link has the base path"
     assert "<loc>https://example.org/new/</loc>" in c.get("/new/sitemap.xml").text, "the sitemap has the base path"
+    assert c.get("/new/api/catalog").headers["X-Robots-Tag"] == "noindex", "an answer of the API under the base path is not indexed"
+    assert "X-Robots-Tag" not in c.get("/new/help").headers, "a page of the app under the base path carries no such header"
 
 
 def test_a_site_without_a_public_address(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
