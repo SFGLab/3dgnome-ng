@@ -2,7 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { reloadOnStaleBuild } from './lib/staleBuild'
 import './styles/base.css'
+
+reloadOnStaleBuild(window)
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } })
 

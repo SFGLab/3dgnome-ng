@@ -104,6 +104,10 @@ running the app. The app sets the title of the tab from the same file on every c
 shared link. `og.png` is the top 1200 by 630 pixels of the title page. Make it again after a change of that
 page.
 
+A deployment replaces the scripts of the build. A tab that was open before it asks for the script of a page
+by the name of the older build and gets a 404, as the page of a job does on its first visit. The app then
+loads itself anew once, `src/lib/staleBuild.ts`, and the reader is on the new build.
+
 The text is set in IBM Plex Sans, served by the site from `@fontsource/ibm-plex-sans`. Code is in JetBrains
 Mono. IBM Plex Sans has no weight above 700.
 
