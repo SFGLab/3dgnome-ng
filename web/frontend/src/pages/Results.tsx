@@ -240,15 +240,15 @@ export function Results() {
           <figure className="bar-chart" aria-label="Comparison over 21 runs">
             <figcaption>
               <span className="chart-title">Comparison over 21 runs</span>
-              <span className="chart-sub">Each of the three cell lines was modelled on three regions of 5 Mb, three regions of 20 Mb and chr1:1-60 Mb. A tool counts as better in a run when the 95% bootstrap interval of the difference does not include zero. The stratum adjusted correlation counts contacts per pair of beads.</span>
+              <span className="chart-sub">Each of the three cell lines was modelled on three regions of 5 Mb, three regions of 20 Mb and chr1:1-60 Mb. A number counts the runs in which 3D-GNOMEᴺᴳ has the higher value. A difference is confirmed when its 95% bootstrap interval does not include zero. The stratum adjusted correlation counts contacts per pair of beads.</span>
             </figcaption>
             <div className={cn('stat')}>
               <span className={cn('stat-value')}>21 of 21</span>
-              <span className={cn('stat-label')}>runs with a higher Pearson correlation and a higher rank correlation with Hi-C for 3D-GNOMEᴺᴳ than for both other tools</span>
+              <span className={cn('stat-label')}>runs with a higher Pearson correlation and a higher rank correlation with Hi-C for 3D-GNOMEᴺᴳ than for both other tools. Every one of these differences is confirmed.</span>
             </div>
             <div className={cn('stat')}>
-              <span className={cn('stat-value')}>6 of 21</span>
-              <span className={cn('stat-label')}>runs with a higher stratum adjusted correlation for 3D-GNOMEᴺᴳ than for MultiMM. The count against cudaMMC is 13 of 21. Neither tool is better than 3D-GNOMEᴺᴳ in any run.</span>
+              <span className={cn('stat-value')}>19 of 21</span>
+              <span className={cn('stat-label')}>runs with a higher stratum adjusted correlation for 3D-GNOMEᴺᴳ than for MultiMM. Against cudaMMC the count is 20 of 21. The difference is confirmed in 6 of the runs against MultiMM and in 13 against cudaMMC. No difference in favour of another tool is confirmed.</span>
             </div>
           </figure>
         </div>
@@ -270,7 +270,7 @@ export function Results() {
           cudaMMC has beads at both ends of about a quarter of the Micro-C loops and this limits the share it places. MultiMM has beads at every loop. It places nearly as many loops as 3D-GNOMEᴺᴳ on GM12878 and a third as many on the other two cell lines. The share of loops placed is tested by 10,000 resamples of the loops and of the moved loops. The share of loops with beads is tested with an exact sign test over the loops.
         </p>
         <p className={cn('reading-note')}>
-          The p value beside the bar of a tool is that of its difference from 3D-GNOMEᴺᴳ, the bar marked reference. For the agreement with Hi-C it is from a paired block bootstrap, which resamples the bins of the region 1,000 times. A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ has the higher value against cudaMMC in eight and against MultiMM in seven. By the interval it is better than cudaMMC in four and better than MultiMM in one. On chr1:1-60 Mb it is better than both tools in every cell line.
+          The p value beside the bar of a tool is that of its difference from 3D-GNOMEᴺᴳ, the bar marked reference. For the agreement with Hi-C it is from a paired block bootstrap, which resamples the bins of the region 1,000 times. A region of 5 Mb has 200 bins of 25 kb, too few for the interval of the stratum adjusted correlation to separate the tools. On the nine runs of 5 Mb, 3D-GNOMEᴺᴳ has the higher value against both tools in all nine. The interval confirms six of them against cudaMMC and two against MultiMM. On the nine runs of 20 Mb it has the higher value against cudaMMC in eight and against MultiMM in seven, with four and one confirmed. On chr1:1-60 Mb the difference is confirmed against both tools in every cell line.
         </p>
       </section>
       <section id="runtime">

@@ -282,8 +282,10 @@ the bead counts of its two bins and prints a two sided p value.
 | chr1 1 to 60 Mb, three structures, 3 runs | MultiMM | 3 | 3 |
 | chr1 1 to 60 Mb, three structures, 3 runs | cudaMMC | 3 | 3 |
 
-Over the 21 runs the uniform chain is better than MultiMM in 6 and better than cudaMMC in 13 by the interval.
-No run is lost to another tool. On chr1 1 to 60 Mb at ten structures the SCC per bead pair is 0.472, 0.349 and
+Over the 21 runs the uniform chain has the higher value than MultiMM in 19 and than cudaMMC in 20. By the
+interval it is better than MultiMM in 6 and better than cudaMMC in 13. No run is lost to another tool by the
+interval. The Results page states the 19 and the 20 with the 6 and the 13 beside them since 2026-11-26. Its
+headline had the 6 alone before, under a label that said higher. On chr1 1 to 60 Mb at ten structures the SCC per bead pair is 0.472, 0.349 and
 0.454 for GM12878, H1ESC and HFFC6. cudaMMC has 0.269, 0.171 and 0.204 and MultiMM 0.297, 0.163 and 0.180. No
 resample of 1,000 has another tool ahead, p under 0.002.
 

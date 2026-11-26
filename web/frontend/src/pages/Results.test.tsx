@@ -79,7 +79,7 @@ describe('Results page', () => {
     expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' }))).toEqual(['0.27', '0.30', '0.47', '0.17', '0.16', '0.35', '0.20', '0.18', '0.45'])
     const runs = screen.getByRole('figure', { name: 'Comparison over 21 runs' })
     expect(within(runs).getByText('21 of 21')).toBeInTheDocument()
-    expect(within(runs).getByText('6 of 21')).toBeInTheDocument()
+    expect(within(runs).getByText('19 of 21')).toBeInTheDocument()
     expect(within(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' })).getAllByTestId('bar-p').map((el) => el.textContent)).toEqual(['p < 0.001', 'p = 0.21', 'reference', 'p < 0.001', 'p < 0.001', 'reference', 'p < 0.001', 'p < 0.001', 'reference'])
     expect(within(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' })).getAllByTestId('bar-p').map((el) => el.textContent)).toEqual(['p < 0.002', 'p < 0.002', 'reference', 'p < 0.002', 'p < 0.002', 'reference', 'p < 0.002', 'p < 0.002', 'reference'])
   })
