@@ -1,16 +1,16 @@
 #!/bin/bash
 # The scores of the arms of trace_arcs_ev.sh and trace_arcs_arm.sh on chr19 of a cell line against
 # half b, beside the two arms of the genome runs, the uniform chain with CTCF loops and with CTCF
-# and RNAPII loops. CELL is GM12878 unless given, and SCORES the folder of the tables, OUT/scores.
+# and RNAPII loops. CELL is GM12878 unless given. SCORES is the folder of the tables, OUT/scores.
 #
 #   DATA=~/gapfill-data OUT=~/3dgnome-gapfill/out/arcs_ev XU=~/xu/out/lr XUN=~/xun/out/lr \
 #     ARMS="base noev r133" bash slurm/ensemble/trace_arcs_ev_score.sh
 #
 # XU holds the genome runs with the loop dropout and XUN, when given, those without it.
-# Into OUT/scores: bands.txt, the SCC per bead pair by band of separation over every bin,
-# trace.txt, the same over the bins with beads in every arm with the classes of pairs 100 to
-# 500 kb apart, ends.txt, the distances of the ends of the loops with the overlaps, and
-# end_pairs.txt, the contacts of pairs of beads by the loop ends at them.
+# Four tables go to the folder of the scores. bands.txt has the SCC per bead pair by band of
+# separation over every bin. trace.txt has the same over the bins with beads in every arm, with
+# the classes of pairs 100 to 500 kb apart. ends.txt has the distances of the ends of the loops
+# with the overlaps. end_pairs.txt has the contacts of pairs of beads by the loop ends at them.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"

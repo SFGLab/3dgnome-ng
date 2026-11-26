@@ -1,5 +1,5 @@
 #!/bin/bash
-# One arm of a trace on one chromosome of a cell line: a config of slurm/ensemble with keys
+# One arm of a trace on one chromosome of a cell line, a config of slurm/ensemble with keys
 # changed, ten structures, on a workstation. CELL is GM12878 and CHROM chr19 unless given.
 #
 #   DATA=~/gapfill-data OUT=~/3dgnome-gapfill/out/arcs_ev bash slurm/ensemble/trace_arcs_arm.sh \
@@ -7,7 +7,8 @@
 #
 # The arguments are the name of the arm, the base config and the keys as section.key=value. The
 # structures go to OUT/lr/<CELL>_<name>/<CHROM> and a line to OUT/arms.log. A run that is there is
-# kept. REPO is the checkout that runs, the one of this script unless given. design/uniform-chain.md, the section on the pairs 100 to 500 kb apart.
+# kept. REPO is the checkout that runs, the one of this script unless given.
+# design/2026-11-25-rnapii-band.md has the trace.
 set -u
 cd "${REPO:-$(dirname "$0")/../..}"
 DATA="${DATA:-data}"

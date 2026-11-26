@@ -309,7 +309,7 @@ export const DATA_SOURCES: DataSource[] = [
   {
     data: 'Structural variants, HGDP, 911 samples', usedFor: 'variant structures',
     accessions: [{ id: 'HGDP structural variation', url: 'https://ngs.sanger.ac.uk/production/hgdp/hgdp_structural_variation/' }],
-    note: 'The calls of Manta genotyped with Graphtyper on GRCh38 that passed the filters of the project: 74,965 deletions, insertions, duplications and inversions. The genotypes are unphased. Insertions of unknown length are left out.',
+    note: 'The calls of Manta genotyped with Graphtyper on GRCh38 that passed the filters of the project, 74,965 deletions, insertions, duplications and inversions. The genotypes are unphased and insertions of unknown length are left out.',
     label: 'Almarri et al., Cell 2020', ref: 'hgdpsv2020',
   },
   {

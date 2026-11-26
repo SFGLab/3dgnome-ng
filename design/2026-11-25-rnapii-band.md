@@ -62,7 +62,7 @@ length. The three values of a cell are GM12878, H1 and HFFc6.
 | 100 to 500 kb | 0.348, 0.307, 0.390 | 0.283, 0.284, 0.283 |
 | 0.5 to 2 Mb | 0.147, 0.123, 0.203 | 0.137, 0.110, 0.146 |
 
-At 25 kb the gain under 100 kb and the loss beyond it cancel, which is the p of 0.5 on the Results page. The
+At 25 kb the gain under 100 kb and the loss beyond it cancel. The Results page shows this as a p of 0.5. The
 loss grows with the density of RNAPII loops of a chromosome, rank correlation -0.80 to -0.84. chr17 and
 chr19 lose the most.
 
@@ -173,7 +173,7 @@ chain beads at the same separation, 0.25 % against 0.38 %.
 
 The strength of a loop is counted twice. The dropout turns the strength into the share of structures that hold
 the loop. The loop target turns the same strength into the distance of the loop in those structures. A typical
-loop is in half of the structures and is held halfway to the background in them. Its two ends are never held in
+loop is in half of the structures and is held halfway to the background in them. Its two ends are not held in
 contact.
 
 A node touches other nodes less often than a chain bead touches a chain bead. Two RNAPII ends without a loop

@@ -3,14 +3,14 @@
     python web/scripts/make_hgdp_sv_set.py HGDP.metadata RAW_DIR OUT.vcf OUT.samples.tsv \\
         del.manta.vcf.gz ins.manta.vcf.gz dup.manta.vcf.gz inv.manta.vcf.gz
 
-The inputs are the files of Almarri et al., Cell 2020, under
-https://ngs.sanger.ac.uk/production/hgdp/hgdp_structural_variation/: the metadata of the samples
-and the calls of Manta genotyped with Graphtyper, one file a type, on GRCh38. RAW_DIR holds the
-files of `SV_CALLSET/RAW/`, the calls before the filters, one file a chromosome.
+The inputs are files of Almarri et al., Cell 2020, under
+https://ngs.sanger.ac.uk/production/hgdp/hgdp_structural_variation/. They are the metadata of the
+samples and the calls of Manta genotyped with Graphtyper, one file a type, on GRCh38. RAW_DIR
+holds the files of `SV_CALLSET/RAW/`, the calls before the filters, one file a chromosome.
 
-A record of those files has its type and its size in the ALT field, `<DEL:SVSIZE=54:AGGREGATED>`,
-and no INFO. The site reads SVTYPE with END or SVLEN from INFO. This script writes one sorted VCF
-with those fields and the genotype alone:
+A record of those files has no INFO. Its type and its size are in the ALT field, as in
+`<DEL:SVSIZE=54:AGGREGATED>`. The site reads SVTYPE with END or SVLEN from INFO. This script writes
+one sorted VCF with those fields and the genotype alone, by these rules.
 
 - A record is kept when its FILTER is PASS and a sample carries it.
 - A genotype is kept when its own filter, FT, is PASS. Any other genotype is written as missing.
@@ -19,15 +19,15 @@ with those fields and the genotype alone:
   minus the size to POS. Two inversions with one span are one record, the one of the higher QUAL.
 - An insertion with a known sequence gets that sequence as its ALT allele. The files by type hold
   no sequence. The raw calls have it in the field SEQ of the record with the same ID. They cover
-  chromosomes 1 to 22, and an insertion without a raw record keeps its size alone.
-- An insertion of unknown length is left out. The raw calls give its two flanks and the least
-  size, `SVSIZE=435+`, and the files by type have it as `<INS:SVSIZE=435::AGGREGATED>`.
+  chromosomes 1 to 22. An insertion without a raw record keeps its size alone.
+- An insertion of unknown length is left out. The raw calls give its two flanks and its least
+  size, `SVSIZE=435+`. The files by type have it as `<INS:SVSIZE=435::AGGREGATED>`.
 - A column is the accession of a sample at ENA or, for the 120 samples that SGDP sequenced, the
-  name of its library. The metadata gives the names of the project, HGDP00129 for one.
+  name of its library. The metadata gives the ids of the project, HGDP00129 for one.
 
 The genotypes are unphased. OUT.vcf is plain text, for bgzip and tabix. OUT.samples.tsv is the
-table of the samples for `add_sample_table.py`: sample, sex, population, superpopulation, father
-and mother, the last two empty.
+table of the samples for `add_sample_table.py`. Its columns are sample, sex, population,
+superpopulation, father and mother, the last two empty.
 """
 
 from __future__ import annotations
@@ -114,8 +114,8 @@ def genotypes(fields: list[str], ft: int) -> tuple[list[str], bool]:
 
 
 def convert(paths: list[Path], names: dict[str, str], sequences: dict[str, str]) -> tuple[list[str], dict[str, list[tuple[int, int, str, float, str]]], dict[str, int]]:
-    """Returns the sample names in the order of the columns, the records by chromosome as position,
-    end, type, QUAL and line, and the counts that the script prints."""
+    """Returns the sample ids in the order of the columns, the records by chromosome as position,
+    end, type, QUAL and line. Also returns the counts that the script prints."""
     samples: list[str] = []
     records: dict[str, list[tuple[int, int, str, float, str]]] = {c: [] for c in CHROMS}
     counts = {"read": 0, "not PASS": 0, "insertion of unknown length": 0, "insertion kept without a sequence": 0, "no carrier with a PASS genotype": 0, "other chromosome": 0, "kept": 0}

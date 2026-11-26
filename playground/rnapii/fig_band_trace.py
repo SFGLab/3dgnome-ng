@@ -4,7 +4,7 @@
 
 GENOME_DIR holds `<LINE>_<chrom>.json` of `band_trace.py` over the two arms of the genome runs.
 CHR19_DIR holds `trace.json` and `end_pairs.json` of `slurm/ensemble/trace_arcs_ev_score.sh`.
-Three figures go to OUT_DIR: `band_problem`, `band_pairs` and `band_arms`, as png and pdf.
+The three figures `band_problem`, `band_pairs` and `band_arms` go to OUT_DIR as png and pdf.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ CLASS_LABEL = {
     "no RNAPII anchor": "no RNAPII\nanchor",
 }
 SIZES = dict(zip([f"chr{i}" for i in range(1, 23)], [248956422, 242193529, 198295559, 190214555, 181538259, 170805979, 159345973, 145138636, 138394717, 133797422, 135086622, 133275309, 114364328, 107043718, 101991189, 90338345, 83257441, 80373285, 58617616, 64444167, 46709983, 50818468], strict=True))
-# The arms of chr19 in the order of the figure: key of the scores, label, colour.
+# The arms of chr19 in the order of the figure, each with the key of its scores, its label and its colour.
 ARMS = (
     ("ctcf", "CTCF loops", CTCF),
     ("contactC", "CTCF loops, a kept loop at one bead", CTCF),

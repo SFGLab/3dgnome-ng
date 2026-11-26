@@ -392,7 +392,7 @@ chr1 1 to 60 Mb, ten structures a tool, against half b. The three values are GM1
 
 The scores by the distance are the stratum adjusted correlation of minus the mean distance of two bins with
 the balanced counts at 10 kb, on the bins where every tool has beads, `playground/rnapii/band_trace.py`. A
-contact is two beads within 1.33 bonds, which is 8.5 percent of the pairs 100 to 500 kb apart for FLAMINGO and
+contact is two beads within 1.33 bonds. That is 8.5 percent of the pairs 100 to 500 kb apart for FLAMINGO and
 0.6 percent for the uniform chain. The distance reads no radius.
 
 - FLAMINGO is level with the uniform chain or above it under 500 kb and below it beyond. On nine runs of 5 Mb

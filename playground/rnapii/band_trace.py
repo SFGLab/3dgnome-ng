@@ -1,11 +1,11 @@
-"""The agreement of a band of separation on the bins that every arm has beads in, and its classes of pairs.
+"""The agreement of a band of separation on the bins where every arm has beads, with its classes of pairs.
 
     python playground/rnapii/band_trace.py MCOOL CHROM CTCF.bedpe RNAPII.bedpe OUT.json [NAME=]ARM_DIR [[NAME=]ARM_DIR ...]
 
-`short_range_scc.py` scores every bin of a chromosome, and a bin without beads holds zero contacts
-there. Two arms with different loops have beads in different bins: the uniform chain covers the
-blocks of its loops. This script reads the same pooled contacts per bead pair at 10 kb and prints,
-for each arm:
+`short_range_scc.py` scores every bin of a chromosome. A bin without beads holds zero contacts
+there. Two arms with different loops have beads in different bins, since the uniform chain covers
+the blocks of its loops. This script reads the same pooled contacts per bead pair at 10 kb and
+prints these for each arm.
 
 - the number of bins with beads and the stratum adjusted correlation of three bands of separation
   against the raw and the balanced map, over every bin, over the bins with beads in every arm and
@@ -15,8 +15,8 @@ for each arm:
   for a tool with another chain. The distance reads no radius,
 - the rank correlation of that distance with the counts over every pair up to 2 Mb apart, with the
   separation kept, the score that a fit of distances to a Hi-C map is built for,
-- for the pairs 100 to 500 kb apart with beads in every arm, by the classes of `band_pairs.py`: the
-  contacts per 1,000 pairs of beads of a structure, the mean contact over the mean of its
+- for the pairs 100 to 500 kb apart with beads in every arm, by the classes of `band_pairs.py`,
+  the contacts per 1,000 pairs of beads of a structure and the mean contact over the mean of its
   separation, beside the same ratio of the raw and of the balanced map. The pooled count of a cell
   over the product of the pooled bead counts of its two bins is the share of a structure over the
   number of structures.

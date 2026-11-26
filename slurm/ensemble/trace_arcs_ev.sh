@@ -1,7 +1,7 @@
 #!/bin/bash
-# The uniform chain with CTCF and RNAPII loops on chr19 of GM12878 without the excluded volume of
-# the arcs stage, and with its radius at the contact radius, on a workstation, one run after
-# another. design/uniform-chain.md, the section on RNAPII loops and the agreement at 25 kb.
+# The uniform chain with CTCF and RNAPII loops on chr19 of GM12878 in two arms, without the
+# excluded volume of the arcs stage and with its radius at the contact radius. The arms run on a
+# workstation, one after another. design/uniform-chain.md, the section on RNAPII loops and the agreement at 25 kb.
 #
 #   DATA=~/gapfill-data OUT=~/3dgnome-gapfill/out/arcs_ev bash slurm/ensemble/trace_arcs_ev.sh
 #

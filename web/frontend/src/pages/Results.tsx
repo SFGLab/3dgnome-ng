@@ -163,7 +163,7 @@ export function Results() {
         ))}
       </div>
       <p className={cn('reading-note')}>
-        The stratum adjusted correlation is the measure of HiCRep (<a href={HICREP}>Yang et al., Genome Research 2017</a>). It compares pairs of bins the same distance apart. The fall of contacts with distance adds nothing to it. The <a href="#measures">Measures</a> section has its formula and those of the other numbers of this page.
+        The stratum adjusted correlation is the measure of HiCRep, <a href={HICREP}>Yang et al., Genome Research 2017</a>. It compares pairs of bins the same distance apart, while the fall of contacts with distance adds nothing to it. The <a href="#measures">Measures</a> section has its formula and those of the other numbers of this page.
       </p>
       <p className={cn('reading-note')}>
         The contact map of a model is the sum of the contacts of its ten structures. The count of a cell of this map is divided by the number of bead pairs of its two bins. Without the division a bin with more beads has more contacts, wherever the beads are. Both chains have beads only on the stretches that loops cover. On these stretches the chain of one bead per kilobase has 25 beads in a bin of 25 kb. The chain of loop anchors has between 1 and 68 beads there, 14 in the median. It has more of them where Hi-C has more reads. The rank correlation between the number of beads of a bin and its Hi-C reads is 0.27 to 0.53 in the three cell lines for this chain and under 0.05 for the other. The undivided count of the chain of loop anchors therefore agrees with Hi-C through the number of beads alone. On GM12878 at 25 kb it scores 0.53 undivided and 0.41 per pair of beads. The chain of one bead per kilobase scores 0.50 and 0.49.
@@ -332,7 +332,7 @@ export function Results() {
           <Equation name="m_scc" />
         </div>
         <p className={cn('reading-note')}>
-          This is the measure of HiCRep (<a href={HICREP}>Yang et al., Genome Research 2017</a>). The pairs of bins that are <var>d</var> bins apart form one stratum. <var>r</var> is the Pearson correlation between the contacts per pair of beads <var>c</var> and the Hi-C counts <var>h</var> over the <var>N</var> pairs of the stratum. A stratum is weighted by its number of pairs and by the standard deviations of the two maps in it. The strata run from one bin to 2 Mb on the charts of chromosomes 1 to 22 and over the whole region on the charts of the other tools. The Hi-C counts are the raw counts of the half of the map that no model read. The maps are not smoothed.
+          This is the measure of HiCRep, <a href={HICREP}>Yang et al., Genome Research 2017</a>. The pairs of bins that are <var>d</var> bins apart form one stratum. <var>r</var> is the Pearson correlation between the contacts per pair of beads <var>c</var> and the Hi-C counts <var>h</var> over the <var>N</var> pairs of the stratum. A stratum is weighted by its number of pairs and by the standard deviations of the two maps in it. The strata run from one bin to 2 Mb on the charts of chromosomes 1 to 22 and over the whole region on the charts of the other tools. The Hi-C counts are the raw counts of the half of the map that no model read. The maps are not smoothed.
         </p>
         <h3 className={cn('sub-head')}>Enhancer to promoter distance</h3>
         <div className="equations">
@@ -354,7 +354,7 @@ export function Results() {
           <Equation name="m_placed" />
         </div>
         <p className={cn('reading-note')}>
-          The numerator of the first formula is the mean 3D distance between the two bins of loop <var>l</var> over the structures. The denominator is the median of the same distance over the control pairs of the loop. A control pair is the two bins of the loop shifted together by 3 to 10 bins along the diagonal, which keeps the genomic separation. A loop is placed when its two ends are at least a fifth closer than the median control. A moved loop is a loop shifted by 30 bins, to a place where no loop was called. The share of moved loops that a model places is the rate at which a pair without a loop passes the threshold.
+          The numerator of the first formula is the mean 3D distance between the two bins of loop <var>l</var> over the structures. The denominator is the median of the same distance over the control pairs of the loop. A control pair is the two bins of the loop shifted together by 3 to 10 bins along the diagonal. The shift keeps the genomic separation. A loop is placed when its two ends are at least a fifth closer than the median control. A moved loop is a loop shifted by 30 bins, to a place where no loop was called. The share of moved loops that a model places is the rate at which a pair without a loop passes the threshold.
         </p>
       </section>
     </DocPage>

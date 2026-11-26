@@ -195,7 +195,7 @@ sup.ng {
   color: var(--accent);
 }
 
-/* A symbol of a formula named in a sentence. The slant of its last letter reaches into the space
+/* A symbol of a formula inside a sentence. The slant of its last letter reaches into the space
    after it. */
 var {
   padding-right: 0.12em;

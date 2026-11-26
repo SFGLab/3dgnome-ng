@@ -3,15 +3,17 @@
     python playground/rnapii/end_pair_contacts.py CHROM CTCF.bedpe RNAPII.bedpe OUT.json [NAME=]ARM_DIR [[NAME=]ARM_DIR ...]
 
 A bead is an RNAPII end when it is the bead nearest the middle of an anchor of an RNAPII loop,
-within 3 kb, a CTCF end the same for a CTCF loop, and a chain bead otherwise. The pairs are the
-RNAPII loops of the band, the CTCF loops of the band, every pair of two RNAPII ends of the band
-that no loop joins, and random pairs of an RNAPII end with a chain bead and of two chain beads at
-the separations of the pairs of ends. The positions of a pair are fixed over the structures of an
-arm and of every arm, and a pair counts in a structure that has a bead at both.
+within 3 kb. A CTCF end is the same for a CTCF loop. Every other bead is a chain bead. The sets
+of pairs are the RNAPII loops of the band, the CTCF loops of the band, every pair of two RNAPII
+ends of the band that no loop joins, random pairs of an RNAPII end with a chain bead and random
+pairs of two chain beads. The random pairs have the separations of the pairs of ends. The
+positions of a pair are fixed over the structures of every arm. A pair counts in a structure
+that has a bead at both positions.
 
-Per arm and set: the pairs, the share within 1.33 bonds, the contact radius of the scores, within
-2 and within 3, the median distance in bonds and the spread of a pair over the structures, the
-median over the pairs of the standard deviation of the distance over its mean. The last line of an
+The script prints these per arm and set. The pairs, the share within 1.33 bonds, the contact
+radius of the scores, the shares within 2 and within 3, the median distance in bonds and the
+spread of a pair over the structures. The spread is the median over the pairs of the standard
+deviation of the distance over its mean. The last line of an
 arm is the distance of consecutive RNAPII ends along the chain and the kilobases between them.
 """
 

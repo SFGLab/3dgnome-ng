@@ -11,8 +11,9 @@ the loops of the two factors and prints, per class, what the map and the two arm
 - `two RNAPII anchors`: each bin holds an end of an RNAPII loop and no loop joins the two.
 - `one RNAPII anchor` and `no RNAPII anchor`: the rest.
 
-Per class: the number of pairs, the mean contact over the mean of its separation in the map and in
-each arm, and the part of the correlation of each arm that the pairs of the class carry. The
+Per class the script prints the number of pairs, the mean contact over the mean of its separation
+in the map and in each arm. It also prints the part of the correlation of each arm that the pairs
+of the class carry. The
 correlation of the band is the sum over its pairs of the products of the two deviations from the
 mean of the separation, over the sum over separations of the count times the two standard
 deviations, as `_scc` has it. The parts of the classes sum to it. The last column is the part of
